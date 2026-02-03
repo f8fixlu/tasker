@@ -14,32 +14,9 @@ pdfMake.vfs = pdfFonts;
 import * as pdfjsLib from 'pdfjs-dist';
 import { GlobalWorkerOptions } from 'pdfjs-dist';
 GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip as ChartTooltip,
-  Legend as ChartLegend,
-  ArcElement,
-  Filler
-} from 'chart.js';
-import { Line, Pie } from 'react-chartjs-2';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  ChartTooltip,
-  ChartLegend,
-  ArcElement,
-  Filler
-);
+// Dynamically import chart components for code splitting
+const ChartSection = React.lazy(() => import('../components/charts'));
 
 // Create a custom hook for outside click detection
 const useOutsideClick = (ref, callback) => {
@@ -450,22 +427,15 @@ const Reports = () => {
     // Add charts if enabled
     if (printSections.charts) {
       staticContent.push(
-        <div key="charts" className="chart-section p-4 border border-gray-200 rounded mb-8">
-          <h2 className="font-bold mb-3">PERFORMANCE CHARTS</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-gray-50 p-4 rounded">
-              <h3 className="text-center font-medium mb-2">Task Completion Rate</h3>
-              <div className="h-64">
-                <Line data={taskCompletionData} options={lineChartOptions} />
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded">
-              <h3 className="text-center font-medium mb-2">Activity Breakdown</h3>
-              <div className="h-64">
-                <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
-              </div>
-            </div>
-          </div>
+        <div key="charts">
+          <Suspense fallback={<div>Loading charts...</div>}>
+            <ChartSection
+              taskCompletionData={taskCompletionData}
+              activityBreakdownChartData={activityBreakdownChartData}
+              lineChartOptions={lineChartOptions}
+              pieChartOptions={pieChartOptions}
+            />
+          </Suspense>
         </div>
       );
     }
@@ -2141,37 +2111,14 @@ const generatePDF = async () => {
           {/* Combined chart card for Task Completion Rate and Activity Breakdown */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-4">Performance Overview</h2>
-            <div className="space-y-2 sm:space-y-4">
-              <div className="h-56 sm:h-64">
-                <h3 className="text-lg font-medium text-[#617589] dark:text-gray-400 mb-2 text-left">Task Completion Rate</h3>
-                <div className="h-full">
-                  <div className="h-full flex justify-start">
-                    <Line data={taskCompletionData} options={lineChartOptions} />
-                  </div>
-                </div>
-              </div>
-              <div className="h-64 sm:h-72">
-                <h3 className="text-lg font-medium text-[#617589] dark:text-gray-400 mb-2 text-left">Activity Breakdown</h3>
-                <div className="h-full">
-                  <div className="h-full flex items-center flex-col sm:flex-row">
-                    <div className="w-full sm:w-2/3 h-40 sm:h-56 flex items-center justify-start">
-                      <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
-                    </div>
-                    <div className="w-full sm:w-1/3 flex flex-col items-start justify-center pl-0 sm:pl-4 mt-2 sm:mt-0">
-                      {activityBreakdownChartData.labels.map((label, index) => (
-                        <div key={label} className="flex items-center my-1">
-                          <div
-                            className="w-3 h-3 mr-2 rounded-full"
-                            style={{ backgroundColor: activityBreakdownChartData.datasets[0].backgroundColor[index] }}
-                          ></div>
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Suspense fallback={<div className="p-4 text-center">Loading charts...</div>}>
+              <ChartSection
+                taskCompletionData={taskCompletionData}
+                activityBreakdownChartData={activityBreakdownChartData}
+                lineChartOptions={lineChartOptions}
+                pieChartOptions={pieChartOptions}
+              />
+            </Suspense>
           </div>
 
           {/* Task List Card */}
