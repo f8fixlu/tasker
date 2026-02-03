@@ -25,10 +25,6 @@
     "concurrently": "^8.0.1"
   },
   "dependencies": {
-    "chart.js": "^4.5.1",
-    "pdfjs-dist": "^5.4.394",
-    "pdfmake": "^0.2.20",
-    "react-chartjs-2": "^5.3.1",
     "sharp": "^0.34.5",
     "sqlite3": "^5.1.7",
     "to-ico": "^1.1.5"

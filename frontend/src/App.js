@@ -17,6 +17,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Preload critical routes when user is authenticated
 const preloadDashboard = () => import('./pages/Dashboard');
@@ -161,6 +162,18 @@ function App() {
                         </div>
                       }>
                         <ResetPassword />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="*"
+                    element={
+                      <Suspense fallback={
+                        <div className="flex justify-center items-center h-screen">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                        </div>
+                      }>
+                        <NotFound />
                       </Suspense>
                     }
                   />

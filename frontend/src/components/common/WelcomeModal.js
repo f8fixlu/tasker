@@ -92,16 +92,16 @@ const WelcomeModal = ({ user, isOpen, onClose }) => {
               disabled={currentStep === 0}
               className={`flex-1 py-2 px-4 rounded-md ${
                 currentStep === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600`}
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
             >
               Previous
             </button>
-            
+
             <button
               onClick={handleNext}
-              className="flex-1 py-2 px-4 bg-primary text-white rounded-md hover:bg-primary-dark"
+              className="flex-1 py-2 px-4 bg-primary text-white rounded-md hover:bg-primary-dark dark:bg-primary-600 dark:hover:bg-primary-700"
             >
               {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
             </button>

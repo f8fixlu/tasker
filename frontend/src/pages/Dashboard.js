@@ -583,8 +583,8 @@ const Dashboard = () => {
         onClose={() => setShowWelcomeModal(false)}
       />
 
-      {/* Today box moved to appear first when hamburger menu is visible (mobile/tablet) */}
-      <div className="md:hidden bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+      {/* Today box moved to appear first on screens <1024px */}
+      <div className="lg:hidden bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
             <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>
@@ -690,7 +690,7 @@ const Dashboard = () => {
         </div>
 
         <div className="flex flex-col gap-4 sm:gap-6">
-          <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden md:block">
+          <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden lg:block">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>

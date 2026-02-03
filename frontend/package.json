@@ -27,6 +27,7 @@
   "scripts": {
     "start": "react-app-rewired start",
     "build": "react-app-rewired build && node optimize-css.js",
+    "build:prod": "cross-env NODE_ENV=production REACT_APP_API_URL=https://backend.f8fixlu.biz/api react-app-rewired build && node optimize-css.js",
     "analyze": "ANALYZE_BUNDLE=true react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
@@ -58,6 +59,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^13.4.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "eslint": "^9.38.0",
     "jest-environment-jsdom": "^30.2.0",
     "nodemon": "^3.1.11",

@@ -270,8 +270,8 @@ const Header = () => {
             </div>
           )}
         </div>
-        {/* Show profile picture and dropdown only on desktop, hide on mobile */}
-        <div className="relative sm:hidden md:block lg:block" ref={profileRef}>
+        {/* Show profile picture and dropdown only on desktop/tablet, hide on mobile */}
+        <div className="relative hidden sm:hidden md:block lg:block xl:block" ref={profileRef}>
           {user?.profile_image_url ? (
             <button
               className="bg-center bg-no-repeat bg-cover bg-origin-padding rounded-full size-6 sm:size-7 flex items-center justify-center"
