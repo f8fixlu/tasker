@@ -1,0 +1,36 @@
+{
+  "name": "tasker",
+  "version": "1.0.0",
+  "description": "Task management application with calendar, reports, and notifications",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "test": "cd backend && npm test && cd ../frontend && npm test"
+  },
+  "keywords": [
+    "tasker",
+    "task-management",
+    "calendar",
+    "productivity"
+  ],
+  "author": "Tasker Development Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "pdfjs-dist": "^5.4.394",
+    "pdfmake": "^0.2.20",
+    "react-chartjs-2": "^5.3.1",
+    "sharp": "^0.34.5",
+    "sqlite3": "^5.1.7",
+    "to-ico": "^1.1.5"
+  }
+}

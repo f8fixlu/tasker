@@ -1,0 +1,31 @@
+/* Preload Material Symbols font for offline use */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  src: url('./fonts/MaterialSymbolsOutlined.woff2') format('woff2');
+  /* Fallback to CDN if local file not available */
+  src: url('https://fonts.gstatic.com/s/materialsymbolsoutlined/v146/kJEhBvYX7BgnkSrXjY6btxo_.woff2') format('woff2');
+  font-display: swap; /* Ensure text remains visible during font load */
+  ascent-override: 95%; /* Font metric override to reduce layout shift */
+  descent-override: 23.333333333333332%; /* Font metric override to reduce layout shift */
+  line-gap-override: 0%; /* Font metric override to reduce layout shift */
+  size-adjust: 100%; /* Font metric override to reduce layout shift */
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,71 @@
+{
+  "name": "tasker-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "proxy": "http://localhost:5000",
+  "homepage": "/",
+  "dependencies": {
+    "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.19",
+    "axios": "^1.12.2",
+    "chart.js": "^4.5.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^7.2.0",
+    "morgan": "^1.10.1",
+    "prop-types": "^15.8.1",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.1",
+    "react-scripts": "^5.0.1"
+  },
+  "scripts": {
+    "start": "react-app-rewired start",
+    "build": "react-app-rewired build && node optimize-css.js",
+    "analyze": "ANALYZE_BUNDLE=true react-app-rewired build",
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject",
+    "server": "node server.js",
+    "prod": "set NODE_ENV=production && node server.js",
+    "prod-unix": "NODE_ENV=production node server.js",
+    "dev-server": "nodemon server.js",
+    "optimize-css": "node optimize-css.js"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^13.4.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.38.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "react-app-rewired": "^2.2.1",
+    "tailwindcss": "^3.4.16",
+    "webpack": "^5.88.0",
+    "webpack-bundle-analyzer": "^5.2.0"
+  }
+}

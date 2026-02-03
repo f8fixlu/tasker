@@ -1,0 +1,14 @@
+[Unit]
+Description=Tasker Application (Frontend and Backend)
+After=network.target
+
+[Service]
+Type=forking
+User=pi
+ExecStart=/home/pi/apps/tasker/start-tasker.sh
+WorkingDirectory=/home/pi/apps/tasker
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
