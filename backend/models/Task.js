@@ -743,7 +743,8 @@ async function forceUpdateOverdueTasks() {
 
 // Get task statistics for dashboard
 async function getTaskStats(user_id, startDate = null, endDate = null, categoryFilters = null) {
-  let sql = `
+  // Main stats query
+  let mainSql = `
     SELECT
       COUNT(*) as total_tasks,
       SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_tasks,
@@ -754,9 +755,36 @@ async function getTaskStats(user_id, startDate = null, endDate = null, categoryF
     FROM tasks
     WHERE user_id = ?
   `;
-  let params = [user_id];
-  
-  // Add date range filtering if both start and end dates are provided
+  let mainParams = [user_id];
+
+  // Recent tasks query (tasks from the last 7 days)
+  let recentSql = `
+    SELECT COUNT(*) as recent_tasks
+    FROM tasks
+    WHERE user_id = ?
+    AND created_date >= datetime('now', '-7 days', 'localtime')
+  `;
+  let recentParams = [user_id];
+
+  // Tasks today query
+  let todaySql = `
+    SELECT COUNT(*) as tasks_today
+    FROM tasks
+    WHERE user_id = ?
+    AND DATE(created_date) = DATE('now', 'localtime')
+  `;
+  let todayParams = [user_id];
+
+  // Tasks this month query
+  let monthSql = `
+    SELECT COUNT(*) as tasks_this_month
+    FROM tasks
+    WHERE user_id = ?
+    AND strftime('%Y-%m', created_date) = strftime('%Y-%m', 'now', 'localtime')
+  `;
+  let monthParams = [user_id];
+
+  // Apply date range filtering if provided
   if (startDate && endDate) {
     // Format dates for SQLite comparison, ensuring proper comparison
     // The frontend sends dates in YYYY-MM-DD format, we want to include the entire end day
@@ -768,12 +796,27 @@ async function getTaskStats(user_id, startDate = null, endDate = null, categoryF
     const endDateBoundary = new Date(endDate);
     endDateBoundary.setHours(23, 59, 59, 999); // End of the end date
 
-    sql += ` AND (task_date >= ? AND task_date <= ?)`;
-    params.push(startDateBoundary.toISOString().slice(0, 19).replace('T', ' '),
-                endDateBoundary.toISOString().slice(0, 19).replace('T', ' '));
+    const dateCondition = `(task_date >= ? AND task_date <= ?)`;
+    mainSql += ` AND ${dateCondition}`;
+    mainParams.push(startDateBoundary.toISOString().slice(0, 19).replace('T', ' '),
+                   endDateBoundary.toISOString().slice(0, 19).replace('T', ' '));
+
+    // Also apply date range to today, month, and recent queries if needed
+    // For today/month/recent queries, we'll use the date range as a filter
+    todaySql += ` AND (created_date >= ? AND created_date <= ?)`;
+    todayParams.push(startDateBoundary.toISOString().slice(0, 19).replace('T', ' '),
+                     endDateBoundary.toISOString().slice(0, 19).replace('T', ' '));
+
+    monthSql += ` AND (created_date >= ? AND created_date <= ?)`;
+    monthParams.push(startDateBoundary.toISOString().slice(0, 19).replace('T', ' '),
+                     endDateBoundary.toISOString().slice(0, 19).replace('T', ' '));
+
+    recentSql += ` AND (created_date >= ? AND created_date <= ?)`;
+    recentParams.push(startDateBoundary.toISOString().slice(0, 19).replace('T', ' '),
+                      endDateBoundary.toISOString().slice(0, 19).replace('T', ' '));
   }
 
-  // Add category filtering
+  // Add category filtering to main query
   if (categoryFilters) {
     // Support both flat structure and nested structure {task: {...}}
     let selectedCategoryFilters;
@@ -805,22 +848,50 @@ async function getTaskStats(user_id, startDate = null, endDate = null, categoryF
       // If we have matching categories, filter by them
       if (categoryIds.length > 0) {
         const placeholders = categoryIds.map(() => '?').join(',');
-        sql += ` AND category_id IS NOT NULL AND category_id IN (${placeholders})`;
-        params.push(...categoryIds);
+        mainSql += ` AND category_id IS NOT NULL AND category_id IN (${placeholders})`;
+        mainParams.push(...categoryIds);
+
+        // Apply same category filter to other queries
+        todaySql += ` AND category_id IS NOT NULL AND category_id IN (${placeholders})`;
+        todayParams.push(...categoryIds);
+
+        monthSql += ` AND category_id IS NOT NULL AND category_id IN (${placeholders})`;
+        monthParams.push(...categoryIds);
+
+        recentSql += ` AND category_id IS NOT NULL AND category_id IN (${placeholders})`;
+        recentParams.push(...categoryIds);
       } else {
         // Check if all available categories are explicitly set to false
         const allFalse = categoryResults.every(cat => !selectedCategoryFilters[cat.name.toLowerCase()]);
         if (allFalse) {
           // If all selected categories are false, we want no results
-          sql += ` AND 1 = 0`; // This ensures no records match
+          mainSql += ` AND 1 = 0`; // This ensures no records match
+          todaySql += ` AND 1 = 0`;
+          monthSql += ` AND 1 = 0`;
+          recentSql += ` AND 1 = 0`;
         }
       }
     }
   }
-  
+
   try {
-    const stats = await getRow(sql, params);
-    return stats;
+    // Execute all queries in parallel for better performance
+    const [mainStats, todayStats, monthStats, recentStats] = await Promise.all([
+      getRow(mainSql, mainParams),
+      getRow(todaySql, todayParams),
+      getRow(monthSql, monthParams),
+      getRow(recentSql, recentParams)
+    ]);
+
+    // Combine all stats into a single object
+    const combinedStats = {
+      ...mainStats,
+      tasks_today: todayStats.tasks_today || 0,
+      tasks_this_month: monthStats.tasks_this_month || 0,
+      recent_tasks: recentStats.recent_tasks || 0
+    };
+
+    return combinedStats;
   } catch (error) {
     console.error('Error in getTaskStats:', error);
     throw new Error(`Error fetching task stats: ${error.message}`);

@@ -97,6 +97,9 @@ const Dashboard = () => {
         setStats(prev => ({
           ...prev,
           totalTasks: apiStats.total_tasks || 0,
+          recentTasks: apiStats.recent_tasks || 0,
+          tasksToday: apiStats.tasks_today || 0,
+          tasksThisMonth: apiStats.tasks_this_month || 0,
           completedTasks: apiStats.completed_tasks || 0,
           inProgressTasks: apiStats.in_progress_tasks || 0,
           pendingTasks: apiStats.pending_tasks || 0,
