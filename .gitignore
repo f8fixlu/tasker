@@ -64,8 +64,10 @@ temp/
 /backend/uploads/*
 !/backend/uploads/.gitkeep
 
-# Frontend build artifacts
+# Frontend and backend build artifacts
 frontend/build/
+backend/build/
+
 
 # System files
 .DS_Store
