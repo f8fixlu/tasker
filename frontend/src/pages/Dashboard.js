@@ -272,10 +272,10 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  // Initial data fetch
+  // Initial data fetch - only run on mount and when updateTrigger changes
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]); // Run once when component mounts
+  }, [fetchDashboardData, updateTrigger]); // Include updateTrigger to refresh when tasks change
 
   // Debounced refresh for task updates to prevent excessive API calls
   const debouncedRefresh = useCallback(
@@ -293,7 +293,10 @@ const Dashboard = () => {
 
   // Refresh dashboard data when task updates occur
   useEffect(() => {
-    debouncedRefresh();
+    // Only trigger refresh if updateTrigger is greater than 0 (meaning an actual update happened)
+    if (updateTrigger > 0) {
+      debouncedRefresh();
+    }
   }, [updateTrigger, debouncedRefresh]); // Run when updateTrigger changes
 
   // Memoize the transformed task data to prevent unnecessary recalculations
@@ -839,31 +842,31 @@ const Dashboard = () => {
                 <span className="font-bold text-success-600 dark:text-success-400">{stats.completedTasks}</span>
               </div>
               <div className="flex items-center justify-center">
-                
+
               </div>
               <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <span className="text-text-secondary-light dark:text-text-secondary-dark">In Progress</span>
                 <span className="font-bold text-warning-600 dark:text-warning-400">{stats.inProgressTasks}</span>
               </div>
-              
+
               <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <span className="text-text-secondary-light dark:text-text-secondary-dark">Pending</span>
                 <span className="font-bold text-danger-600 dark:text-danger-400">{stats.pendingTasks}</span>
               </div>
               <div className="flex items-center justify-center">
-                
+
               </div>
               <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <span className="text-text-secondary-light dark:text-text-secondary-dark">Overdue</span>
                 <span className="font-bold text-red-600 dark:text-red-400">{stats.overdueTasks}</span>
               </div>
-              
+
               <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <span className="text-text-secondary-light dark:text-text-secondary-dark">Archived</span>
                 <span className="font-bold text-gray-600 dark:text-gray-400">{stats.archivedTasks}</span>
               </div>
               <div className="flex items-center justify-center">
-                
+
               </div>
               <div className="p-2"></div>
             </div>
