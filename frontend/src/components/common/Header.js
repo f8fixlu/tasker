@@ -39,15 +39,10 @@ const Header = () => {
   const location = useLocation();
 
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
-  const toggleNotifications = async () => {
-    const newState = !isNotificationsOpen;
-    setIsNotificationsOpen(newState);
 
-    // Only fetch notifications when opening the dropdown if they haven't been refreshed recently
-    // (last 1 minute), to keep them current without over-fetching
-    if (newState && (Date.now() - lastFetchTime > 60000)) {
-      await fetchNotifications();
-    }
+  // Toggle notifications dropdown without fetching - show cached data instantly
+  const toggleNotifications = () => {
+    setIsNotificationsOpen(!isNotificationsOpen);
   };
 
   // Refresh notifications when tasks or events are updated
@@ -68,6 +63,8 @@ const Header = () => {
   }, [updateTrigger, fetchNotifications, lastFetchTime]);
 
   // Refresh notifications when notification updates occur (e.g., when marked as read)
+  // NOTE: This effect is kept for other notification update scenarios, but individual notification clicks
+  // now update the state directly without triggering a full refresh
   useEffect(() => {
     if (notificationUpdateTrigger) {
       const now = Date.now();
@@ -205,15 +202,12 @@ const Header = () => {
                 )}
               </div>
               <div className="divide-y divide-border-light dark:divide-border-dark max-h-96 overflow-y-auto scrollbar-hide">
-                {loading && (
-                  <div className="px-4 py-6 flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
-                )}
+                {/* Remove the loading spinner to prevent flickering */}
                 {error && (
                   <div className="px-4 py-3 text-sm text-red-500">Error loading notifications</div>
                 )}
-                {!loading && (!notifications || notifications.length === 0) && (
+                {/* Show notifications immediately from cache without loading state */}
+                {(!notifications || notifications.length === 0) && (
                   <div className="px-4 py-6 text-center text-sm text-text-light dark:text-text-dark">
                     <p>No notifications yet</p>
                     <p className="text-xs mt-1 text-text-secondary-light dark:text-text-secondary-dark">
@@ -221,13 +215,17 @@ const Header = () => {
                     </p>
                   </div>
                 )}
-                {!loading && notifications && notifications.slice(0, 5).map((notification) => (
+                {notifications && notifications.slice(0, 5).map((notification) => (
                   <a
                     key={notification.id}
-                    className={`block px-4 py-3 hover:bg-background-light dark:hover:bg-background-dark cursor-pointer ${!notification.is_read ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                    onClick={async () => {
-                      await markAsRead(notification.id);
-                      triggerNotificationUpdate(); // Trigger update to refresh the header
+                    className={`block px-4 py-3 hover:bg-background-light dark:hover:bg-background-dark ${!notification.is_read ? 'cursor-pointer bg-blue-50 dark:bg-blue-900/20' : 'cursor-default'}`}
+                    onClick={async (e) => {
+                      // Only allow click if the notification is not already read
+                      if (!notification.is_read) {
+                        e.stopPropagation(); // Prevent event bubbling
+                        await markAsRead(notification.id);
+                        // Don't trigger a full refresh since the notification is already updated in local state
+                      }
                     }}
                   >
                     <div className="flex justify-between">
