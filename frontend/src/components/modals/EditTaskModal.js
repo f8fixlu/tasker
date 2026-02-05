@@ -50,10 +50,10 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
   const [error, setError] = useState(null);
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' }); // type: 'info', 'success', 'error'
 
-  // Effect to handle loading options when modal opens
+  // Effect to handle loading options and task data when modal opens
   useEffect(() => {
-    const loadOptions = async () => {
-      if (isOpen) {
+    const loadData = async () => {
+      if (isOpen && task && task.id) {
         try {
           setLoading(true);
           setError(null);
@@ -121,28 +121,34 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             setAllSubTypes([]);
             setFilteredSubTypes([]);
           }
-        } catch (err) {
-          setError(err.message);
-          console.error('Error loading options:', err);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
 
-    loadOptions();
-  }, [isOpen]); // Only load options when modal opens/closes
-
-  // Effect to handle loading task data when modal opens and options are loaded
-  useEffect(() => {
-    const loadTaskData = async () => {
-      if (isOpen && task && task.id && categories.length > 0 && allTypes.length > 0 && allSubTypes.length > 0) {
-        try {
-          // Fetch fresh task data from the API to ensure we have the latest data
-          const response = await taskService.getTaskById(task.id);
+          // Now that options are loaded, fetch the task data and attachments in parallel
+          const [taskResponse, attachmentResponse] = await Promise.all([
+            taskService.getTaskById(task.id),
+            attachmentService.getAttachmentsByEntity(task.id, 'task')
+          ]);
           
           // The API returns the task wrapped in a 'task' property
-          const freshTask = response.task || response;
+          const freshTask = taskResponse.task || taskResponse;
+          
+          // Process attachments
+          let existingAttachments = [];
+          try {
+            existingAttachments = (attachmentResponse.attachments || []).map(att => ({
+              id: att.id,
+              name: att.filename,
+              size: att.file_size,
+              type: att.file_type,
+              filepath: att.filepath  // Include filepath for reference
+            }));
+          } catch (attachmentError) {
+            console.error('Error processing attachments:', attachmentError);
+            // If there's an error loading attachments, continue with empty attachments
+            existingAttachments = [];
+          }
+          
+          // Set attachments first
+          setAttachments(existingAttachments);
           
           // First, determine the category and type IDs to load dependent options
           let targetCategoryId = null;
@@ -193,23 +199,6 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             }
           }
           
-          // Load existing attachments for this task
-          try {
-            const attachmentResponse = await attachmentService.getAttachmentsByEntity(freshTask.id, 'task');
-            const existingAttachments = (attachmentResponse.attachments || []).map(att => ({
-              id: att.id,
-              name: att.filename,
-              size: att.file_size,
-              type: att.file_type,
-              filepath: att.filepath  // Include filepath for reference
-            }));
-            setAttachments(existingAttachments);
-          } catch (attachmentError) {
-            console.error('Error loading attachments:', attachmentError);
-            // If there's an error loading attachments, continue with empty attachments
-            setAttachments([]);
-          }
-          
           // Set form data with initial subType value
           setFormData(prev => ({
             ...prev,
@@ -218,28 +207,12 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                       allSubTypes.find(subType => subType.name === freshTask.sub_type_name)?.id?.toString() : "")
           }));
 
-          // Load existing attachments for this task
-          try {
-            const attachmentResponse = await attachmentService.getAttachmentsByEntity(freshTask.id, 'task');
-            const existingAttachments = (attachmentResponse.attachments || []).map(att => ({
-              id: att.id,
-              name: att.filename,
-              size: att.file_size,
-              type: att.file_type,
-              filepath: att.filepath  // Include filepath for reference
-            }));
-            setAttachments(existingAttachments);
-          } catch (attachmentError) {
-            console.error('Error loading attachments:', attachmentError);
-            // If there's an error loading attachments, continue with empty attachments
-            setAttachments([]);
-          }
-
           // Reset the user modification flag to allow auto-population on initial load
           setHasUserModifiedTitle(false);
           setDataLoaded(true);
         } catch (error) {
-          console.error('Error in loadTaskData:', error);
+          console.error('Error in loadData:', error);
+          setError(error.message);
           // Fallback to the original task data if the API call fails
           setFormData({
             id: task.id !== undefined ? task.id : (task.Id || null),
@@ -315,20 +288,24 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
 
           // Mark data as loaded even if there was an error
           setDataLoaded(true);
+        } finally {
+          setLoading(false);
         }
       } else if (isOpen) {
         // If modal is open but no task is provided, mark as loaded but with empty state
         // Reset the user modification flag when no task is provided
         setHasUserModifiedTitle(false);
         setDataLoaded(true);
+        setLoading(false);
       } else {
         // When modal is closed, reset states
         setDataLoaded(false);
+        setLoading(false);
       }
     };
 
-    loadTaskData();
-  }, [isOpen, task, categories, allTypes, allSubTypes]); // Depend on isOpen, task, and all option arrays
+    loadData();
+  }, [isOpen, task]); // Depend on isOpen and task only
 
   // Effect to reset form data when modal closes
   useEffect(() => {
@@ -1048,102 +1025,6 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
     setShowNewSubTypeModal(false);
   };
 
-  if (loading && isOpen) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" size="lg">
-        <div className="flex items-center justify-center h-40">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          <span className="ml-3">Loading options...</span>
-        </div>
-      </Modal>
-    );
-  }
-
-  if (error && isOpen) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" size="lg">
-        <div className="p-4 text-center">
-          <p className="text-red-500 mb-4">Error loading options: {error}</p>
-          <Button onClick={async () => {
-            try {
-              setLoading(true);
-              setError(null);
-              
-              // Fetch categories, types, and sub types from the API
-              const [categoriesRes, typesRes, subTypesRes] = await Promise.allSettled([
-                categoryService.getAllCategories(),
-                taskTypeService.getAllTaskTypes(),
-                subTypeService.getAllSubTypes()
-              ]);
-              
-              if (categoriesRes.status === 'fulfilled') {
-                // Handle different possible response formats for categories
-                let categoriesData = [];
-                const response = categoriesRes.value;
-                if (response && response.categories) {
-                  categoriesData = response.categories; // new format
-                } else if (response && response.data) {
-                  categoriesData = response.data; // alternative format
-                } else if (Array.isArray(response)) {
-                  categoriesData = response; // direct array response
-                }
-                setCategories(categoriesData || []);
-              } else {
-                console.error('Error fetching categories:', categoriesRes.reason);
-                setCategories([]);
-              }
-              
-              if (typesRes.status === 'fulfilled') {
-                // Handle different possible response formats for task types
-                let typesData = [];
-                const response = typesRes.value;
-                if (response && response.types) {
-                  typesData = response.types; // new format
-                } else if (response && response.data) {
-                  typesData = response.data; // alternative format
-                } else if (Array.isArray(response)) {
-                  typesData = response; // direct array response
-                }
-                setAllTypes(typesData || []);
-                setFilteredTypes(typesData || []); // Initially show all types as filtered types too
-              } else {
-                console.error('Error fetching task types:', typesRes.reason);
-                setAllTypes([]);
-                setFilteredTypes([]);
-              }
-              
-              if (subTypesRes.status === 'fulfilled') {
-                // Handle different possible response formats for sub types
-                let subTypesData = [];
-                const response = subTypesRes.value;
-                if (response && response.subTypes) {
-                  subTypesData = response.subTypes; // new format
-                } else if (response && response.subtypes) {
-                  subTypesData = response.subtypes; // old format
-                } else if (response && response.data) {
-                  subTypesData = response.data; // alternative format
-                } else if (Array.isArray(response)) {
-                  subTypesData = response; // direct array response
-                }
-                setAllSubTypes(subTypesData || []);
-                setFilteredSubTypes(subTypesData || []);
-              } else {
-                console.error('Error fetching sub types:', subTypesRes.reason);
-                setAllSubTypes([]);
-                setFilteredSubTypes([]);
-              }
-            } catch (err) {
-              setError(err.message);
-              console.error('Error loading options:', err);
-            } finally {
-              setLoading(false);
-            }
-          }} className="mb-4">Retry</Button>
-        </div>
-      </Modal>
-    );
-  }
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" size="lg">
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -1372,8 +1253,8 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
         </div>
         
         <div className="flex justify-end gap-3 pt-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             type="button"
             onClick={onClose}
           >
@@ -1384,18 +1265,18 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             type="submit"
             disabled={!dataLoaded || !formData.id || savingTask}
           >
-            {savingTask ? (
+            {!dataLoaded ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                Loading...
+              </div>
+            ) : savingTask ? (
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Saving...
               </div>
             ) : (
-              dataLoaded && formData.id ? 'Save Task' : (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </div>
-              )
+              'Save Task'
             )}
           </Button>
         </div>
