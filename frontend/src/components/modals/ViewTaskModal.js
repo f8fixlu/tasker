@@ -7,7 +7,8 @@ import { attachmentService } from '../../services/attachmentService';
 const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
   const [attachments, setAttachments] = useState([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
-  
+  const [loadingAttachmentId, setLoadingAttachmentId] = useState(null); // Track which attachment is loading
+
   // Load attachments when the modal opens and task data is available
   useEffect(() => {
     const loadAttachments = async () => {
@@ -28,7 +29,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
         setAttachments([]);
       }
     };
-    
+
     loadAttachments();
   }, [isOpen, task]);
 
@@ -50,6 +51,9 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
 
   const handlePreview = async (attachment) => {
     try {
+      // Set loading state for this specific attachment
+      setLoadingAttachmentId(attachment.id);
+      
       // Download the attachment to create a preview
       const blob = await attachmentService.downloadAttachment(attachment.id);
 
@@ -69,6 +73,9 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
       } else {
         alert('Failed to preview attachment: ' + (error.message || 'Unknown error'));
       }
+    } finally {
+      // Reset loading state for this attachment
+      setLoadingAttachmentId(null);
     }
   };
 
@@ -419,12 +426,20 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                 attachments.map(attachment => (
                   <div
                     key={attachment.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                    className={`border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${
+                      loadingAttachmentId === attachment.id ? 'opacity-70' : ''
+                    }`}
                     onClick={() => handlePreview(attachment)}
                   >
-                    <span className="material-symbols-outlined text-gray-500 text-2xl flex-shrink-0">
-                      {getFileIcon(attachment.file_type)}
-                    </span>
+                    {loadingAttachmentId === attachment.id ? (
+                      <div className="flex items-center justify-center w-8 h-8">
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <span className="material-symbols-outlined text-gray-500 text-2xl flex-shrink-0">
+                        {getFileIcon(attachment.file_type)}
+                      </span>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title={attachment.filename}>{attachment.filename}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{getFileSizeDisplay(attachment.file_size)}</p>

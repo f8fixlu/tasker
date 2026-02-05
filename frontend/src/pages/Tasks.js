@@ -421,6 +421,7 @@ const Option2Tasks = () => {
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', type: 'info' }); // type: 'info', 'success', 'error'
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [taskAttachments, setTaskAttachments] = useState({ isOpen: false, taskId: null, attachments: [] });
+  const [loadingAttachmentTaskId, setLoadingAttachmentTaskId] = useState(null); // Track which task's attachment is loading
 
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -549,20 +550,30 @@ const Option2Tasks = () => {
         <div className="flex items-center gap-2">
           <button
             className={`${task.attachment_count > 0
-              ? 'text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary'
+              ? (loadingAttachmentTaskId === task.id 
+                  ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                  : 'text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary')
               : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'}`}
             title={task.attachment_count > 0
-              ? `${task.attachment_count} attachment${task.attachment_count > 1 ? 's' : ''}`
+              ? (loadingAttachmentTaskId === task.id 
+                  ? 'Loading attachment...' 
+                  : `${task.attachment_count} attachment${task.attachment_count > 1 ? 's' : ''}`)
               : 'No attachments'}
             onClick={(e) => {
               e.stopPropagation(); // Prevent row click from triggering
-              if (task.attachment_count > 0) {
+              if (task.attachment_count > 0 && loadingAttachmentTaskId !== task.id) {
                 handleAttachmentClick(task.id, e);
               }
             }}
-            disabled={task.attachment_count === 0}
+            disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
           >
-            <span className="material-symbols-outlined">attach_file</span>
+            {loadingAttachmentTaskId === task.id ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current"></div>
+              </div>
+            ) : (
+              <span className="material-symbols-outlined">attach_file</span>
+            )}
           </button>
 
           <button
@@ -896,7 +907,10 @@ const Option2Tasks = () => {
     if (!taskId) return;
 
     try {
-      // Temporarily disable loading state to avoid UI refresh
+      // Set loading state for this specific task
+      setLoadingAttachmentTaskId(taskId);
+      
+      // Fetch attachments for the task
       const response = await attachmentService.getAttachmentsByEntity(taskId, 'task');
       const attachments = response.attachments || [];
 
@@ -931,6 +945,9 @@ const Option2Tasks = () => {
         message: 'Failed to load attachments: ' + (error.message || 'Unknown error'),
         type: 'error'
       });
+    } finally {
+      // Reset loading state for this task
+      setLoadingAttachmentTaskId(null);
     }
   };
 
