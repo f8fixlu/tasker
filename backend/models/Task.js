@@ -757,30 +757,30 @@ async function getTaskStats(user_id, startDate = null, endDate = null, categoryF
   `;
   let mainParams = [user_id];
 
-  // Recent tasks query (tasks from the last 7 days)
+  // Recent tasks query (tasks from the last 7 days) - using task_date instead of created_date
   let recentSql = `
     SELECT COUNT(*) as recent_tasks
     FROM tasks
     WHERE user_id = ?
-    AND created_date >= datetime('now', '-7 days', 'localtime')
+    AND task_date >= datetime('now', '-7 days', 'localtime')
   `;
   let recentParams = [user_id];
 
-  // Tasks today query
+  // Tasks today query - using task_date instead of created_date
   let todaySql = `
     SELECT COUNT(*) as tasks_today
     FROM tasks
     WHERE user_id = ?
-    AND DATE(created_date) = DATE('now', 'localtime')
+    AND DATE(task_date) = DATE('now', 'localtime')
   `;
   let todayParams = [user_id];
 
-  // Tasks this month query
+  // Tasks this month query - using task_date instead of created_date
   let monthSql = `
     SELECT COUNT(*) as tasks_this_month
     FROM tasks
     WHERE user_id = ?
-    AND strftime('%Y-%m', created_date) = strftime('%Y-%m', 'now', 'localtime')
+    AND strftime('%Y-%m', task_date) = strftime('%Y-%m', 'now', 'localtime')
   `;
   let monthParams = [user_id];
 
