@@ -84,12 +84,34 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
     const loadEventData = async () => {
       if (isOpen && event && event.id && categories.length > 0) {
         try {
-          // Fetch fresh event data from the API to ensure we have the latest data
-          const response = await eventService.getEventById(event.id);
+          // Fetch fresh event data and attachments in parallel
+          const [eventResponse, attachmentResponse] = await Promise.all([
+            eventService.getEventById(event.id),
+            attachmentService.getAttachmentsByEntity(event.id, 'event')
+          ]);
 
           // The API returns the event wrapped in an 'event' property
-          const freshEvent = response.event || response;
-          
+          const freshEvent = eventResponse.event || eventResponse;
+
+          // Process attachments
+          let existingAttachments = [];
+          try {
+            existingAttachments = (attachmentResponse.attachments || []).map(att => ({
+              id: att.id,
+              name: att.filename,
+              size: att.file_size,
+              type: att.file_type,
+              filepath: att.filepath  // Include filepath for reference
+            }));
+          } catch (attachmentError) {
+            console.error('Error processing attachments:', attachmentError);
+            // If there's an error loading attachments, continue with empty attachments
+            existingAttachments = [];
+          }
+
+          // Set attachments first
+          setAttachments(existingAttachments);
+
           // Extract date and time components from the event data
           let startDate = '';
           let startTime = '00:00';
@@ -147,23 +169,6 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
             is_whole_day: freshEvent.is_whole_day || freshEvent.wholeDay || false,
             status: freshEvent.status || 'Scheduled'
           });
-
-          // Load existing attachments for this event
-          try {
-            const attachmentResponse = await attachmentService.getAttachmentsByEntity(freshEvent.id, 'event');
-            const existingAttachments = (attachmentResponse.attachments || []).map(att => ({
-              id: att.id,
-              name: att.filename,
-              size: att.file_size,
-              type: att.file_type,
-              filepath: att.filepath  // Include filepath for reference
-            }));
-            setAttachments(existingAttachments);
-          } catch (attachmentError) {
-            console.error('Error loading attachments:', attachmentError);
-            // If there's an error loading attachments, continue with empty attachments
-            setAttachments([]);
-          }
 
           // Reset the user modification flag to allow auto-population on initial load
           setHasUserModifiedTitle(false);
@@ -522,54 +527,6 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
   };
 
 
-  if (loading && isOpen) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Edit Event" size="lg">
-        <div className="flex items-center justify-center h-40">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          <span className="ml-3">Loading options...</span>
-        </div>
-      </Modal>
-    );
-  }
-
-  if (error && isOpen) {
-    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Edit Event" size="lg">
-        <div className="p-4 text-center">
-          <p className="text-red-500 mb-4">Error loading options: {error}</p>
-          <Button onClick={async () => {
-            try {
-              setLoading(true);
-              setError(null);
-
-              // Fetch categories from the API
-              const categoriesRes = await eventCategoryService.getAllEventCategories();
-
-              if (categoriesRes) {
-                // Handle different possible response formats for categories
-                let categoriesData = [];
-                if (categoriesRes && categoriesRes.categories) {
-                  categoriesData = categoriesRes.categories; // new format
-                } else if (categoriesRes && categoriesRes.data) {
-                  categoriesData = categoriesRes.data; // alternative format
-                } else if (Array.isArray(categoriesRes)) {
-                  categoriesData = categoriesRes; // direct array response
-                }
-                setCategories(categoriesData || []);
-              }
-            } catch (err) {
-              setError(err.message);
-              console.error('Error loading categories:', err);
-            } finally {
-              setLoading(false);
-            }
-          }} className="mb-4">Retry</Button>
-        </div>
-      </Modal>
-    );
-  }
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Event" size="lg">
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -810,7 +767,7 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
               dataLoaded && formData.id ? 'Save Event' : (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                  Saving...
+                  Loading...
                 </div>
               )
             )}
