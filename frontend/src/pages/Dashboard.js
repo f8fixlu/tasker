@@ -44,13 +44,13 @@ const Dashboard = () => {
   const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
   const [loading, setLoading] = useState(false); // Changed to false since we're using progressive loading
   const [loadingStates, setLoadingStates] = useState({
-    taskStats: true,
-    eventStats: true,
-    recentTasks: true,
-    upcomingEvents: true,
-    upcomingDeadlines: true
+    taskStats: false,
+    eventStats: false,
+    recentTasks: false,
+    upcomingEvents: false,
+    upcomingDeadlines: false
   });
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(true);
   const [error, setError] = useState(null);
 
 
@@ -79,8 +79,15 @@ const Dashboard = () => {
         eventsThisMonth: 0
       });
 
-      // Set initial loading state for each section individually
-      // We'll manage loading state per section rather than globally
+      // Set loading state for each section to true when fetching starts
+      setLoadingStates({
+        taskStats: true,
+        eventStats: true,
+        recentTasks: true,
+        upcomingEvents: true,
+        upcomingDeadlines: true
+      });
+      setInitialLoadComplete(false);
 
       // Run all API calls in parallel to improve performance
       // Each will update its respective state as it completes
@@ -253,11 +260,9 @@ const Dashboard = () => {
       setUpcomingDeadlines([]);
     } finally {
       // Only set initialLoadComplete after all data is processed
-      if (!initialLoadComplete) {
-        setInitialLoadComplete(true);
-      }
+      setInitialLoadComplete(true);
     }
-  }, [initialLoadComplete]);
+  }, []);
 
   // Check if welcome modal should be shown
   useEffect(() => {
@@ -515,38 +520,166 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2 flex flex-col gap-4 sm:gap-6">
-            <TaskStatsSkeleton />
-            <EventStatsSkeleton />
-            <RecentTasksSkeleton />
-          </div>
-
-          <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Task Stats - preserve static headers and icons, only skeleton data */}
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  <Skeleton type="button" className="w-6 h-6 text-gray-400" />
+              <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">My Tasks</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-blue-100 dark:bg-blue-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-blue-700 dark:text-blue-300 text-sm">Total Tasks</h3>
+                    <span className="material-symbols-outlined text-blue-700 dark:text-blue-300 text-base">list_alt</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
                 </div>
-                <div>
-                  <Skeleton type="text" className="w-16 h-4 mb-1" />
-                  <Skeleton type="text" className="w-24 h-5" />
+
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-purple-100 dark:bg-purple-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-purple-700 dark:text-purple-300 text-sm">Recent Tasks</h3>
+                    <span className="material-symbols-outlined text-purple-700 dark:text-purple-300 text-base">history</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-green-100 dark:bg-green-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-green-700 dark:text-green-300 text-sm">Today's Tasks</h3>
+                    <span className="material-symbols-outlined text-green-700 dark:text-green-300 text-base">today</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-yellow-100 dark:bg-yellow-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-yellow-700 dark:text-yellow-300 text-sm">Tasks This Month</h3>
+                    <span className="material-symbols-outlined text-yellow-700 dark:text-yellow-300 text-base">calendar_month</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
                 </div>
               </div>
             </div>
 
-            <TaskOverviewSkeleton />
+            {/* Event Stats - preserve static headers and icons, only skeleton data */}
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">My Events</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-indigo-100 dark:bg-indigo-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-indigo-700 dark:text-indigo-300 text-sm">Total Events</h3>
+                    <span className="material-symbols-outlined text-indigo-700 dark:text-indigo-300 text-base">event</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
 
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-pink-100 dark:bg-pink-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-pink-700 dark:text-pink-300 text-sm">Events Today</h3>
+                    <span className="material-symbols-outlined text-pink-700 dark:text-pink-300 text-base">event_available</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-teal-100 dark:bg-teal-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-teal-700 dark:text-teal-300 text-sm">Upcoming Events</h3>
+                    <span className="material-symbols-outlined text-teal-700 dark:text-teal-300 text-base">event_upcoming</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-lg p-3 bg-orange-100 dark:bg-orange-900/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-orange-700 dark:text-orange-300 text-sm">Past Events</h3>
+                    <span className="material-symbols-outlined text-orange-700 dark:text-orange-300 text-base">event_busy</span>
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Tasks - preserve static header, only skeleton data */}
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <div className="flex justify-between items-center pb-3">
+                <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold">Recent Tasks</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border-light dark:border-border-dark">
+                      <th className="py-2 px-3 sm:px-4 font-medium text-text-secondary-light dark:text-text-secondary-dark">Title</th>
+                      <th className="py-2 px-3 sm:px-4 font-medium text-text-secondary-light dark:text-text-secondary-dark">Status</th>
+                      <th className="py-2 px-3 sm:px-4 font-medium text-text-secondary-light dark:text-text-secondary-dark">Priority</th>
+                      <th className="py-2 px-3 sm:px-4 font-medium text-text-secondary-light dark:text-text-secondary-dark">Due Date</th>
+                      <th className="py-2 px-3 sm:px-4 font-medium text-text-secondary-light dark:text-text-secondary-dark">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...Array(5)].map((_, i) => (
+                      <tr key={i} className="border-b border-border-light dark:border-border-dark">
+                        <td className="py-3 px-3 sm:px-4">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4"></div>
+                        </td>
+                        <td className="py-3 px-3 sm:px-4">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2"></div>
+                        </td>
+                        <td className="py-3 px-3 sm:px-4">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/3"></div>
+                        </td>
+                        <td className="py-3 px-3 sm:px-4">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/3"></div>
+                        </td>
+                        <td className="py-3 px-3 sm:px-4">
+                          <div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Static "Today" date display - should not be replaced with skeleton */}
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden lg:block">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>
+                  <p className="text-base font-medium text-text-light dark:text-text-dark">{optimizedDateUtils.memoizedFormatDate(new Date().toISOString(), 'fullDateWithDay')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Task Overview - preserve static header, only skeleton data */}
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <div className="flex justify-between items-center pb-3">
+                <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold">Task Status Overview</h2>
+              </div>
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex justify-between items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-8"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upcoming Deadlines - preserve static header, only skeleton data */}
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
               <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">Upcoming Deadlines</h2>
               <div className="flex flex-col gap-4">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="flex items-start gap-3 sm:gap-4">
-                    <Skeleton type="text" className="w-8 h-10" />
+                    <div className="w-8 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                     <div className="flex-1 border-l-2 border-primary-600 pl-3 sm:pl-4">
-                      <Skeleton type="text" className="w-32 mb-1" />
-                      <Skeleton type="text" className="w-24 h-4" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2 mb-2"></div>
                       <div className="flex gap-2 mt-1">
-                        <Skeleton type="text" className="w-12 h-4" />
-                        <Skeleton type="text" className="w-16 h-4" />
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-12"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
                       </div>
                     </div>
                   </div>
@@ -554,19 +687,120 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* Upcoming Events - preserve static header, only skeleton data */}
             <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
               <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">Upcoming Events</h2>
               <div className="flex flex-col gap-4">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="flex items-start gap-3 sm:gap-4">
-                    <Skeleton type="text" className="w-8 h-10" />
+                    <div className="w-8 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                     <div className="flex-1 border-l-2 border-primary-600 pl-3 sm:pl-4">
-                      <Skeleton type="text" className="w-32 mb-1" />
-                      <Skeleton type="text" className="w-24 h-4" />
-                      <Skeleton type="text" className="w-16 h-3" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4 mb-2"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2 mb-2"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/5"></div>
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Static "Today" date display - should not be replaced with skeleton */}
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden lg:block">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>
+                  <p className="text-base font-medium text-text-light dark:text-text-dark">{optimizedDateUtils.memoizedFormatDate(new Date().toISOString(), 'fullDateWithDay')}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <div className="flex justify-between items-center pb-3">
+                <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold">Task Status Overview</h2>
+              </div>
+              <div className="grid grid-cols-[1fr_24px_1fr] gap-0 relative">
+                <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <span className="text-text-secondary-light dark:text-text-secondary-dark">Completed</span>
+                  <span className="font-bold text-success-600 dark:text-success-400">{stats.completedTasks}</span>
+                </div>
+                <div className="flex items-center justify-center">
+
+                </div>
+                <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <span className="text-text-secondary-light dark:text-text-secondary-dark">In Progress</span>
+                  <span className="font-bold text-warning-600 dark:text-warning-400">{stats.inProgressTasks}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <span className="text-text-secondary-light dark:text-text-secondary-dark">Pending</span>
+                  <span className="font-bold text-danger-600 dark:text-danger-400">{stats.pendingTasks}</span>
+                </div>
+                <div className="flex items-center justify-center">
+
+                </div>
+                <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <span className="text-text-secondary-light dark:text-text-secondary-dark">Overdue</span>
+                  <span className="font-bold text-red-600 dark:text-red-400">{stats.overdueTasks}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <span className="text-text-secondary-light dark:text-text-secondary-dark">Archived</span>
+                  <span className="font-bold text-gray-600 dark:text-gray-400">{stats.archivedTasks}</span>
+                </div>
+                <div className="flex items-center justify-center">
+
+                </div>
+                <div className="p-2"></div>
+              </div>
+            </div>
+
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">Upcoming Deadlines</h2>
+              <div className="flex flex-col gap-4">
+                {loadingStates.upcomingDeadlines ? (
+                  // Show skeleton loading when upcoming deadlines are loading
+                  [...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 sm:gap-4 p-2 rounded-lg">
+                      <div className="w-8 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="flex-1 border-l-2 border-primary-600 pl-3 sm:pl-4">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2 mb-2"></div>
+                        <div className="flex gap-2 mt-1">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-12"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  upcomingDeadlinesContent
+                )}
+              </div>
+            </div>
+
+            <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
+              <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">Upcoming Events</h2>
+              <div className="flex flex-col gap-4">
+                {loadingStates.upcomingEvents ? (
+                  // Show skeleton loading when upcoming events are loading
+                  [...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 sm:gap-4 p-2 rounded-lg">
+                      <div className="w-8 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="flex-1 border-l-2 border-primary-600 pl-3 sm:pl-4">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2 mb-2"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  upcomingEventsContent
+                )}
               </div>
             </div>
           </div>
@@ -622,154 +856,74 @@ const Dashboard = () => {
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
             <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">My Tasks</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {loadingStates.taskStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-blue-700 dark:text-blue-300 text-sm">Total Tasks</h3>
+                  <span className="material-symbols-outlined text-blue-700 dark:text-blue-300 text-base">list_alt</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-blue-700 dark:text-blue-300 text-sm">Total Tasks</h3>
-                    <span className="material-symbols-outlined text-blue-700 dark:text-blue-300 text-base">list_alt</span>
-                  </div>
-                  <p className="text-xl font-bold text-blue-900 dark:text-text-dark">{stats.totalTasks}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-blue-900 dark:text-text-dark">{stats.totalTasks}</p>
+              </div>
 
-              {loadingStates.taskStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-purple-700 dark:text-purple-300 text-sm">Recent Tasks</h3>
+                  <span className="material-symbols-outlined text-purple-700 dark:text-purple-300 text-base">history</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-purple-700 dark:text-purple-300 text-sm">Recent Tasks</h3>
-                    <span className="material-symbols-outlined text-purple-700 dark:text-purple-300 text-base">history</span>
-                  </div>
-                  <p className="text-xl font-bold text-purple-900 dark:text-text-dark">{stats.recentTasks}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-purple-900 dark:text-text-dark">{stats.recentTasks}</p>
+              </div>
 
-              {loadingStates.taskStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-green-700 dark:text-green-300 text-sm">Tasks Today</h3>
+                  <span className="material-symbols-outlined text-green-700 dark:text-green-300 text-base">today</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-green-700 dark:text-green-300 text-sm">Tasks Today</h3>
-                    <span className="material-symbols-outlined text-green-700 dark:text-green-300 text-base">today</span>
-                  </div>
-                  <p className="text-xl font-bold text-green-900 dark:text-text-dark">{stats.tasksToday}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-green-900 dark:text-text-dark">{stats.tasksToday}</p>
+              </div>
 
-              {loadingStates.taskStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-orange-700 dark:text-orange-300 text-sm">Tasks this Month</h3>
+                  <span className="material-symbols-outlined text-orange-700 dark:text-orange-300 text-base">calendar_month</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-orange-700 dark:text-orange-300 text-sm">Tasks this Month</h3>
-                    <span className="material-symbols-outlined text-orange-700 dark:text-orange-300 text-base">calendar_month</span>
-                  </div>
-                  <p className="text-xl font-bold text-orange-900 dark:text-text-dark">{stats.tasksThisMonth}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-orange-900 dark:text-text-dark">{stats.tasksThisMonth}</p>
+              </div>
             </div>
           </div>
 
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
             <h2 className="text-text-light dark:text-text-dark text-xl sm:text-[22px] font-bold pb-3">My Events</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {loadingStates.eventStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-indigo-700 dark:text-indigo-300 text-sm">Total Events</h3>
+                  <span className="material-symbols-outlined text-indigo-700 dark:text-indigo-300 text-base">event</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-indigo-700 dark:text-indigo-300 text-sm">Total Events</h3>
-                    <span className="material-symbols-outlined text-indigo-700 dark:text-indigo-300 text-base">event</span>
-                  </div>
-                  <p className="text-xl font-bold text-indigo-900 dark:text-text-dark">{eventStats.totalEvents}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-indigo-900 dark:text-text-dark">{eventStats.totalEvents}</p>
+              </div>
 
-              {loadingStates.eventStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-cyan-700 dark:text-cyan-300 text-sm">Events Today</h3>
+                  <span className="material-symbols-outlined text-cyan-700 dark:text-cyan-300 text-base">today</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-cyan-700 dark:text-cyan-300 text-sm">Events Today</h3>
-                    <span className="material-symbols-outlined text-cyan-700 dark:text-cyan-300 text-base">today</span>
-                  </div>
-                  <p className="text-xl font-bold text-cyan-900 dark:text-text-dark">{eventStats.eventsToday}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-cyan-900 dark:text-text-dark">{eventStats.eventsToday}</p>
+              </div>
 
-              {loadingStates.eventStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-teal-700 dark:text-teal-300 text-sm">Events This Month</h3>
+                  <span className="material-symbols-outlined text-teal-700 dark:text-teal-300 text-base">calendar_month</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-teal-700 dark:text-teal-300 text-sm">Events This Month</h3>
-                    <span className="material-symbols-outlined text-teal-700 dark:text-teal-300 text-base">calendar_month</span>
-                  </div>
-                  <p className="text-xl font-bold text-teal-900 dark:text-text-dark">{eventStats.eventsThisMonth}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-teal-900 dark:text-text-dark">{eventStats.eventsThisMonth}</p>
+              </div>
 
-              {loadingStates.eventStats ? (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-gray-100 dark:bg-gray-700 animate-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
-                    <div className="h-6 w-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                  </div>
-                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              <div className="flex flex-col gap-2 rounded-lg p-3 bg-rose-100 dark:bg-rose-900/30 hover:bg-rose-200 dark:hover:bg-rose-800/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-rose-700 dark:text-rose-300 text-sm">Completed Events</h3>
+                  <span className="material-symbols-outlined text-rose-700 dark:text-rose-300 text-base">check_circle</span>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-lg p-3 bg-rose-100 dark:bg-rose-900/30 hover:bg-rose-200 dark:hover:bg-rose-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-rose-700 dark:text-rose-300 text-sm">Completed Events</h3>
-                    <span className="material-symbols-outlined text-rose-700 dark:text-rose-300 text-base">check_circle</span>
-                  </div>
-                  <p className="text-xl font-bold text-rose-900 dark:text-text-dark">{eventStats.completedEvents}</p>
-                </div>
-              )}
+                <p className="text-xl font-bold text-rose-900 dark:text-text-dark">{eventStats.completedEvents}</p>
+              </div>
             </div>
           </div>
 
