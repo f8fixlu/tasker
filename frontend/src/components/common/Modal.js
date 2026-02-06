@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+const Modal = ({ isOpen, onClose, title, children, size = 'md', showOverlaySpinner = false }) => {
   const sizes = {
     sm: 'max-w-md',
     md: 'max-w-lg',
@@ -27,8 +27,8 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div 
-          className="fixed inset-0 transition-opacity" 
+        <div
+          className="fixed inset-0 transition-opacity"
           onClick={onClose}
         >
           <div className="absolute inset-0 bg-gray-500 opacity-75 dark:bg-gray-900 dark:opacity-80"></div>
@@ -52,8 +52,13 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
               </svg>
             </button>
           </div>
-          <div className="px-4 py-5 sm:p-6">
+          <div className="px-4 py-5 sm:p-6 relative">
             {children}
+            {showOverlaySpinner && (
+              <div className="absolute inset-0 bg-white/70 dark:bg-gray-800/70 flex items-center justify-center rounded-lg z-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            )}
           </div>
         </div>
       </div>

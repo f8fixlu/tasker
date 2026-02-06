@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useNotificationUpdate } from '../../context/NotificationUpdateContext';
 import { formatToLocalDateTime } from '../../utils/date';
@@ -12,13 +12,18 @@ const NotificationsModal = ({ isOpen, onClose }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const hasLoadedOnce = useRef(false); // Track if notifications have been loaded at least once
   const itemsPerPage = 10; // Number of notifications per page
 
   useEffect(() => {
     if (isOpen) {
       loadNotifications();
+      hasLoadedOnce.current = true; // Mark that we've loaded at least once
+    } else {
+      // Reset the flag when modal is closed
+      hasLoadedOnce.current = false;
     }
-  }, [isOpen, currentPage]);
+  }, [isOpen, currentPage]); // Depend on both isOpen and currentPage
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -79,13 +84,10 @@ const NotificationsModal = ({ isOpen, onClose }) => {
       onClose={onClose}
       title="All Notifications"
       size="xl"
+      showOverlaySpinner={loading} // Show overlay spinner when loading
     >
       <div className="max-h-[70vh] overflow-y-auto scrollbar-hide">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : allNotifications.length === 0 ? (
+        {allNotifications.length === 0 && !loading ? (
           <div className="py-8 text-center text-text-light dark:text-text-dark">
             <p>No notifications found</p>
           </div>
@@ -95,8 +97,8 @@ const NotificationsModal = ({ isOpen, onClose }) => {
               <div
                 key={notification.id}
                 className={`p-4 rounded-lg border ${
-                  notification.is_read 
-                    ? 'bg-surface-light dark:bg-surface-dark border-border-light dark:border-border-dark' 
+                  notification.is_read
+                    ? 'bg-surface-light dark:bg-surface-dark border-border-light dark:border-border-dark'
                     : 'bg-blue-50 dark:bg-blue-900/20 border-primary-200 dark:border-primary-800'
                 }`}
               >
@@ -140,39 +142,37 @@ const NotificationsModal = ({ isOpen, onClose }) => {
       </div>
 
       {/* Pagination Controls */}
-      {!loading && (
-        <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-light dark:border-border-dark">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className={`px-3 py-1 rounded ${
-              currentPage === 1
-                ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                : 'text-primary-600 dark:text-primary-400 hover:bg-background-light dark:hover:bg-background-dark'
-            }`}
-          >
-            Previous
-          </button>
+      <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-light dark:border-border-dark">
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1 || loading}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1 || loading
+              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              : 'text-primary-600 dark:text-primary-400 hover:bg-background-light dark:hover:bg-background-dark'
+          }`}
+        >
+          Previous
+        </button>
 
-          <span className="text-sm text-text-light dark:text-text-dark">
-            {total > 0 ?
-              `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, total)}-${Math.min(currentPage * itemsPerPage, total)} of ${total}`
-              : 'No notifications'}
-          </span>
+        <span className="text-sm text-text-light dark:text-text-dark">
+          {total > 0 ?
+            `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, total)}-${Math.min(currentPage * itemsPerPage, total)} of ${total}`
+            : 'No notifications'}
+        </span>
 
-          <button
-            onClick={() => setCurrentPage(prev => prev + 1)}
-            disabled={!hasMore}
-            className={`px-3 py-1 rounded ${
-              !hasMore
-                ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                : 'text-primary-600 dark:text-primary-400 hover:bg-background-light dark:hover:bg-background-dark'
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      )}
+        <button
+          onClick={() => setCurrentPage(prev => prev + 1)}
+          disabled={!hasMore || loading}
+          className={`px-3 py-1 rounded ${
+            !hasMore || loading
+              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              : 'text-primary-600 dark:text-primary-400 hover:bg-background-light dark:hover:bg-background-dark'
+          }`}
+        >
+          Next
+        </button>
+      </div>
     </Modal>
   );
 };
