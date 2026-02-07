@@ -208,13 +208,15 @@ const Calendar = () => {
   // Function to handle saving a new event
   const handleSaveEvent = async (eventData) => {
     try {
-      await eventService.createEvent(eventData);
+      const result = await eventService.createEvent(eventData);
       await fetchEvents(); // Refresh events after creation
 
       // Trigger notification refresh to update badge count
       triggerTaskUpdate();
       // Also fetch notifications directly for immediate update
       setTimeout(() => fetchNotifications(), 100);
+      
+      return result; // Return the result so the modal can extract the event ID
     } catch (error) {
       console.error('Error creating event:', error);
     }

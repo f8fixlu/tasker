@@ -7,6 +7,8 @@ import NewEventCategoryModal from './NewEventCategoryModal';
 import NewEventTypeModal from './NewEventTypeModal';
 import { eventCategoryService } from '../../services/eventCategoryService';
 import { eventTypeService } from '../../services/eventTypeService';
+import { attachmentService } from '../../services/attachmentService';
+import { eventService } from '../../services/eventService';
 
 const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
   const [formData, setFormData] = useState({
@@ -171,6 +173,17 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Validate file sizes before adding
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(file => file.name).join(', ');
+      alert(`The following files exceed the 10MB size limit and cannot be uploaded: ${fileNames}`);
+      return; // Don't add oversized files
+    }
+    
     const newAttachments = files.map(file => ({
       id: Date.now() + Math.random(),
       name: file.name,
@@ -429,7 +442,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
     }
 
     try {
-      // Prepare event data for submission
+      // Prepare event data for submission (without attachments initially)
       const submissionData = {
         ...formData,
         start_date: startDateTime,
@@ -447,16 +460,41 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
         // Don't send the original event type field if it exists
         event_type: undefined,
         // Add a random color class for the event display
-        color_class: getRandomColor(),
-        attachments
+        color_class: getRandomColor()
       };
-
-      // Debug: Log submission data
-      console.log('Submitting event data:', submissionData);
 
       // Call the onSave function passed from the parent component with properly formatted dates
       if (onSave) {
-        await onSave(submissionData);
+        const result = await onSave(submissionData);
+
+        // Extract event ID from the result - it could be in different formats
+        let eventId = null;
+        if (result && typeof result === 'object') {
+          // Handle different possible response formats
+          eventId = result.id ||
+                   (result.event && result.event.id) ||
+                   (result.data && result.data.id) ||
+                   (result.event && result.event.Event && result.event.Event.id) ||
+                   null;
+        }
+
+        // If we have an event ID and there are file attachments to upload, upload them after the event is created
+        if (eventId && attachments.length > 0) {
+          const uploadPromises = attachments
+            .filter(attachment => attachment.file) // Only upload if it's a new file (not yet uploaded)
+            .map(attachment =>
+              attachmentService.uploadAttachment(attachment.file, null, eventId)
+            );
+
+          if (uploadPromises.length > 0) {
+            try {
+              await Promise.all(uploadPromises);
+            } catch (uploadError) {
+              console.error('Error uploading attachments:', uploadError);
+              // We'll continue even if attachment upload fails, just log the error
+            }
+          }
+        }
       }
       onClose(); // Close the modal after submission
     } catch (error) {

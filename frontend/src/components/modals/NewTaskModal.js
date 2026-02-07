@@ -535,6 +535,17 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Validate file sizes before adding
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(file => file.name).join(', ');
+      alert(`The following files exceed the 10MB size limit and cannot be uploaded: ${fileNames}`);
+      return; // Don't add oversized files
+    }
+    
     const newAttachments = files.map(file => ({
       id: Date.now() + Math.random(),
       name: file.name,

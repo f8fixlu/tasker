@@ -290,6 +290,17 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Validate file sizes before adding
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(file => file.name).join(', ');
+      alert(`The following files exceed the 10MB size limit and cannot be uploaded: ${fileNames}`);
+      return; // Don't add oversized files
+    }
+    
     const newAttachments = files.map(file => ({
       id: Date.now() + Math.random(),
       name: file.name,
@@ -417,14 +428,19 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
       await eventService.updateEvent(formData.id, eventData);
 
       // If there are new attachments to upload, upload them separately
-      if (formData.id && attachments.length > 0) {
-        const uploadPromises = attachments
-          .filter(attachment => attachment.file) // Only upload if it's a new file (not yet uploaded)
-          .map(attachment =>
-            attachmentService.uploadAttachment(attachment.file, null, formData.id) // Use event ID for event attachments
-          );
+      if (formData.id && attachments && attachments.length > 0) {
+        const newAttachments = attachments.filter(attachment => attachment.file); // Only upload if it's a new file (not yet uploaded)
+        
+        if (newAttachments.length > 0) {
+          const uploadPromises = newAttachments.map(attachment => {
+            // Make sure the attachment.file has all required properties
+            if (!attachment.file || !attachment.file.name || !attachment.file.size) {
+              console.error('Invalid attachment file object:', attachment);
+              return Promise.reject(new Error('Invalid attachment file'));
+            }
+            return attachmentService.uploadAttachment(attachment.file, null, formData.id); // Use event ID for event attachments
+          });
 
-        if (uploadPromises.length > 0) {
           try {
             await Promise.all(uploadPromises);
             console.log('Attachments uploaded successfully');

@@ -627,8 +627,9 @@ const ViewEventModal = ({ isOpen, onClose, event, onDelete, onEventUpdate }) => 
             // Update the event data in the view modal
             // Since event prop is passed from parent, we need to trigger a refresh
           }
-          // Close the edit modal and optionally refresh the view
+          // Close both the edit modal and the view modal after saving
           setIsEditModalOpen(false);
+          onClose(); // Close the view modal as well
         }}
       />
 
