@@ -536,24 +536,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
   };
 
 
+  const [exportLoading, setExportLoading] = useState(false);
+
   const handleExportDatabase = async () => {
+    setExportLoading(true);
     try {
-      // Show progress modal
-      setProgressMessage('Exporting database...');
-      setProgressPercentage(0);
-      setShowProgressModal(true);
-
-      // Simulate progress for export
-      const progressInterval = setInterval(() => {
-        setProgressPercentage(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90; // Stop at 90% until complete
-          }
-          return prev + 10;
-        });
-      }, 500);
-
       // Get token from both localStorage and sessionStorage like the API service does
       let token = localStorage.getItem('token');
       if (!token) {
@@ -561,8 +548,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
       }
 
       if (!token) {
-        clearInterval(progressInterval);
-        setShowProgressModal(false);
         throw new Error('No authentication token found. Please log in again.');
       }
 
@@ -572,9 +557,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
           'Authorization': `Bearer ${token}`,
         },
       });
-
-      clearInterval(progressInterval);
-      setProgressPercentage(100);
 
       if (!response.ok) {
         // Try to get error details from response
@@ -611,8 +593,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setSuccessMessage('Error exporting full database: ' + error.message);
       setShowSuccessModal(true);
     } finally {
-      // Hide progress modal
-      setShowProgressModal(false);
+      setExportLoading(false);
     }
   };
 
@@ -1176,8 +1157,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     variant="primary"
                     onClick={handleExportDatabase}
                     className="w-full sm:w-auto"
+                    disabled={exportLoading}
                   >
-                    Export Full Database (SQLite)
+                    {exportLoading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Exporting...
+                      </div>
+                    ) : (
+                      'Export Full Database (SQLite)'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1361,27 +1350,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </div>
       </Modal>
 
-      {/* Progress Modal */}
-      <Modal
-        isOpen={showProgressModal}
-        onClose={() => {}}
-        title="Operation in Progress"
-        size="md"
-      >
-        <div className="py-4">
-          <div className="flex items-center justify-center mb-4">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
-          </div>
-          <p className="text-center text-gray-700 dark:text-gray-300 mb-4">{progressMessage}</p>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-            <div
-              className="bg-primary h-2.5 rounded-full transition-all duration-300 ease-in-out"
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2">{progressPercentage}%</p>
-        </div>
-      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal
