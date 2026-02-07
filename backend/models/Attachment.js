@@ -133,17 +133,51 @@ async function getAttachmentsByTaskId(task_id) {
 async function getAttachmentsByEventId(event_id) {
   const sql = `
     SELECT id, filename, filepath, file_type, file_size, user_id, created_at
-    FROM attachments 
+    FROM attachments
     WHERE event_id = ?
     ORDER BY created_at DESC
   `;
   const params = [event_id];
-  
+
   try {
     const attachments = await getAll(sql, params);
     return attachments;
   } catch (error) {
     throw new Error(`Error fetching attachments by event ID: ${error.message}`);
+  }
+}
+
+// Get attachment by file path
+async function getAttachmentByFilePath(filepath) {
+  const sql = `
+    SELECT id, filename, filepath, file_type, file_size, task_id, event_id, user_id, created_at
+    FROM attachments
+    WHERE filepath = ?
+  `;
+  const params = [filepath];
+
+  try {
+    const attachment = await getRow(sql, params);
+    return attachment;
+  } catch (error) {
+    throw new Error(`Error fetching attachment by file path: ${error.message}`);
+  }
+}
+
+// Check if an attachment with the same filename exists for the user
+async function attachmentExistsForUser(filename, user_id) {
+  const sql = `
+    SELECT id
+    FROM attachments
+    WHERE filename = ? AND user_id = ?
+  `;
+  const params = [filename, user_id];
+
+  try {
+    const attachment = await getRow(sql, params);
+    return !!attachment; // Return true if exists, false otherwise
+  } catch (error) {
+    throw new Error(`Error checking if attachment exists for user: ${error.message}`);
   }
 }
 
@@ -153,5 +187,7 @@ module.exports = {
   getAttachmentsByUserId,
   deleteAttachment,
   getAttachmentsByTaskId,
-  getAttachmentsByEventId
+  getAttachmentsByEventId,
+  getAttachmentByFilePath,
+  attachmentExistsForUser
 };
