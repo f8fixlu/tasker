@@ -681,9 +681,25 @@ async function updateTask(id, taskData) {
 
 // Delete task
 async function deleteTask(id) {
+  // First, get any attachments associated with this task to delete the files
+  const { getAttachmentsByTaskId, deleteAttachment } = require('./Attachment');
+  
+  try {
+    const attachments = await getAttachmentsByTaskId(id);
+    
+    // Delete each attachment file and record
+    for (const attachment of attachments) {
+      await deleteAttachment(attachment.id);
+    }
+  } catch (attachmentError) {
+    console.error('Error deleting task attachments:', attachmentError);
+    // Continue with task deletion even if attachment deletion fails
+  }
+
+  // Now delete the task
   const sql = 'DELETE FROM tasks WHERE id = ?';
   const params = [id];
-  
+
   try {
     const result = await runQuery(sql, params);
     return result.changes > 0;
