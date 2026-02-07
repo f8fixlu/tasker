@@ -509,9 +509,25 @@ async function updateEvent(id, eventData) {
 
 // Delete event
 async function deleteEvent(id) {
+  // First, get any attachments associated with this event to delete the files
+  const { getAttachmentsByEventId, deleteAttachment } = require('./Attachment');
+  
+  try {
+    const attachments = await getAttachmentsByEventId(id);
+    
+    // Delete each attachment file and record
+    for (const attachment of attachments) {
+      await deleteAttachment(attachment.id);
+    }
+  } catch (attachmentError) {
+    console.error('Error deleting event attachments:', attachmentError);
+    // Continue with event deletion even if attachment deletion fails
+  }
+
+  // Now delete the event
   const sql = 'DELETE FROM events WHERE id = ?';
   const params = [id];
-  
+
   try {
     const result = await runQuery(sql, params);
     return result.changes > 0;
