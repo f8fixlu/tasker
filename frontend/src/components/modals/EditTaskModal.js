@@ -196,16 +196,29 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             if (targetType_id) {
               // Wait for the filtered types to be loaded before loading subtypes
               await loadFilteredSubTypes(targetType_id);
+              
+              // After loading subtypes, update the subType in form data with the correct value
+              setFormData(prev => ({
+                ...prev,
+                subType: freshTask.sub_type_id ? freshTask.sub_type_id.toString() :
+                        (freshTask.sub_type_name && filteredSubTypes.length > 0 ?
+                          filteredSubTypes.find(subType => subType.name === freshTask.sub_type_name)?.id?.toString() : "")
+              }));
+            } else {
+              // If no type_id, set subType to empty
+              setFormData(prev => ({
+                ...prev,
+                subType: ""
+              }));
             }
+          } else {
+            // If no category, reset type and subType
+            setFormData(prev => ({
+              ...prev,
+              type: "",
+              subType: ""
+            }));
           }
-          
-          // Set form data with initial subType value
-          setFormData(prev => ({
-            ...prev,
-            subType: freshTask.sub_type_id ? freshTask.sub_type_id.toString() :
-                    (freshTask.sub_type_name && allSubTypes.length > 0 ?
-                      allSubTypes.find(subType => subType.name === freshTask.sub_type_name)?.id?.toString() : "")
-          }));
 
           // Reset the user modification flag to allow auto-population on initial load
           setHasUserModifiedTitle(false);
@@ -267,24 +280,40 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             }
           }
           
-          // After setting the form data, load the dependent options first
+          // Load dependent options from the fallback data first
           if (targetCategoryId) {
             await loadFilteredTypes(targetCategoryId);
             if (targetType_id) {
               // Wait for the filtered types to be loaded before loading subtypes
               await loadFilteredSubTypes(targetType_id);
-            }
-          }
 
-          // Re-set form data after dependencies are loaded to ensure correct subType association
-          setFormData(prevFormData => ({
-            ...prevFormData,
-            category: targetCategoryId?.toString() || prevFormData.category,
-            type: targetType_id?.toString() || prevFormData.type,
-            subType: task.sub_type_id ? task.sub_type_id.toString() :
-                    (task.sub_type_name && allSubTypes.length > 0 ?
-                      allSubTypes.find(subType => subType.name === task.sub_type_name)?.id?.toString() : "")
-          }));
+              // After loading subtypes, update the subType in form data with the correct value
+              setFormData(prev => ({
+                ...prev,
+                category: targetCategoryId?.toString() || prev.category,
+                type: targetType_id?.toString() || prev.type,
+                subType: task.sub_type_id ? task.sub_type_id.toString() :
+                        (task.sub_type_name && filteredSubTypes.length > 0 ?
+                          filteredSubTypes.find(subType => subType.name === task.sub_type_name)?.id?.toString() : "")
+              }));
+            } else {
+              // If no type_id, set subType to empty
+              setFormData(prev => ({
+                ...prev,
+                category: targetCategoryId?.toString() || prev.category,
+                type: targetType_id?.toString() || prev.type,
+                subType: ""
+              }));
+            }
+          } else {
+            // If no category, reset type and subType
+            setFormData(prev => ({
+              ...prev,
+              category: targetCategoryId?.toString() || prev.category,
+              type: "",
+              subType: ""
+            }));
+          }
 
           // Mark data as loaded even if there was an error
           setDataLoaded(true);
@@ -331,6 +360,63 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       setHasUserModifiedTitle(false); // Reset the flag when modal closes
     }
   }, [isOpen]); // Only run when isOpen changes
+
+  // Effect to ensure dropdowns are properly synchronized when form data changes
+  useEffect(() => {
+    if (!isOpen || !dataLoaded) return;
+
+    // When category changes in form data, ensure filtered types are updated
+    if (formData.category) {
+      loadFilteredTypes(formData.category);
+    } else {
+      setFilteredTypes(allTypes); // Show all types when no category is selected
+    }
+
+    // When type changes in form data, ensure filtered subtypes are updated
+    if (formData.type) {
+      loadFilteredSubTypes(formData.type);
+    } else {
+      setFilteredSubTypes(allSubTypes); // Show all subtypes when no type is selected
+    }
+  }, [formData.category, formData.type, isOpen, dataLoaded]);
+
+  // Effect to ensure that when form data is updated, the dependent dropdowns are also updated
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !formData.category) return;
+
+    // Load filtered types when category is set
+    loadFilteredTypes(formData.category);
+  }, [formData.category, isOpen, dataLoaded]);
+
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !formData.type) return;
+
+    // Load filtered subtypes when type is set
+    loadFilteredSubTypes(formData.type);
+  }, [formData.type, isOpen, dataLoaded]);
+
+  // Effect to ensure form data is updated when filtered dropdowns change
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !task) return;
+
+    // Only update if we have filtered data and the current values are not in the filtered lists
+    if (formData.type && filteredTypes.length > 0 && !filteredTypes.some(t => t.id?.toString() === formData.type)) {
+      // Current type is not in filtered list, reset it
+      setFormData(prev => ({
+        ...prev,
+        type: '',
+        subType: ''  // Also reset subType when type changes
+      }));
+    }
+
+    if (formData.subType && filteredSubTypes.length > 0 && !filteredSubTypes.some(st => st.id?.toString() === formData.subType)) {
+      // Current subType is not in filtered list, reset it
+      setFormData(prev => ({
+        ...prev,
+        subType: ''
+      }));
+    }
+  }, [filteredTypes, filteredSubTypes, isOpen, dataLoaded, task, formData.type, formData.subType]);
 
   // Effect to automatically format the task title when type, subType, or quantity changes
   useEffect(() => {
@@ -390,14 +476,14 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       if (!subTypeInFiltered && task) {
         // The current subType doesn't exist in filtered list, let's try to find the right one
         let newSubTypeValue = "";
-        
+
         // Try to find the original task's sub type in the filtered list
         if (task.sub_type_id) {
           const originalSubTypeInFiltered = filteredSubTypes.find(st => st.id?.toString() === task.sub_type_id.toString());
           if (originalSubTypeInFiltered) {
             newSubTypeValue = originalSubTypeInFiltered.id.toString();
           } else if (task.sub_type_name) {
-            // If original ID not in filtered list, try by name 
+            // If original ID not in filtered list, try by name
             const subTypeByName = filteredSubTypes.find(st => st.name === task.sub_type_name);
             if (subTypeByName) {
               newSubTypeValue = subTypeByName.id.toString();
@@ -410,7 +496,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
             newSubTypeValue = subTypeByName.id.toString();
           }
         }
-        
+
         // Only update if we found a valid replacement
         if (newSubTypeValue && newSubTypeValue !== formData.subType) {
           setFormData(prev => ({
@@ -422,7 +508,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
     } else if (task && (task.sub_type_id || task.sub_type_name)) {
       // If no subType is set but the original task has one, try to set it
       let newSubTypeValue = "";
-      
+
       if (task.sub_type_id) {
         const originalSubTypeInFiltered = filteredSubTypes.find(st => st.id?.toString() === task.sub_type_id.toString());
         if (originalSubTypeInFiltered) {
@@ -441,7 +527,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
           newSubTypeValue = subTypeByName.id.toString();
         }
       }
-      
+
       if (newSubTypeValue) {
         setFormData(prev => ({
           ...prev,
@@ -450,7 +536,85 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       }
     }
   }, [filteredSubTypes, isOpen, dataLoaded, task, formData.subType]);
-  
+
+  // Effect to ensure form data is properly set after all dropdowns are loaded
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !task) return;
+    
+    // Only run this effect after all dropdowns are loaded and we have the task data
+    if (categories.length > 0 && allTypes.length > 0 && allSubTypes.length > 0) {
+      // Determine the correct IDs based on the task data
+      let targetCategoryId = null;
+      let targetType_id = null;
+      let targetSubType_id = null;
+
+      if (task.category_id) {
+        targetCategoryId = task.category_id.toString();
+      } else if (task.category_name && categories.length > 0) {
+        const categoryObj = categories.find(cat => cat.name === task.category_name);
+        if (categoryObj) targetCategoryId = categoryObj.id.toString();
+      }
+
+      if (task.type_id) {
+        targetType_id = task.type_id.toString();
+      } else if (task.type_name && allTypes.length > 0) {
+        const typeObj = allTypes.find(type => type.name === task.type_name);
+        if (typeObj) targetType_id = typeObj.id.toString();
+      }
+
+      if (task.sub_type_id) {
+        targetSubType_id = task.sub_type_id.toString();
+      } else if (task.sub_type_name && allSubTypes.length > 0) {
+        const subTypeObj = allSubTypes.find(st => st.name === task.sub_type_name);
+        if (subTypeObj) targetSubType_id = subTypeObj.id.toString();
+      }
+
+      // Set the form data with the correct values after all dropdowns are loaded
+      setFormData(prev => ({
+        ...prev,
+        id: task.id !== undefined ? task.id : (task.Id || null),
+        title: task.title || task.Title || '',
+        taskDate: formatDateTimeForInput(task.task_date || task.taskDate) || '',
+        dueDate: formatDateTimeForInput(task.due_date || task.dueDate) || '',
+        category: targetCategoryId || prev.category,
+        type: targetType_id || prev.type,
+        subType: targetSubType_id || prev.subType,
+        priority: (task.priority || 'high').toLowerCase(),
+        quantity: String(task.quantity || 1),
+        description: task.description || '',
+        status: task.status || 'Pending'
+      }));
+    }
+  }, [isOpen, dataLoaded, task, categories, allTypes, allSubTypes]);
+
+  // Additional effect to ensure form data is properly updated after all dropdowns are loaded
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !task) return;
+    
+    // After all dropdowns are loaded, make sure the form data reflects the correct values
+    const updateFormDataAfterLoad = async () => {
+      // Check if the current type is valid in the filtered types
+      if (formData.category && formData.type) {
+        const typeExistsInFiltered = filteredTypes.some(t => t.id?.toString() === formData.type);
+        if (!typeExistsInFiltered) {
+          // Type doesn't exist in filtered list, reload types for this category
+          await loadFilteredTypes(formData.category);
+        }
+      }
+      
+      // Check if the current subType is valid in the filtered subTypes
+      if (formData.type && formData.subType) {
+        const subTypeExistsInFiltered = filteredSubTypes.some(st => st.id?.toString() === formData.subType);
+        if (!subTypeExistsInFiltered) {
+          // SubType doesn't exist in filtered list, reload subTypes for this type
+          await loadFilteredSubTypes(formData.type);
+        }
+      }
+    };
+    
+    updateFormDataAfterLoad();
+  }, [isOpen, dataLoaded, task, formData.category, formData.type, formData.subType, filteredTypes, filteredSubTypes]);
+
   // Note: Cascading dropdowns are now handled in the main data loading useEffect to avoid race conditions
 
   // Load task types filtered by selected category
@@ -507,10 +671,10 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-    
+
     // For number inputs, ensure the value remains a string to satisfy Input component's PropTypes
     const processedValue = type === 'number' ? String(value) : value;
-    
+
     // Track if user manually changes the title
     if (name === 'title') {
       setFormData(prev => ({
@@ -520,17 +684,13 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       setHasUserModifiedTitle(true);
       return;
     }
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: processedValue
-    }));
 
-    // Handle cascading dropdowns
+    // Handle cascading dropdowns before updating form data
     if (name === 'category') {
       // When category changes, reset type and subType selections
       setFormData(prev => ({
         ...prev,
+        category: processedValue,
         type: '',
         subType: ''
       }));
@@ -546,6 +706,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       // When type changes, reset subType selection
       setFormData(prev => ({
         ...prev,
+        type: processedValue,
         subType: ''
       }));
       // Load sub types for the selected type
@@ -554,6 +715,12 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       } else {
         setFilteredSubTypes(allSubTypes); // Show all sub types when no type is selected
       }
+    } else {
+      // For other fields, just update the form data
+      setFormData(prev => ({
+        ...prev,
+        [name]: processedValue
+      }));
     }
   };
 

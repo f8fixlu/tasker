@@ -154,8 +154,9 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
             }
           }
 
-          // Set form data with the event's data
-          setFormData({
+          // Set basic form data first (without dependent values)
+          setFormData(prev => ({
+            ...prev,
             id: freshEvent.id,
             title: freshEvent.title || '',
             start_date: startDate,
@@ -164,11 +165,37 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
             end_time: endTime,
             description: freshEvent.description || '',
             location: freshEvent.location || '',
-            category_id: freshEvent.category_id ? freshEvent.category_id.toString() : '',
-            event_type_id: freshEvent.event_type_id ? freshEvent.event_type_id.toString() : '', // Add event_type_id
             is_whole_day: freshEvent.is_whole_day || freshEvent.wholeDay || false,
             status: freshEvent.status || 'Scheduled'
-          });
+          }));
+
+          // Set the category and event type IDs after basic data is set
+          const targetCategoryId = freshEvent.category_id ? freshEvent.category_id.toString() : '';
+          const targetEventTypeId = freshEvent.event_type_id ? freshEvent.event_type_id.toString() : '';
+
+          // Update form data with category first
+          setFormData(prev => ({
+            ...prev,
+            category_id: targetCategoryId
+          }));
+
+          // If category is set, load event types and then set event type
+          if (targetCategoryId) {
+            // Wait for event types to load
+            await new Promise(resolve => setTimeout(resolve, 0)); // Allow UI to update
+            
+            // Update form data with event type after event types are loaded
+            setFormData(prev => ({
+              ...prev,
+              event_type_id: targetEventTypeId
+            }));
+          } else {
+            // If no category, clear event type
+            setFormData(prev => ({
+              ...prev,
+              event_type_id: ''
+            }));
+          }
 
           // Reset the user modification flag to allow auto-population on initial load
           setHasUserModifiedTitle(false);
@@ -246,6 +273,122 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
     loadEventTypes();
   }, [formData.category_id]);
 
+  // Effect to ensure form data is properly set after all dropdowns are loaded
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !event) return;
+    
+    // Only run this effect after all dropdowns are loaded and we have the event data
+    if (categories.length > 0) {
+      // Set the form data with the correct values after all dropdowns are loaded
+      setFormData(prev => {
+        // Determine the correct IDs based on the event data
+        let targetCategoryId = null;
+        let targetEventTypeId = null;
+
+        if (event.category_id) {
+          targetCategoryId = event.category_id.toString();
+        } else if (event.category_name && categories.length > 0) {
+          const categoryObj = categories.find(cat => cat.name === event.category_name);
+          if (categoryObj) targetCategoryId = categoryObj.id.toString();
+        }
+
+        if (event.event_type_id) {
+          targetEventTypeId = event.event_type_id.toString();
+        } else if (event.event_type_name && eventTypes.length > 0) {
+          const eventTypeObj = eventTypes.find(et => et.name === event.event_type_name);
+          if (eventTypeObj) targetEventTypeId = eventTypeObj.id.toString();
+        }
+
+        return {
+          ...prev,
+          id: event.id !== undefined ? event.id : (event.Id || null),
+          title: event.title || event.Title || '',
+          start_date: prev.start_date,
+          start_time: prev.start_time,
+          end_date: prev.end_date,
+          end_time: prev.end_time,
+          description: event.description || '',
+          location: event.location || '',
+          category_id: targetCategoryId || prev.category_id,
+          event_type_id: targetEventTypeId || prev.event_type_id,
+          is_whole_day: event.is_whole_day || event.wholeDay || false,
+          status: event.status || 'Scheduled'
+        };
+      });
+    }
+  }, [isOpen, dataLoaded, event, categories, eventTypes]);
+
+  // Effect to ensure form data is updated when event types change
+  useEffect(() => {
+    if (!isOpen || !dataLoaded || !event || eventTypes.length === 0) return;
+
+    // Check if current event_type_id exists in the loaded event types
+    if (formData.event_type_id) {
+      const eventTypeInLoaded = eventTypes.find(et => et.id?.toString() === formData.event_type_id);
+      if (!eventTypeInLoaded && event) {
+        // The current event type doesn't exist in loaded list, try to find the right one
+        let newEventTypeId = "";
+
+        // Try to find the original event's event type in the loaded list
+        if (event.event_type_id) {
+          const originalEventTypeInLoaded = eventTypes.find(et => et.id?.toString() === event.event_type_id.toString());
+          if (originalEventTypeInLoaded) {
+            newEventTypeId = originalEventTypeInLoaded.id.toString();
+          } else if (event.event_type_name) {
+            // If original ID not in loaded list, try by name
+            const eventTypeByName = eventTypes.find(et => et.name === event.event_type_name);
+            if (eventTypeByName) {
+              newEventTypeId = eventTypeByName.id.toString();
+            }
+          }
+        } else if (event.event_type_name) {
+          // If no ID, try to find by name from the loaded list
+          const eventTypeByName = eventTypes.find(et => et.name === event.event_type_name);
+          if (eventTypeByName) {
+            newEventTypeId = eventTypeByName.id.toString();
+          }
+        }
+
+        // Only update if we found a valid replacement
+        if (newEventTypeId && newEventTypeId !== formData.event_type_id) {
+          setFormData(prev => ({
+            ...prev,
+            event_type_id: newEventTypeId
+          }));
+        }
+      }
+    } else if (event && (event.event_type_id || event.event_type_name)) {
+      // If no event_type_id is set but the original event has one, try to set it
+      let newEventTypeId = "";
+
+      if (event.event_type_id) {
+        const originalEventTypeInLoaded = eventTypes.find(et => et.id?.toString() === event.event_type_id.toString());
+        if (originalEventTypeInLoaded) {
+          newEventTypeId = originalEventTypeInLoaded.id.toString();
+        } else if (event.event_type_name) {
+          // If original ID not in loaded list, try by name
+          const eventTypeByName = eventTypes.find(et => et.name === event.event_type_name);
+          if (eventTypeByName) {
+            newEventTypeId = eventTypeByName.id.toString();
+          }
+        }
+      } else if (event.event_type_name) {
+        // If no ID, try to find by name from the loaded list
+        const eventTypeByName = eventTypes.find(et => et.name === event.event_type_name);
+        if (eventTypeByName) {
+          newEventTypeId = eventTypeByName.id.toString();
+        }
+      }
+
+      if (newEventTypeId) {
+        setFormData(prev => ({
+          ...prev,
+          event_type_id: newEventTypeId
+        }));
+      }
+    }
+  }, [eventTypes, isOpen, dataLoaded, event, formData.event_type_id]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
@@ -261,8 +404,15 @@ const EditEventModal = ({ isOpen, onClose, event, onSave, onEventUpdate }) => {
       return;
     }
 
-    // Handle date/time components separately
-    if (name === 'start_date' || name === 'end_date') {
+    // Handle cascading dropdowns before updating form data
+    if (name === 'category_id') {
+      // When category changes, reset event_type_id selection
+      setFormData(prev => ({
+        ...prev,
+        category_id: value,
+        event_type_id: ''  // Reset event type when category changes
+      }));
+    } else if (name === 'start_date' || name === 'end_date') {
       setFormData(prev => ({
         ...prev,
         [name]: value
