@@ -19,6 +19,7 @@
   "author": "Tasker Development Team",
   "license": "MIT",
   "dependencies": {
+    "archiver": "^6.0.2",
     "bcrypt": "^6.0.0",
     "busboy": "^1.6.0",
     "crypto": "^1.0.1",
@@ -29,6 +30,7 @@
     "path": "^0.12.7",
     "sharp": "^0.32.6",
     "sqlite3": "^5.1.7",
+    "unzipper": "^0.12.3",
     "validator": "^13.15.15"
   },
   "devDependencies": {

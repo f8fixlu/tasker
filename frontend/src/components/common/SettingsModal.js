@@ -537,6 +537,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
 
   const [exportLoading, setExportLoading] = useState(false);
+  const [fullDataExportLoading, setFullDataExportLoading] = useState(false);
+  const [fullDataImportLoading, setFullDataImportLoading] = useState(false);
 
   const handleExportDatabase = async () => {
     setExportLoading(true);
@@ -594,6 +596,64 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setShowSuccessModal(true);
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleExportFullData = async () => {
+    setFullDataExportLoading(true);
+    try {
+      // Get token from both localStorage and sessionStorage like the API service does
+      let token = localStorage.getItem('token');
+      if (!token) {
+        token = sessionStorage.getItem('token');
+      }
+
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/database/export-full-data`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        // Try to get error details from response
+        let errorDetails;
+        try {
+          const errorData = await response.json();
+          errorDetails = errorData.error || `HTTP error! status: ${response.status}`;
+        } catch (e) {
+          errorDetails = `HTTP error! status: ${response.status}`;
+        }
+        throw new Error(errorDetails);
+      }
+
+      // Get the blob data (zip file)
+      const blob = await response.blob();
+
+      // Create a download link for the zip file
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      // Use user.id or user.email as fallback if user.id is not available
+      const userId = user?.id || user?.email?.split('@')[0] || 'unknown';
+      link.href = url;
+      link.download = `tasker_user_${userId}_full_data_export_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setSuccessMessage('Full data exported successfully!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error exporting full data:', error);
+      setSuccessMessage('Error exporting full data: ' + error.message);
+      setShowSuccessModal(true);
+    } finally {
+      setFullDataExportLoading(false);
     }
   };
 
@@ -676,6 +736,92 @@ const SettingsModal = ({ isOpen, onClose }) => {
         }
       } else {
         setSuccessMessage('Unsupported file format. Please use SQLite database files (.db, .sqlite, .sqlite3).');
+        setShowSuccessModal(true);
+      }
+    } catch (error) {
+      console.error('Error reading file:', error);
+      setSuccessMessage('Error reading file: ' + error.message);
+      setShowSuccessModal(true);
+    }
+  };
+
+  const handleImportFullData = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      // Check the file extension to determine the type - only allow ZIP files
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+
+      if (fileExtension === 'zip') {
+        // Handle ZIP file import for full data
+        // Use direct fetch to properly handle multipart form data
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+        if (!token) {
+          setSuccessMessage('Authentication required. Please log in again.');
+          setShowSuccessModal(true);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('data', file);
+
+        try {
+          if (!window.confirm('This will import all data from the ZIP file including database, profile picture, and attachments. Are you sure you want to continue?\n\nNote: This will add to your existing data without replacing it.')) {
+            return;
+          }
+
+          // Show progress modal
+          setProgressMessage('Importing full data...');
+          setProgressPercentage(0);
+          setShowProgressModal(true);
+
+          // Simulate progress for import
+          const progressInterval = setInterval(() => {
+            setProgressPercentage(prev => {
+              if (prev >= 90) {
+                clearInterval(progressInterval);
+                return 90; // Stop at 90% until complete
+              }
+              return prev + 3; // Slower progress for full data import
+            });
+          }, 500);
+
+          const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/database/import-full-data`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+              // Note: Don't set Content-Type header for FormData, let browser set it automatically
+            },
+            body: formData
+          });
+
+          clearInterval(progressInterval);
+          setProgressPercentage(100);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+          }
+
+          setSuccessMessage('Full data imported successfully! Reloading the page to show changes...');
+          setShowSuccessModal(true);
+
+          // Wait a moment to show the success message, then reload the page
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } catch (uploadError) {
+          console.error('Error uploading ZIP file:', uploadError);
+          setSuccessMessage('Error importing full data from ZIP file: ' + uploadError.message);
+          setShowSuccessModal(true);
+        } finally {
+          // Hide progress modal
+          setShowProgressModal(false);
+        }
+      } else {
+        setSuccessMessage('Unsupported file format. Please use ZIP files (.zip) for full data import.');
         setShowSuccessModal(true);
       }
     } catch (error) {
@@ -1168,6 +1314,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       'Export Full Database (SQLite)'
                     )}
                   </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleExportFullData}
+                    className="w-full sm:w-auto"
+                    disabled={true} /* Disabled because functionality is not fully working yet */
+                  >
+                    {'Export Full Data (ZIP) - Coming Soon'}
+                  </Button>
                 </div>
               </div>
 
@@ -1176,23 +1330,41 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Import data from an SQLite database file to restore your data.
                 </p>
-                <input
-                  id="database-import"
-                  type="file"
-                  accept=".db,.sqlite,.sqlite3"
-                  className="hidden"
-                  onChange={handleImportDatabase}
-                />
-                <Button
-                  variant="outline"
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={() => document.getElementById('database-import').click()}
-                >
-                  Choose File
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    id="database-import"
+                    type="file"
+                    accept=".db,.sqlite,.sqlite3"
+                    className="hidden"
+                    onChange={handleImportDatabase}
+                  />
+                  <Button
+                    variant="outline"
+                    type="button"
+                    className="w-full sm:w-auto"
+                    onClick={() => document.getElementById('database-import').click()}
+                  >
+                    Choose File
+                  </Button>
+                  <input
+                    id="fulldata-import"
+                    type="file"
+                    accept=".zip"
+                    className="hidden"
+                    onChange={handleImportFullData}
+                    disabled={true} /* Disabled because functionality is not fully working yet */
+                  />
+                  <Button
+                    variant="outline"
+                    type="button"
+                    className="w-full sm:w-auto"
+                    disabled={true} /* Disabled because functionality is not fully working yet */
+                  >
+                    Import Data (ZIP) - Coming Soon
+                  </Button>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Supports SQLite database files (.db, .sqlite, .sqlite3).
+                  Supports SQLite database files (.db, .sqlite, .sqlite3) and ZIP files (.zip) for full data import.
                 </p>
               </div>
 

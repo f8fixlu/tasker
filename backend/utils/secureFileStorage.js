@@ -36,13 +36,13 @@ function generateUniqueFilename(originalName) {
 function sanitizeFilePath(filepath) {
   // Resolve the path to prevent directory traversal attacks
   const resolvedPath = path.resolve(filepath);
-  
+
   // Ensure the path is within the secure upload directory
   const secureBase = path.resolve(SECURE_UPLOAD_DIR);
   if (!resolvedPath.startsWith(secureBase)) {
     throw new Error('File path is outside of allowed directory');
   }
-  
+
   return resolvedPath;
 }
 
