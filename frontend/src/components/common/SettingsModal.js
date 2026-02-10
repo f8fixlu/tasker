@@ -612,6 +612,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
         throw new Error('No authentication token found. Please log in again.');
       }
 
+      // Show initial progress message
+      setSuccessMessage('Starting export process...');
+      setShowSuccessModal(true);
+
       const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/database/export-full-data`, {
         method: 'GET',
         headers: {

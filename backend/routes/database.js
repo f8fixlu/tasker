@@ -442,9 +442,9 @@ function initializeTempDatabaseSchema(tempDb) {
   });
 }
 
-// Copy user-specific data to the temporary database
+// Copy user-specific data to the temporary database using batch processing
 function copyUserDataToTempDb(tempDb, userId) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const { db } = require('../config/database'); // Main database instance
 
     console.log(`Starting to copy data for user ID: ${userId}`);
@@ -474,75 +474,93 @@ function copyUserDataToTempDb(tempDb, userId) {
       { name: 'notifications', cols: ['title', 'message', 'type', 'is_read', 'user_id', 'related_task_id', 'related_event_id', 'created_at'] }
     ];
 
-    let currentIndex = 0;
-
-    function copyNextTable() {
-      if (currentIndex >= orderedTables.length) {
-        // All tables copied successfully
-        console.log('All tables copied successfully');
-        return resolve();
-      }
-
-      const table = orderedTables[currentIndex];
+    // Process each table with batch inserts
+    for (const table of orderedTables) {
       const selectQuery = `SELECT ${table.cols.join(', ')} FROM ${table.name} WHERE user_id = ?`;
 
       console.log(`Fetching data from table: ${table.name}`);
 
-      db.all(selectQuery, [userId], (err, rows) => {
-        if (err) {
-          console.error(`Error selecting from ${table.name}:`, err);
-          return reject(err);
-        }
+      try {
+        const rows = await new Promise((resolveRows, rejectRows) => {
+          db.all(selectQuery, [userId], (err, result) => {
+            if (err) {
+              console.error(`Error selecting from ${table.name}:`, err);
+              return rejectRows(err);
+            }
+            resolveRows(result);
+          });
+        });
 
         console.log(`Found ${rows.length} rows in ${table.name} for user ${userId}`);
 
         if (rows.length === 0) {
           // No data for this user in this table, continue to the next table
           console.log(`No data found for user ${userId} in table ${table.name}, skipping...`);
-          currentIndex++;
-          return copyNextTable();
+          continue;
         }
 
-        // Prepare insert statement
-        const placeholders = table.cols.map(() => '?').join(', ');
-        const insertQuery = `INSERT INTO ${table.name} (${table.cols.join(', ')}) VALUES (${placeholders})`;
+        // Batch insert all rows for this table
+        await batchInsertRows(tempDb, table.name, table.cols, rows);
+        console.log(`Completed inserting ${rows.length} rows into ${table.name}`);
+      } catch (error) {
+        console.error(`Error processing table ${table.name}:`, error);
+        return reject(error);
+      }
+    }
 
-        // Insert all rows for this table
-        let rowIndex = 0;
+    console.log('All tables copied successfully');
+    resolve();
+  });
+}
 
-        function insertNextRow() {
-          if (rowIndex >= rows.length) {
-            // All rows for this table inserted, move to next table
-            console.log(`Completed inserting ${rows.length} rows into ${table.name}`);
-            currentIndex++;
-            return copyNextTable();
-          }
+// Helper function to batch insert rows into a table
+function batchInsertRows(tempDb, tableName, columns, rows) {
+  return new Promise((resolve, reject) => {
+    if (rows.length === 0) {
+      return resolve();
+    }
 
-          const row = rows[rowIndex];
-          const values = table.cols.map(col => row[col]);
+    // Calculate optimal batch size based on the number of rows
+    const batchSize = Math.min(1000, Math.max(100, Math.floor(rows.length / 10))); // Between 100-1000, adjust based on total count
+    
+    let batchStart = 0;
+    
+    function processBatch() {
+      if (batchStart >= rows.length) {
+        return resolve(); // All batches processed
+      }
 
-          // Debug: Log the values being inserted
-          if (rowIndex < 3) { // Only log first few rows to avoid too much output
-            console.log(`Inserting row ${rowIndex + 1}/${rows.length} into ${table.name}:`, values);
-          }
+      const batchEnd = Math.min(batchStart + batchSize, rows.length);
+      const batchRows = rows.slice(batchStart, batchEnd);
+      
+      // Prepare the SQL statement with multiple value sets for batch insert
+      const placeholders = Array(columns.length).fill('?').join(',');
+      const valueSets = Array(batchRows.length).fill(`(${placeholders})`).join(',');
+      const insertQuery = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${valueSets}`;
+      
+      // Flatten the values array for the batch insert
+      const flatValues = [];
+      for (const row of batchRows) {
+        for (const col of columns) {
+          flatValues.push(row[col]);
+        }
+      }
 
-          tempDb.run(insertQuery, values, function(err) {
-            if (err) {
-              console.error(`Error inserting into ${table.name}:`, err);
-              console.error(`Values that caused error:`, values);
-              return reject(err);
-            }
-
-            rowIndex++;
-            insertNextRow();
-          });
+      tempDb.run(insertQuery, flatValues, function(err) {
+        if (err) {
+          console.error(`Error inserting batch into ${tableName}:`, err);
+          return reject(err);
         }
 
-        insertNextRow();
+        // Move to the next batch
+        batchStart = batchEnd;
+        
+        // Use setImmediate to allow other operations to run between batches
+        setImmediate(processBatch);
       });
     }
 
-    copyNextTable();
+    processBatch();
   });
 }
 
@@ -1333,7 +1351,7 @@ async function handleExportFullData(req, res) {
     const { db } = require('../config/database');
     const { retrieveFile } = require('../utils/secureFileStorage');
     const archiver = require('archiver');
-    
+
     console.log('Starting full data export for user:', req.user.id);
 
     // Create a temporary directory for this user's export
@@ -1410,18 +1428,18 @@ async function handleExportFullData(req, res) {
       userEmail: user.email,
       profileImageUrl: user.profile_image_url
     };
-    
+
     const metadataPath = path.join(tempDir, 'metadata.json');
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
     // Copy user's profile picture if it exists
     if (user.profile_image_url) {
       console.log(`Attempting to export profile image: ${user.profile_image_url}`);
-      
+
       // Extract the file path from the URL - profile images are stored in /uploads/profiles/{userId}/
       // Handle both absolute URLs (with protocol) and relative paths
       let profileImagePath = user.profile_image_url;
-      
+
       // If it's a full URL, extract just the path portion
       if (profileImagePath.startsWith('http://') || profileImagePath.startsWith('https://')) {
         try {
@@ -1436,10 +1454,10 @@ async function handleExportFullData(req, res) {
           }
         }
       }
-      
+
       // Remove the '/uploads/profiles/' prefix to get the relative path
       profileImagePath = profileImagePath.replace('/uploads/profiles/', '');
-      
+
       // First, try the profiles folder (normal location)
       let profileImageFullPath = path.join(__dirname, '../uploads/profiles/', profileImagePath);
       let profileImageFound = false;
@@ -1486,6 +1504,7 @@ async function handleExportFullData(req, res) {
         fs.mkdirSync(attachmentsDir, { recursive: true });
       }
 
+      let attachmentCount = 0;
       for (const attachment of attachments) {
         try {
           // Extract the file path from the attachment record
@@ -1497,12 +1516,17 @@ async function handleExportFullData(req, res) {
           // Write the file to the export directory
           const destAttachmentPath = path.join(attachmentsDir, attachment.filename);
           fs.writeFileSync(destAttachmentPath, fileBuffer);
+
+          attachmentCount++;
+          if (attachmentCount % 10 === 0 || attachmentCount === attachments.length) {
+            console.log(`Progress: Copied ${attachmentCount}/${attachments.length} attachments...`);
+          }
         } catch (error) {
           console.error(`Error copying attachment ${attachment.id}:`, error);
           // Continue with other attachments even if one fails
           // Log the specific attachment that failed for debugging
           console.log(`Skipping attachment ID ${attachment.id} with filename: ${attachment.filename}, filepath: ${attachment.filepath}`);
-          
+
           // If the error is specifically about file not found or access denied, continue silently
           if (error.message.includes('File not found') || error.message.includes('Access denied')) {
             console.log(`File issue for attachment ${attachment.id} (filename: ${attachment.filename}), continuing export...`);
@@ -1544,7 +1568,7 @@ async function handleExportFullData(req, res) {
             fs.unlinkSync(zipPath);
             console.log('Zip file deleted:', zipPath);
           }
-          
+
           // Delete the temporary directory
           if (fs.existsSync(tempDir)) {
             fs.rmSync(tempDir, { recursive: true, force: true });
@@ -1560,7 +1584,7 @@ async function handleExportFullData(req, res) {
           fs.unlinkSync(zipPath);
           console.log('Zip file deleted after stream error:', zipPath);
         }
-        
+
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
           console.log('Temporary export directory deleted after stream error:', tempDir);
@@ -1597,7 +1621,7 @@ async function handleExportFullData(req, res) {
 
   } catch (error) {
     console.error('Full data export error:', error);
-    
+
     // Clean up any partially created files
     try {
       const tempDir = path.join(__dirname, '../temp/', `user_${req.user.id}_export_${Date.now()}`);
