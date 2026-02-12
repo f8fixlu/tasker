@@ -322,12 +322,20 @@ function createOtherTablesAndColumns(callback) {
   });
 
   // Add status_updated_at column to users table for tracking when status was last updated
-  db.run(`ALTER TABLE users ADD COLUMN status_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
+  db.run(`ALTER TABLE users ADD COLUMN status_updated_at DATETIME`, (err) => {
     if (err) {
       // Column might already exist, which is fine
       console.log('Note: status_updated_at column may already exist or table is not ready yet');
     } else {
       console.log('status_updated_at column added to users table successfully');
+      // Update existing records to have current timestamp
+      db.run(`UPDATE users SET status_updated_at = datetime('now')`, (updateErr) => {
+        if (updateErr) {
+          console.log('Note: Could not update existing records with timestamp');
+        } else {
+          console.log('Existing records updated with current timestamp');
+        }
+      });
     }
   });
 

@@ -7,14 +7,14 @@ const saltRounds = 12;
 
 // Create a new user
 async function createUser(userData) {
-  const { full_name, email, password_hash, profile_image_url, role } = userData;
+  const { full_name, email, password_hash, profile_image_url } = userData;
 
   const sql = `
-    INSERT INTO users (full_name, email, password_hash, profile_image_url, welcome_shown, role)
-    VALUES (?, ?, ?, ?, 0, ?)
+    INSERT INTO users (full_name, email, password_hash, profile_image_url, welcome_shown)
+    VALUES (?, ?, ?, ?, 0)
   `;
 
-  const params = [full_name, email, password_hash, profile_image_url, role || null];
+  const params = [full_name, email, password_hash, profile_image_url];
 
   try {
     const result = await runQuery(sql, params);
@@ -26,7 +26,7 @@ async function createUser(userData) {
 
 // Get user by ID
 async function getUserById(id) {
-  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, created_at, updated_at, status, status_updated_at FROM users WHERE id = ?';
+  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at FROM users WHERE id = ?';
   const params = [id];
 
   try {
@@ -39,7 +39,7 @@ async function getUserById(id) {
 
 // Get user by email
 async function getUserByEmail(email) {
-  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, created_at, updated_at, status, status_updated_at FROM users WHERE email = ?';
+  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at FROM users WHERE email = ?';
   const params = [email];
 
   try {
@@ -72,19 +72,9 @@ async function updateUser(id, userData) {
     fields.push('role = ?');
     params.push(userData.role);
   }
-  if (userData.status !== undefined) {
-    fields.push('status = ?');
-    params.push(userData.status);
-  }
 
   // Add updated_at timestamp
   fields.push('updated_at = CURRENT_TIMESTAMP');
-  
-  // Add status_updated_at timestamp if status is being updated
-  if (userData.status !== undefined) {
-    fields.push('status_updated_at = CURRENT_TIMESTAMP');
-  }
-  
   // Add the ID for WHERE clause
   params.push(id);
 
@@ -170,9 +160,9 @@ async function updateUserResetToken(userId, resetToken, resetTokenExpiry) {
   }
 }
 
-  // Get user by reset token
+// Get user by reset token
 async function getUserByResetToken(resetToken) {
-  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, created_at, updated_at, reset_token_expiry, status, status_updated_at FROM users WHERE reset_token = ?';
+  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, role, status, created_at, updated_at, reset_token_expiry FROM users WHERE reset_token = ?';
   const params = [resetToken];
 
   try {
@@ -216,34 +206,36 @@ async function markWelcomeShown(userId) {
 }
 
 // Update user status
-async function updateUserStatus(userId, status, customReason = null) {
+async function updateUserStatus(userId, newStatus, reason = '') {
   const { runQuery, getRow } = require('../utils/database');
-  const StatusTracker = require('../utils/statusTracker');
 
   try {
-    // Get current status to log the change
-    const currentUser = await getRow('SELECT status FROM users WHERE id = ?', [userId]);
-    const previousStatus = currentUser?.status || 'unknown';
+    // Get current status from the users table
+    const userResult = await getRow(`
+      SELECT status as current_status
+      FROM users
+      WHERE id = ?
+    `, [userId]);
 
-    const sql = 'UPDATE users SET status = ?, status_updated_at = CURRENT_TIMESTAMP WHERE id = ?';
-    const params = [status, userId];
+    const currentStatus = userResult?.current_status || 'offline';
 
-    const result = await runQuery(sql, params);
-    
-    // Log the status change if the update was successful
-    if (result.changes > 0) {
-      let reason = customReason || 'manual_update';
-      if (!customReason) { // Only auto-determine reason if not provided
-        if (status === 'online') reason = 'login';
-        else if (status === 'pending_offline') reason = 'logout';
-        else if (status === 'offline') reason = 'cleanup_service';
-      }
-      
-      await StatusTracker.logStatusChange(userId, previousStatus, status, reason);
-    }
-    
-    return result.changes > 0;
+    // Update the user's status in the users table
+    // Note: status_updated_at column was added in a later migration, so we handle both cases
+    await runQuery(`
+      UPDATE users
+      SET status = ?, status_updated_at = datetime('now')
+      WHERE id = ?
+    `, [newStatus, userId]);
+
+    // Insert the status change into the status_history table
+    await runQuery(`
+      INSERT INTO status_history (user_id, previous_status, new_status, reason)
+      VALUES (?, ?, ?, ?)
+    `, [userId, currentStatus, newStatus, reason]);
+
+    return true;
   } catch (error) {
+    console.error(`Error updating user status for user ${userId}:`, error);
     throw new Error(`Error updating user status: ${error.message}`);
   }
 }
@@ -253,83 +245,29 @@ async function getUsersWithPendingOffline() {
   const { getAll } = require('../utils/database');
 
   try {
+    // Find users whose status is 'pending_offline' in the users table
     const sql = `
-      SELECT id, email, status_updated_at
+      SELECT id, email, full_name
       FROM users
       WHERE status = 'pending_offline'
-      AND datetime(status_updated_at) <= datetime('now', '-30 seconds')
     `;
 
     const users = await getAll(sql);
     return users;
   } catch (error) {
-    throw new Error(`Error fetching users with pending offline status: ${error.message}`);
+    console.error('Error getting users with pending offline status:', error);
+    throw new Error(`Error getting users with pending offline status: ${error.message}`);
   }
 }
 
-// Get user online status based on sessions and user status
-async function getUserOnlineStatus(userId) {
-  const { getRow } = require('../utils/database');
-
-  try {
-    // First check if user has explicit status
-    const userSql = 'SELECT status, status_updated_at FROM users WHERE id = ?';
-    const user = await getRow(userSql, [userId]);
-
-    if (user) {
-      // If user is explicitly online, return online
-      if (user.status === 'online') {
-        return 'online';
-      }
-      
-      // If user is pending_offline and within 30 seconds window, still show as online
-      if (user.status === 'pending_offline') {
-        const statusTime = new Date(user.status_updated_at);
-        const now = new Date();
-        const diffInSeconds = (now - statusTime) / 1000;
-        
-        if (diffInSeconds < 30) {
-          return 'online';
-        } else {
-          return 'offline';
-        }
-      }
-      
-      // If user is offline, check sessions to see if they might be online
-      if (user.status === 'offline') {
-        const sessionSql = `
-          SELECT COUNT(*) as active_sessions
-          FROM sessions
-          WHERE user_id = ? 
-          AND expires_at > CURRENT_TIMESTAMP 
-          AND last_activity_at > datetime('now', '-5 minutes')
-        `;
-        
-        const sessionResult = await getRow(sessionSql, [userId]);
-
-        if (sessionResult && sessionResult.active_sessions > 0) {
-          // Don't automatically update status - just return online for display purposes
-          return 'online';
-        }
-      }
-    }
-
-    // Default to offline
-    return 'offline';
-  } catch (error) {
-    console.error(`Error getting user online status for user ${userId}:`, error);
-    return 'offline';
-  }
-}
-
-// Set user status to online (for login/heartbeat)
-async function setUserOnline(userId) {
-  return await updateUserStatus(userId, 'online', 'activity'); // Using 'activity' to indicate non-login online status
-}
-
-// Set user status to pending offline (for logout)
+// Set user status to pending offline
 async function setUserPendingOffline(userId) {
-  return await updateUserStatus(userId, 'pending_offline', 'logout');
+  return await updateUserStatus(userId, 'pending_offline', 'set_pending_offline');
+}
+
+// Set user status to online
+async function setUserOnline(userId) {
+  return await updateUserStatus(userId, 'online', 'set_online');
 }
 
 module.exports = {
@@ -347,7 +285,6 @@ module.exports = {
   markWelcomeShown,
   updateUserStatus,
   getUsersWithPendingOffline,
-  getUserOnlineStatus,
-  setUserOnline,
-  setUserPendingOffline
+  setUserPendingOffline,
+  setUserOnline
 };

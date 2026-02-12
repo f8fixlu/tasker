@@ -49,7 +49,7 @@ class InactivityDetectionService {
 
       // Find users who are currently online but haven't had activity in the threshold time
       const inactiveUsers = await getAll(`
-        SELECT u.id, u.email, u.status, u.status_updated_at, s.last_activity_at
+        SELECT u.id, u.email, u.status, s.last_activity_at
         FROM users u
         LEFT JOIN (
           SELECT user_id, MAX(last_activity_at) as last_activity_at
