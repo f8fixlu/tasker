@@ -1,8 +1,19 @@
-require('dotenv').config(); // Load environment variables from .env file
+// Load environment variables from .env file - look in project root
+const path = require('path');
+const fs = require('fs');
+
+// Try to load .env from the project root (parent directory)
+const rootEnvPath = path.join(__dirname, '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  require('dotenv').config({ path: rootEnvPath });
+  console.log('Environment variables loaded from project root (.env)');
+} else {
+  // Fallback to current directory
+  require('dotenv').config();
+  console.log('Environment variables loaded from current directory (.env)');
+}
 
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 const url = require('url');
 
 // Import configuration and utilities
@@ -25,14 +36,25 @@ const reportRoutes = require('./routes/reports');
 const eventTypeRoutes = require('./routes/eventTypes');
 const databaseRoutes = require('./routes/database');
 const dashboardRoutes = require('./routes/dashboard');
+const adminRoutes = require('./routes/admin');
+const statusTrackingRoutes = require('./routes/statusTracking');
 
 // Import session management utilities
 const { startSessionCleanupJob } = require('./utils/sessionManagement');
 // Import notification jobs
 const { startNotificationJobs } = require('./utils/notificationJobs');
+// Import status cleanup service
+const statusCleanupService = require('./services/statusCleanupService');
+// Import inactivity detection service
+const inactivityDetectionService = require('./services/inactivityDetectionService');
 
 // Initialize the database
-setupDatabase();
+setupDatabase((err) => {
+  if (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -197,6 +219,10 @@ const server = http.createServer((req, res) => {
             databaseRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/dashboard')) {
             dashboardRoutes(req, res, parsedUrl);
+          } else if (pathname.startsWith('/api/admin')) {
+            adminRoutes(req, res, parsedUrl);
+          } else if (pathname.startsWith('/api/status-tracking')) {
+            statusTrackingRoutes(req, res, parsedUrl);
           } else {
             // API route not found - return JSON error instead of static file
             res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -367,4 +393,13 @@ server.listen(PORT, () => {
 
   // Start the notification jobs (check every 5 minutes for overdue tasks and upcoming events)
   startNotificationJobs(5);
+
+  // Delay starting status cleanup service to ensure database is fully ready
+  setTimeout(() => {
+    // Start status cleanup service (process pending offline users every 10 seconds)
+    statusCleanupService.start();
+    
+    // Start inactivity detection service (detect inactive users and update their status)
+    inactivityDetectionService.start();
+  }, 1000); // Wait 1 second to ensure database operations complete
 });

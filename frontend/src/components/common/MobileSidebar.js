@@ -104,62 +104,102 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
           {/* Navigation links */}
           <nav className="flex-1 overflow-y-auto p-4">
             <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/"
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
-                    location.pathname === '/' || location.pathname === '/dashboard'
-                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
-                      : 'hover:bg-background-light dark:hover:bg-background-dark'
-                  }`}
-                  onClick={onClose}
-                >
-                  <span className="material-symbols-outlined text-base">dashboard</span>
-                  <span>Dashboard</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/tasks"
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
-                    location.pathname === '/tasks'
-                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
-                      : 'hover:bg-background-light dark:hover:bg-background-dark'
-                  }`}
-                  onClick={onClose}
-                >
-                  <span className="material-symbols-outlined text-base">task</span>
-                  <span>Tasks</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/calendar"
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
-                    location.pathname === '/calendar'
-                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
-                      : 'hover:bg-background-light dark:hover:bg-background-dark'
-                  }`}
-                  onClick={onClose}
-                >
-                  <span className="material-symbols-outlined text-base">calendar_month</span>
-                  <span>Calendar</span>
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/reports"
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
-                    location.pathname === '/reports'
-                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
-                      : 'hover:bg-background-light dark:hover:bg-background-dark'
-                  }`}
-                  onClick={onClose}
-                >
-                  <span className="material-symbols-outlined text-base">analytics</span>
-                  <span>Reports</span>
-                </Link>
-              </li>
+              {!(user?.role === 'admin') && (
+                <li>
+                  <Link
+                    to="/"
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                      location.pathname === '/' || location.pathname === '/dashboard'
+                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                        : 'hover:bg-background-light dark:hover:bg-background-dark'
+                    }`}
+                    onClick={onClose}
+                  >
+                    <span className="material-symbols-outlined text-base">dashboard</span>
+                    <span>Dashboard</span>
+                  </Link>
+                </li>
+              )}
+              {!(user?.role === 'admin') && (
+                <li>
+                  <Link
+                    to="/tasks"
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                      location.pathname === '/tasks'
+                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                        : 'hover:bg-background-light dark:hover:bg-background-dark'
+                    }`}
+                    onClick={onClose}
+                  >
+                    <span className="material-symbols-outlined text-base">task</span>
+                    <span>Tasks</span>
+                  </Link>
+                </li>
+              )}
+              {!(user?.role === 'admin') && (
+                <li>
+                  <Link
+                    to="/calendar"
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                      location.pathname === '/calendar'
+                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                        : 'hover:bg-background-light dark:hover:bg-background-dark'
+                    }`}
+                    onClick={onClose}
+                  >
+                    <span className="material-symbols-outlined text-base">calendar_month</span>
+                    <span>Calendar</span>
+                  </Link>
+                </li>
+              )}
+              {!(user?.role === 'admin') && (
+                <li>
+                  <Link
+                    to="/reports"
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                      location.pathname === '/reports'
+                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                        : 'hover:bg-background-light dark:hover:bg-background-dark'
+                    }`}
+                    onClick={onClose}
+                  >
+                    <span className="material-symbols-outlined text-base">analytics</span>
+                    <span>Reports</span>
+                  </Link>
+                </li>
+              )}
+              {user?.role === 'admin' && (
+                <>
+                  <li>
+                    <Link
+                      to="/admin/stats"
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                        location.pathname === '/admin/stats'
+                          ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                          : 'hover:bg-background-light dark:hover:bg-background-dark'
+                      }`}
+                      onClick={onClose}
+                    >
+                      <span className="material-symbols-outlined text-base">bar_chart</span>
+                      <span>System Stats</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/admin/user-management"
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark ${
+                        location.pathname === '/admin/user-management'
+                          ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                          : 'hover:bg-background-light dark:hover:bg-background-dark'
+                      }`}
+                      onClick={onClose}
+                    >
+                      <span className="material-symbols-outlined text-base">people</span>
+                      <span>User Management</span>
+                    </Link>
+                  </li>
+                </>
+              )}
               <li>
                 <button
                   className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark hover:bg-background-light dark:hover:bg-background-dark`}

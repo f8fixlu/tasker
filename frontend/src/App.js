@@ -6,6 +6,8 @@ import { ModalProvider } from './context/ModalContext';
 import { TaskUpdateProvider } from './context/TaskUpdateContext';
 import { NotificationUpdateProvider } from './context/NotificationUpdateContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import AdminRoute from './components/admin/AdminRoute';
+import AdminRedirectRoute from './components/common/AdminRedirectRoute';
 import Layout from './components/layout/Layout';
 import './styles/index.css';
 
@@ -18,6 +20,8 @@ const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const AdminStatsPage = lazy(() => import('./pages/admin/AdminStatsPage'));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 
 // Preload critical routes when user is authenticated
 const preloadDashboard = () => import('./pages/Dashboard');
@@ -76,7 +80,7 @@ function App() {
                   <Route
                     path="/"
                     element={
-                      <ProtectedRoute>
+                      <AdminRedirectRoute>
                         <Layout>
                           <Suspense fallback={
                             <div className="flex justify-center items-center h-screen">
@@ -86,13 +90,13 @@ function App() {
                             <Dashboard />
                           </Suspense>
                         </Layout>
-                      </ProtectedRoute>
+                      </AdminRedirectRoute>
                     }
                   />
                   <Route
                     path="/dashboard"
                     element={
-                      <ProtectedRoute>
+                      <AdminRedirectRoute>
                         <Layout>
                           <Suspense fallback={
                             <div className="flex justify-center items-center h-screen">
@@ -102,13 +106,13 @@ function App() {
                             <Dashboard />
                           </Suspense>
                         </Layout>
-                      </ProtectedRoute>
+                      </AdminRedirectRoute>
                     }
                   />
                   <Route
                     path="/tasks"
                     element={
-                      <ProtectedRoute>
+                      <AdminRedirectRoute>
                         <Layout>
                           <Suspense fallback={
                             <div className="flex justify-center items-center h-screen">
@@ -118,13 +122,13 @@ function App() {
                             <Tasks />
                           </Suspense>
                         </Layout>
-                      </ProtectedRoute>
+                      </AdminRedirectRoute>
                     }
                   />
                   <Route
                     path="/calendar"
                     element={
-                      <ProtectedRoute>
+                      <AdminRedirectRoute>
                         <Layout>
                           <Suspense fallback={
                             <div className="flex justify-center items-center h-screen">
@@ -134,13 +138,13 @@ function App() {
                             <Calendar />
                           </Suspense>
                         </Layout>
-                      </ProtectedRoute>
+                      </AdminRedirectRoute>
                     }
                   />
                   <Route
                     path="/reports"
                     element={
-                      <ProtectedRoute>
+                      <AdminRedirectRoute>
                         <Layout>
                           <Suspense fallback={
                             <div className="flex justify-center items-center h-screen">
@@ -150,7 +154,7 @@ function App() {
                             <Reports />
                           </Suspense>
                         </Layout>
-                      </ProtectedRoute>
+                      </AdminRedirectRoute>
                     }
                   />
                   <Route
@@ -163,6 +167,38 @@ function App() {
                       }>
                         <ResetPassword />
                       </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/admin/stats"
+                    element={
+                      <AdminRoute>
+                        <Layout>
+                          <Suspense fallback={
+                            <div className="flex justify-center items-center h-screen">
+                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                            </div>
+                          }>
+                            <AdminStatsPage />
+                          </Suspense>
+                        </Layout>
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/user-management"
+                    element={
+                      <AdminRoute>
+                        <Layout>
+                          <Suspense fallback={
+                            <div className="flex justify-center items-center h-screen">
+                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                            </div>
+                          }>
+                            <UserManagementPage />
+                          </Suspense>
+                        </Layout>
+                      </AdminRoute>
                     }
                   />
                   <Route

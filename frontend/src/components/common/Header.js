@@ -127,34 +127,59 @@ const Header = () => {
           <h2 className="text-text-light dark:text-text-dark text-lg font-bold">Tasker</h2>
         </div>
         <div className="hidden md:flex items-center gap-6 lg:gap-9">
-          <Link
-            className={`text-sm font-medium ${location.pathname === '/' || location.pathname === '/dashboard' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
-            to="/"
-          >
-            Dashboard
-          </Link>
-          <Link
-            className={`text-sm font-medium ${location.pathname === '/tasks' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
-            to="/tasks"
-          >
-            Tasks
-          </Link>
-          <Link
-            className={`text-sm font-medium ${location.pathname === '/calendar' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
-            to="/calendar"
-          >
-            Calendar
-          </Link>
-          <Link
-            className={`text-sm font-medium ${location.pathname === '/reports' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
-            to="/reports"
-          >
-            Reports
-          </Link>
+          {!(user?.role === 'admin') && (
+            <Link
+              className={`text-sm font-medium ${location.pathname === '/' || location.pathname === '/dashboard' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+              to="/"
+            >
+              Dashboard
+            </Link>
+          )}
+          {!(user?.role === 'admin') && (
+            <Link
+              className={`text-sm font-medium ${location.pathname === '/tasks' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+              to="/tasks"
+            >
+              Tasks
+            </Link>
+          )}
+          {!(user?.role === 'admin') && (
+            <Link
+              className={`text-sm font-medium ${location.pathname === '/calendar' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+              to="/calendar"
+            >
+              Calendar
+            </Link>
+          )}
+          {!(user?.role === 'admin') && (
+            <Link
+              className={`text-sm font-medium ${location.pathname === '/reports' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+              to="/reports"
+            >
+              Reports
+            </Link>
+          )}
+          {user?.role === 'admin' && (
+            <>
+              <Link
+                className={`text-sm font-medium ${location.pathname === '/admin/stats' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+                to="/admin/stats"
+              >
+                System Stats
+              </Link>
+              <Link
+                className={`text-sm font-medium ${location.pathname === '/admin/user-management' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+                to="/admin/user-management"
+              >
+                User Management
+              </Link>
+            </>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-3 sm:gap-4">
         <ThemeToggle />
+        {!(user?.role === 'admin') && (
         <div className="relative" ref={notificationsRef}>
           <button
             className="p-2 rounded-full text-text-light dark:text-text-dark hover:bg-surface-light dark:hover:bg-surface-dark relative focus:outline-none"
@@ -268,6 +293,7 @@ const Header = () => {
             </div>
           )}
         </div>
+        )}
         {/* Show profile picture and dropdown only on desktop/tablet, hide on mobile */}
         <div className="relative hidden sm:hidden md:block lg:block xl:block" ref={profileRef}>
           {user?.profile_image_url ? (
@@ -341,6 +367,7 @@ const Header = () => {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        user={user}
       />
 
       {/* Logout Confirmation Modal */}

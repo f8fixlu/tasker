@@ -5,8 +5,8 @@ import Button from './Button';
 import Input from './Input';
 import Modal from './Modal';
 
-const SettingsModal = ({ isOpen, onClose }) => {
-  const { user, refreshUser } = useAuth();
+const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
+  const { user: authUser, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const fileInputRef = useRef(null);
   const [signatoryData, setSignatoryData] = useState({
@@ -28,21 +28,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
   });
   const [loadingSignatories, setLoadingSignatories] = useState(true);
   const [profileData, setProfileData] = useState({
-    fullName: user?.name || user?.full_name || '',
-    email: user?.email || '',
-    profileImage: user?.profile_image_url || '',
+    fullName: authUser?.name || authUser?.full_name || '',
+    email: authUser?.email || '',
+    profileImage: authUser?.profile_image_url || '',
     profileImageFile: null
   });
 
   // Update profileData when user data changes (e.g., after profile image operations)
   useEffect(() => {
     setProfileData({
-      fullName: user?.name || user?.full_name || '',
-      email: user?.email || '',
-      profileImage: user?.profile_image_url || '',
+      fullName: authUser?.name || authUser?.full_name || '',
+      email: authUser?.email || '',
+      profileImage: authUser?.profile_image_url || '',
       profileImageFile: null
     });
-  }, [user]);
+  }, [authUser]);
   const [bugReport, setBugReport] = useState({
     description: '',
     steps: '',
@@ -76,11 +76,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [autoSavePath, setAutoSavePath] = useState('');
 
   useEffect(() => {
-    if (user) {
+    if (authUser) {
       setProfileData({
-        fullName: user?.name || user?.full_name || '',
-        email: user?.email || '',
-        profileImage: user?.profile_image_url || '',
+        fullName: authUser?.name || authUser?.full_name || '',
+        email: authUser?.email || '',
+        profileImage: authUser?.profile_image_url || '',
         profileImageFile: null
       });
     }
@@ -106,7 +106,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     if (savedAutoSavePath) {
       setAutoSavePath(savedAutoSavePath);
     }
-  }, [user]);
+  }, [authUser]);
 
   // Save auto-save settings to localStorage when they change
   useEffect(() => {
@@ -126,7 +126,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     try {
       // In a real implementation, this would fetch from an API
       // For now, we'll use a mock implementation or retrieve from local storage
-      const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
+      const savedSignatories = localStorage.getItem(`signatories_${authUser?.id}`);
       if (savedSignatories) {
         const parsedData = JSON.parse(savedSignatories);
         // Ensure title properties exist for backward compatibility
@@ -151,8 +151,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
         // Default values could be loaded from user profile settings
         setSignatoryData({
           preparedBy: {
-            name: user?.name || user?.full_name || '',
-            position: user?.position || 'Job Order',
+            name: authUser?.name || authUser?.full_name || '',
+            position: authUser?.position || 'Job Order',
             title: 'Prepared By'
           },
           reviewedBy: {
@@ -196,7 +196,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     try {
       // In a real implementation, this would save to an API
       // For now, we'll save to local storage
-      localStorage.setItem(`signatories_${user?.id}`, JSON.stringify(signatoryData));
+      localStorage.setItem(`signatories_${authUser?.id}`, JSON.stringify(signatoryData));
       setSuccessMessage('Signatory data saved successfully!');
       setShowSuccessModal(true);
     } catch (error) {
@@ -578,8 +578,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
       // Create a download link for the SQLite database file
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      // Use user.id or user.email as fallback if user.id is not available
-      const userId = user?.id || user?.email?.split('@')[0] || 'unknown';
+      // Use authUser.id or authUser.email as fallback if authUser.id is not available
+      const userId = authUser?.id || authUser?.email?.split('@')[0] || 'unknown';
       link.href = url;
       link.download = `tasker_user_${userId}_backup_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.db`;
       document.body.appendChild(link);
@@ -641,8 +641,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
       // Create a download link for the zip file
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      // Use user.id or user.email as fallback if user.id is not available
-      const userId = user?.id || user?.email?.split('@')[0] || 'unknown';
+      // Use authUser.id or authUser.email as fallback if authUser.id is not available
+      const userId = authUser?.id || authUser?.email?.split('@')[0] || 'unknown';
       link.href = url;
       link.download = `tasker_user_${userId}_full_data_export_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.zip`;
       document.body.appendChild(link);
@@ -881,36 +881,42 @@ const SettingsModal = ({ isOpen, onClose }) => {
         >
           Account Security
         </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'notifications'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-          }`}
-          onClick={() => setActiveTab('notifications')}
-        >
-          Notifications
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'signatories'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-          }`}
-          onClick={() => setActiveTab('signatories')}
-        >
-          Signatories
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'database'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-          }`}
-          onClick={() => setActiveTab('database')}
-        >
-          Database
-        </button>
+        {!(propsUser?.role === 'admin') && (
+          <button
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'notifications'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+            onClick={() => setActiveTab('notifications')}
+          >
+            Notifications
+          </button>
+        )}
+        {!(propsUser?.role === 'admin') && (
+          <button
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'signatories'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+            onClick={() => setActiveTab('signatories')}
+          >
+            Signatories
+          </button>
+        )}
+        {!(propsUser?.role === 'admin') && (
+          <button
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'database'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+            onClick={() => setActiveTab('database')}
+          >
+            Database
+          </button>
+        )}
       </div>
       
       <div className="flex flex-col gap-6 max-h-[70vh] overflow-y-auto pr-2">
@@ -1026,7 +1032,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         )}
         
         {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
+        {activeTab === 'notifications' && !(propsUser?.role === 'admin') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-[#111418] dark:text-white pb-4">Notifications</h2>
             <form className="grid grid-cols-1 gap-4">
@@ -1160,7 +1166,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         
 
         {/* Signatories Tab */}
-        {activeTab === 'signatories' && (
+        {activeTab === 'signatories' && !(propsUser?.role === 'admin') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-[#111418] dark:text-white pb-4">Report Signatories</h2>
             {loadingSignatories ? (
@@ -1293,7 +1299,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         )}
 
         {/* Database Tab */}
-        {activeTab === 'database' && (
+        {activeTab === 'database' && !(propsUser?.role === 'admin') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-bold text-[#111418] dark:text-white pb-4">Database Management</h2>
             <div className="space-y-6">

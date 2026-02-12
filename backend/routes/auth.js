@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const { jsonParser } = require('../middleware/auth');
 const sanitizeMiddleware = require('../middleware/sanitize');
 const { validateUser } = require('../middleware/validation');
-const { createUser, getUserByEmail, getUserById, updateUser, hashPassword, verifyPassword, updateUserPassword } = require('../models/User');
+const { createUser, getUserByEmail, getUserById, updateUser, hashPassword, verifyPassword, updateUserPassword, updateUserStatus, setUserPendingOffline, setUserOnline } = require('../models/User');
 const { createSession, getSessionByToken, deleteSessionByToken, deleteSessionById, deleteAllSessionsForUser, updateLastActivity } = require('../models/Session');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken, revokeToken } = require('../utils/jwtManagement');
 const { handleFileUpload } = require('../utils/multipartParser');
@@ -55,6 +55,8 @@ function authRoutes(req, res, parsedUrl) {
           await validateResetToken(req, res, token);
         } else if (method === 'POST' && path === '/api/auth/mark-welcome-shown') {
           await handleMarkWelcomeShown(req, res, req.user.id);
+        } else if (method === 'POST' && path === '/api/auth/heartbeat') {
+          await handleHeartbeat(req, res);
         } else {
           // Route not found
           res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -172,9 +174,19 @@ async function handleLogin(req, res) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'Invalid email or password' }));
     }
-    
-    // Generate tokens
-    const payload = { id: user.id, email: user.email };
+
+    // Ensure admin role is set for eligible users
+    const { ensureAdminRole } = require('../middleware/auth');
+    const userWithRole = ensureAdminRole(user);
+
+    // Always update the role if it should be set (to ensure it's properly stored in database)
+    if (userWithRole.role && user.role !== userWithRole.role) {
+      await updateUser(user.id, { role: userWithRole.role });
+    }
+
+    // Generate tokens - use the updated user object with correct role
+    const updatedUser = await getUserById(user.id); // Get user again to ensure we have the latest role
+    const payload = { id: updatedUser.id, email: updatedUser.email, role: updatedUser.role || null };
     const accessToken = await generateAccessToken(payload);
     const refreshToken = await generateRefreshToken(payload);
     
@@ -188,6 +200,9 @@ async function handleLogin(req, res) {
     const ipAddress = cfConnectingIp || xForwardedFor || req.connection.remoteAddress || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'] || '';
     
+    // Set user status to online when logging in (with explicit 'login' reason)
+    await updateUserStatus(user.id, 'online', 'login');
+
     // Store refresh token in session with metadata
     const { JWT_REFRESH_EXPIRES_IN } = require('../config/auth');
     // Convert the expiration string to milliseconds for the date calculation
@@ -249,14 +264,35 @@ async function handleLogout(req, res) {
       // Revoke the token (add to blacklist)
       await revokeToken(token, userId);
 
-      // Delete the session from the database
-      await deleteSessionByToken(token);
+      // Set user status to pending offline (will become offline after 30 seconds) with explicit 'logout' reason
+      await updateUserStatus(userId, 'pending_offline', 'logout');
+
+      // Mark ALL sessions for this user as ended (invalidate all sessions)
+      const { runQuery } = require('../utils/database');
+      await runQuery(
+        `UPDATE sessions
+         SET expires_at = datetime('now', '-1 minute')  -- Mark all sessions as expired
+         WHERE user_id = ?`,
+        [userId]
+      );
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ message: 'Logged out successfully' }));
     } catch (error) {
       // Even if token verification fails, we still want to clean up
-      await deleteSessionByToken(token);
+      // Try to get user ID from the token without verification to invalidate all their sessions
+      try {
+        // Decode the token without verification to extract user ID
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.id) {
+          // Invalidate all sessions for this user
+          await deleteAllSessionsForUser(decoded.id);
+        }
+      } catch (decodeError) {
+        // If we can't decode the token, at least try to delete by token
+        await deleteSessionByToken(token);
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ message: 'Logged out successfully' }));
@@ -788,6 +824,188 @@ async function handleMarkWelcomeShown(req, res, userId) {
     console.error('Mark welcome shown error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Internal server error during welcome status update' }));
+  }
+}
+
+// Handle heartbeat to update user's last activity time
+async function handleHeartbeat(req, res) {
+  try {
+    const { verifyAccessToken } = require('../utils/jwtManagement');
+    const authHeader = req.headers['authorization'];
+    const accessToken = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    console.log('Heartbeat received with access token:', accessToken ? 'present' : 'missing');
+
+    if (!accessToken) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Access token is required' }));
+    }
+
+    // Verify the access token to get user information
+    let decodedToken;
+    try {
+      decodedToken = await verifyAccessToken(accessToken);
+    } catch (error) {
+      console.log('Access token verification failed:', error.message);
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Invalid or expired token' }));
+    }
+
+    // Set user status to online when heartbeat is received, but only if they're not in pending offline status
+    try {
+      const { getRow } = require('../utils/database');
+      const currentUser = await getRow('SELECT status FROM users WHERE id = ?', [decodedToken.id]);
+      
+      // Only update to online if the user is not in pending_offline status
+      // This prevents heartbeat from overriding a logout status
+      if (currentUser && currentUser.status !== 'pending_offline') {
+        await setUserOnline(decodedToken.id);
+      } else if (currentUser) {
+        console.log(`Heartbeat: Not updating status for user ${decodedToken.id}, current status is ${currentUser.status}`);
+      }
+    } catch (statusError) {
+      console.error('Error checking or setting user online status:', statusError);
+      // Continue anyway, as this shouldn't prevent heartbeat from working
+    }
+
+    // Update the session activity for the user
+    // Since sessions are stored with refresh tokens, we need to update based on user ID
+    try {
+      const { runQuery, getRow } = require('../utils/database');
+
+      // First, check what sessions exist for this user
+      const checkSql = `
+        SELECT id, session_id, token, expires_at, last_activity_at
+        FROM sessions
+        WHERE user_id = ?
+      `;
+      const existingSessions = await getRow(checkSql, [decodedToken.id]);
+      console.log('Existing sessions for user', decodedToken.id, ':', existingSessions);
+
+      // Check if there are any non-expired sessions
+      const checkValidSql = `
+        SELECT id, session_id, token, expires_at, last_activity_at
+        FROM sessions
+        WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP
+      `;
+      const validSessions = await getRow(checkValidSql, [decodedToken.id]);
+      console.log('Valid (non-expired) sessions for user', decodedToken.id, ':', validSessions);
+
+      // Update the last activity time for the user regardless of session status
+      // This ensures that the user's online status is always updated when they send a heartbeat
+      const updateSql = `
+        UPDATE sessions
+        SET last_activity_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP
+      `;
+
+      const result = await runQuery(updateSql, [decodedToken.id]);
+      const success = result.changes > 0;
+
+      console.log('Update last activity result for user', decodedToken.id, ':', success, 'rows updated:', result.changes);
+
+      // Even if no session was updated (because all sessions expired), we still want to track the user's activity
+      // If no active session exists, we should update an existing expired session or create a new one
+      if (!success) {
+        console.log('No active session found for user', decodedToken.id, ', possibly already logged out or session expired');
+
+        // First, try to update an existing expired session for this user
+        try {
+          // Find an expired session ID for this user first
+          const findExpiredSql = `
+            SELECT id, session_id
+            FROM sessions
+            WHERE user_id = ? AND expires_at <= CURRENT_TIMESTAMP
+            LIMIT 1
+          `;
+          
+          const expiredSession = await getRow(findExpiredSql, [decodedToken.id]);
+          
+          if (expiredSession) {
+            // Update the specific expired session
+            const updateExpiredSql = `
+              UPDATE sessions
+              SET last_activity_at = CURRENT_TIMESTAMP,
+                  expires_at = datetime('now', '+1 day')  -- Reset expiration to 1 day from now
+              WHERE id = ?
+            `;
+            
+            const updateResult = await runQuery(updateExpiredSql, [expiredSession.id]);
+            const updatedRows = updateResult.changes;
+            
+            if (updatedRows > 0) {
+              console.log('Updated expired session for user', decodedToken.id, 'rows updated:', updatedRows);
+            }
+          } else {
+            // If no expired session was found, create a new session
+            const crypto = require('crypto');
+            const { generateRefreshToken } = require('../utils/jwtManagement');
+
+            // Generate a new session ID using crypto
+            const sessionId = crypto.randomBytes(16).toString('hex');
+            const refreshToken = await generateRefreshToken({ id: decodedToken.id, email: decodedToken.email });
+
+            // Calculate expiration time (using the same logic as login)
+            const { JWT_REFRESH_EXPIRES_IN } = require('../config/auth');
+            let expirationMs;
+            if (typeof JWT_REFRESH_EXPIRES_IN === 'string') {
+              if (JWT_REFRESH_EXPIRES_IN.endsWith('d')) {
+                const days = parseInt(JWT_REFRESH_EXPIRES_IN.replace('d', ''));
+                expirationMs = days * 24 * 60 * 60 * 1000;
+              } else if (JWT_REFRESH_EXPIRES_IN.endsWith('h')) {
+                const hours = parseInt(JWT_REFRESH_EXPIRES_IN.replace('h', ''));
+                expirationMs = hours * 60 * 60 * 1000;
+              } else {
+                // Default to 1 day if format is unexpected
+                expirationMs = 24 * 60 * 60 * 1000;
+              }
+            } else {
+              // Default to 1 day if not a string
+              expirationMs = 24 * 60 * 60 * 1000;
+            }
+
+            const expiresAt = new Date(Date.now() + expirationMs);
+
+            // Create a new session record
+            const insertSql = `
+              INSERT INTO sessions (session_id, user_id, token, expires_at, last_activity_at)
+              VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `;
+
+            await runQuery(insertSql, [sessionId, decodedToken.id, refreshToken, expiresAt]);
+            console.log('Created new session for user', decodedToken.id, 'after heartbeat');
+          }
+        } catch (sessionUpdateError) {
+          console.error('Error updating or creating session for user after heartbeat:', sessionUpdateError);
+          // Continue anyway, as the token is still valid
+        }
+      } else {
+        console.log('Successfully updated activity time for user', decodedToken.id, 'rows:', result.changes);
+
+        // Check the updated session
+        const updatedCheckSql = `
+          SELECT id, session_id, token, expires_at, last_activity_at
+          FROM sessions
+          WHERE user_id = ? AND last_activity_at >= datetime('now', '-1 minute')
+        `;
+        const updatedSession = await getRow(updatedCheckSql, [decodedToken.id]);
+        console.log('Updated session for user', decodedToken.id, ':', updatedSession);
+      }
+    } catch (error) {
+      console.error('Error updating last activity for user:', decodedToken.id, error);
+      // Don't return an error here as it might be a valid scenario (e.g., token expired)
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      message: 'Activity updated successfully', 
+      timestamp: new Date().toISOString(),
+      userId: decodedToken.id
+    }));
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error during heartbeat' }));
   }
 }
 

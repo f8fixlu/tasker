@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useModal } from '../hooks/useModal';
 import { useDebounce } from '../hooks/useDebounce';
 import { taskService } from '../services/taskService';
@@ -20,6 +21,19 @@ const truncateText = (text, maxLength = 50) => {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // If user is admin, redirect to system stats page
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      navigate('/admin/stats');
+    }
+  }, [user, navigate]);
+  
+  // If user is admin, don't render the regular dashboard content
+  if (user?.role === 'admin') {
+    return null; // The redirect will happen in useEffect
+  }
   const { openViewTaskModal } = useModal();
   const { updateTrigger } = useTaskUpdate(); // Get the task update trigger state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);

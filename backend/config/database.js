@@ -6,7 +6,10 @@ const dbPath = path.resolve(__dirname, '../database/tasker.db');
 const db = new sqlite3.Database(dbPath);
 
 // Database initialization function
-function setupDatabase() {
+function setupDatabase(callback) {
+  // Initialize the status tracker
+  const StatusTracker = require('../utils/statusTracker');
+  StatusTracker.initialize().catch(console.error);
   // Create users table
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,8 +21,19 @@ function setupDatabase() {
     reset_token_expiry DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  )`, function(err) {
+    if (err) {
+      console.error('Error creating users table:', err);
+      if (callback) callback(err);
+      return;
+    }
 
+    // Continue with other table creations and alterations
+    createOtherTablesAndColumns(callback);
+  });
+}
+
+function createOtherTablesAndColumns(callback) {
   // Create task_categories table
   db.run(`CREATE TABLE IF NOT EXISTS task_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -277,6 +291,16 @@ function setupDatabase() {
     }
   });
 
+  // Add role column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT NULL`, (err) => {
+    if (err) {
+      // Column might already exist, which is fine
+      console.log('Note: role column may already exist or table is not ready yet');
+    } else {
+      console.log('role column added to users table successfully');
+    }
+  });
+
   // Add task_date column if it doesn't exist (for existing databases)
   db.run(`ALTER TABLE tasks ADD COLUMN task_date DATETIME`, (err) => {
     if (err) {
@@ -287,7 +311,56 @@ function setupDatabase() {
     }
   });
 
+  // Add status column to users table for tracking online/offline status
+  db.run(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'offline' CHECK(status IN ('online', 'offline', 'pending_offline'))`, (err) => {
+    if (err) {
+      // Column might already exist, which is fine
+      console.log('Note: status column may already exist or table is not ready yet');
+    } else {
+      console.log('status column added to users table successfully');
+    }
+  });
+
+  // Add status_updated_at column to users table for tracking when status was last updated
+  db.run(`ALTER TABLE users ADD COLUMN status_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
+    if (err) {
+      // Column might already exist, which is fine
+      console.log('Note: status_updated_at column may already exist or table is not ready yet');
+    } else {
+      console.log('status_updated_at column added to users table successfully');
+    }
+  });
+
+  // Create status_history table to track all status changes
+  db.run(`CREATE TABLE IF NOT EXISTS status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    previous_status TEXT,
+    new_status TEXT NOT NULL,
+    changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reason TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`, (err) => {
+    if (err) {
+      console.error('Error creating status_history table:', err);
+    } else {
+      console.log('status_history table created or already exists');
+    }
+  });
+
+  // Create an index for faster queries by user_id and changed_at
+  db.run(`CREATE INDEX IF NOT EXISTS idx_status_history_user_time 
+    ON status_history(user_id, changed_at)`, (err) => {
+    if (err) {
+      console.log('Note: status_history index may already exist');
+    } else {
+      console.log('status_history index created successfully');
+    }
+  });
+
   console.log('Database initialized successfully');
+
+  if (callback) callback(null);
 }
 
 module.exports = { db, setupDatabase };

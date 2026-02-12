@@ -47,9 +47,19 @@ function authenticateToken(req, res, next) {
 
       // Update the last activity time for the session
       if (token) {
-        updateLastActivity(token).catch(err => {
-          console.error('Error updating session activity:', err);
-        });
+        // Decode the token to get the user ID
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.id) {
+          // Update the session activity for the user
+          const { runQuery } = require('../utils/database');
+          runQuery(`
+            UPDATE sessions
+            SET last_activity_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP
+          `, [decoded.id]).catch(err => {
+            console.error('Error updating session activity:', err);
+          });
+        }
       }
 
       next();
@@ -115,6 +125,60 @@ function jsonParser(req, res, next) {
   });
 }
 
+// Function to check if user is admin
+function isAdmin(user) {
+  // Check if user is admin based on the ADMIN_EMAILS environment variable
+  if (!user || !user.email) {
+    return false;
+  }
+  
+  // Check if user's email is in the ADMIN_EMAILS list
+  const adminEmails = process.env.ADMIN_EMAILS ? 
+    process.env.ADMIN_EMAILS.split(',').map(email => email.trim().toLowerCase()) : 
+    ['admin@example.com']; // Default admin email
+  
+  console.log('DEBUG: Checking admin status for user:', user.email);
+  console.log('DEBUG: ADMIN_EMAILS environment variable:', process.env.ADMIN_EMAILS);
+  console.log('DEBUG: Parsed admin emails:', adminEmails);
+  console.log('DEBUG: Does user email match?', adminEmails.includes(user.email.toLowerCase()));
+  console.log('DEBUG: Does user have role?', user.role && user.role.toLowerCase() === 'admin');
+  
+  return adminEmails.includes(user.email.toLowerCase()) ||
+         (user.role && user.role.toLowerCase() === 'admin');
+}
+
+// Function to ensure admin role is set for eligible users
+function ensureAdminRole(user) {
+  if (!user || !user.email) {
+    return user;
+  }
+  
+  // Check if user's email is in the ADMIN_EMAILS list
+  const adminEmails = process.env.ADMIN_EMAILS ? 
+    process.env.ADMIN_EMAILS.split(',').map(email => email.trim().toLowerCase()) : 
+    ['admin@example.com']; // Default admin email
+  
+  console.log('DEBUG ensureAdminRole: Checking user:', user.email);
+  console.log('DEBUG ensureAdminRole: ADMIN_EMAILS environment variable:', process.env.ADMIN_EMAILS);
+  console.log('DEBUG ensureAdminRole: Parsed admin emails:', adminEmails);
+  console.log('DEBUG ensureAdminRole: Does user email match?', adminEmails.includes(user.email.toLowerCase()));
+  console.log('DEBUG ensureAdminRole: Current user role:', user.role);
+  
+  if (adminEmails.includes(user.email.toLowerCase())) {
+    // If user is in admin list but doesn't have role set, update their role
+    if (!user.role || user.role.toLowerCase() !== 'admin') {
+      console.log('DEBUG ensureAdminRole: Setting role to admin for user:', user.email);
+      user.role = 'admin';
+    } else {
+      console.log('DEBUG ensureAdminRole: User already has admin role:', user.role);
+    }
+  } else {
+    console.log('DEBUG ensureAdminRole: User email does not match admin emails');
+  }
+  
+  return user;
+}
+
 // Middleware for logging requests
 function requestLogger(req, res, next) {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -124,5 +188,7 @@ function requestLogger(req, res, next) {
 module.exports = {
   authenticateToken,
   jsonParser,
-  requestLogger
+  requestLogger,
+  isAdmin,
+  ensureAdminRole
 };
