@@ -51,7 +51,7 @@ app.use(compression());
 
 // Enable CORS for your backend API
 app.use(cors({
-  origin: process.env.BACKEND_URL || 'https://backend.f8fixlu.biz', // Your backend URL
+  origin: process.env.BACKEND_URL || 'https://backend.f8fixlu.biz', // Backend URL
   credentials: true
 }));
 
@@ -98,7 +98,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Tasker Frontend Server running on port ${PORT}`);
+  console.log(`Tasker Frontend Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Compression: Enabled`);
   console.log(`CORS: Enabled for ${process.env.BACKEND_URL || 'https://backend.f8fixlu.biz'}`);
