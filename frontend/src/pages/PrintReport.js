@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { reportsService } from '../services/reportsService';
+import api from '../services/api';
 
 const PrintReport = () => {
   const { user } = useAuth();
@@ -10,49 +11,182 @@ const PrintReport = () => {
   const [error, setError] = useState(null);
   
   // This is mock data for the report - in real implementation, this would come from API
-  const [signatoryData, setSignatoryData] = useState({
-    preparedBy: { name: '', position: '' },
-    reviewedBy: { name: '', position: '' },
-    notedBy: { name: '', position: '' }
-  });
+  const [signatoryData, setSignatoryData] = useState([]);
 
-  // Helper function to determine if signature section has all 9 lines (all fields populated)
+  // Helper function to determine if signature section has all fields populated (dynamic signatory system)
   const hasAllSignatureFields = () => {
-    const hasPreparedByName = !!reportData?.signatureSection.preparedBy.name;
-    const hasPreparedByPosition = !!reportData?.signatureSection.preparedBy.position;
-    const hasReviewedByName = !!reportData?.signatureSection.reviewedBy.name;
-    const hasReviewedByPosition = !!reportData?.signatureSection.reviewedBy.position;
-    const hasNotedByName = !!reportData?.signatureSection.notedBy.name;
-    const hasNotedByPosition = !!reportData?.signatureSection.notedBy.position;
-
-    // All 6 fields (3 names and 3 positions) need to be populated to have all 9 lines
-    return hasPreparedByName && hasPreparedByPosition &&
-           hasReviewedByName && hasReviewedByPosition &&
-           hasNotedByName && hasNotedByPosition;
+    // Check if signatoryData is in array format
+    if (Array.isArray(signatoryData)) {
+      return signatoryData.length > 0 && signatoryData.every(sig => sig.name && sig.position);
+    }
+    
+    return false;
   };
 
-  // Load signatory data from local storage or API
-  const loadSignatoryData = () => {
+  // Load signatory data from API first, fallback to local storage
+  const loadSignatoryData = async () => {
+    console.log('Loading signatory data for user:', user);
     if (user) {
       try {
-        const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
-        if (savedSignatories) {
-          setSignatoryData(JSON.parse(savedSignatories));
+        // First try to get from API via user profile using the api service
+        console.log('Fetching user profile...');
+        const userData = await api.get('/users/profile');
+        console.log('User data received:', userData);
+        
+        // Check if signatory data exists in user profile
+        if (userData.user?.signatories) {
+          console.log('Signatories found in user data:', userData.user.signatories);
+          // If signatories is an array (like from DB), use it directly
+          if (Array.isArray(userData.user.signatories)) {
+            setSignatoryData(userData.user.signatories);
+            console.log('Set signatory data from array format:', userData.user.signatories);
+          } else if (typeof userData.user.signatories === 'object') {
+            // If it's in object format, convert to array format
+            const signatoryArray = [];
+            
+            // Handle signatory1, signatory2, etc. format
+            let signatoryIndex = 1;
+            while (userData.user.signatories[`signatory${signatoryIndex}`]) {
+              const signatoryField = userData.user.signatories[`signatory${signatoryIndex}`];
+              if (signatoryField && (signatoryField.name || signatoryField.position)) {
+                signatoryArray.push({
+                  title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: signatoryField.name || '',
+                  position: signatoryField.position || ''
+                });
+              }
+              signatoryIndex++;
+            }
+            
+            // Also handle legacy format (preparedBy, reviewedBy, notedBy) if they exist
+            if (userData.user.signatories.preparedBy && (userData.user.signatories.preparedBy.name || userData.user.signatories.preparedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.preparedBy.name || '',
+                position: userData.user.signatories.preparedBy.position || ''
+              });
+            }
+            
+            if (userData.user.signatories.reviewedBy && (userData.user.signatories.reviewedBy.name || userData.user.signatories.reviewedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.reviewedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.reviewedBy.name || '',
+                position: userData.user.signatories.reviewedBy.position || ''
+              });
+            }
+            
+            if (userData.user.signatories.notedBy && (userData.user.signatories.notedBy.name || userData.user.signatories.notedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.notedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.notedBy.name || '',
+                position: userData.user.signatories.notedBy.position || ''
+              });
+            }
+            
+            setSignatoryData(signatoryArray);
+            console.log('Set signatory data from object format:', signatoryArray);
+          }
+        } else {
+          console.log('No signatories in API response, trying localStorage');
+          // If no signatories in API, try localStorage as fallback
+          const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
+          if (savedSignatories) {
+            const parsedSignatories = JSON.parse(savedSignatories);
+            // If it's an array (like from DB), use it directly
+            if (Array.isArray(parsedSignatories)) {
+              setSignatoryData(parsedSignatories);
+            } else if (typeof parsedSignatories === 'object') {
+              // Convert object format to array format
+              const signatoryArray = [];
+              
+              // Handle signatory1, signatory2, etc. format
+              let signatoryIndex = 1;
+              while (parsedSignatories[`signatory${signatoryIndex}`]) {
+                const signatoryField = parsedSignatories[`signatory${signatoryIndex}`];
+                if (signatoryField && (signatoryField.name || signatoryField.position)) {
+                  signatoryArray.push({
+                    title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
+                    name: signatoryField.name || '',
+                    position: signatoryField.position || ''
+                  });
+                }
+                signatoryIndex++;
+              }
+              
+              // Also handle legacy format (preparedBy, reviewedBy, notedBy) if they exist
+              if (parsedSignatories.preparedBy && (parsedSignatories.preparedBy.name || parsedSignatories.preparedBy.position)) {
+                signatoryArray.push({
+                  title: parsedSignatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: parsedSignatories.preparedBy.name || '',
+                  position: parsedSignatories.preparedBy.position || ''
+                });
+              }
+              
+              if (parsedSignatories.reviewedBy && (parsedSignatories.reviewedBy.name || parsedSignatories.reviewedBy.position)) {
+                signatoryArray.push({
+                  title: parsedSignatories.reviewedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: parsedSignatories.reviewedBy.name || '',
+                  position: parsedSignatories.reviewedBy.position || ''
+                });
+              }
+              
+              if (parsedSignatories.notedBy && (parsedSignatories.notedBy.name || parsedSignatories.notedBy.position)) {
+                signatoryArray.push({
+                  title: parsedSignatories.notedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: parsedSignatories.notedBy.name || '',
+                  position: parsedSignatories.notedBy.position || ''
+                });
+              }
+              
+              setSignatoryData(signatoryArray);
+            } else {
+              setSignatoryData([]);
+            }
+            console.log('Loaded signatory data from localStorage:', parsedSignatories);
+          } else {
+            console.log('No signatory data found in localStorage');
+          }
         }
       } catch (error) {
         console.error('Error loading signatory data:', error);
-        // Set default values if there's an error
-        setSignatoryData({
-          preparedBy: { name: '', position: '' },
-          reviewedBy: { name: '', position: '' },
-          notedBy: { name: '', position: '' }
-        });
+        // Set default empty array if there's an error
+        setSignatoryData([]);
       }
+    } else {
+      console.log('No user available to load signatory data');
     }
   };
 
   useEffect(() => {
-    loadSignatoryData();
+    const loadAndFetch = async () => {
+      console.log('Checking user in effect:', user);
+      // Wait a bit to ensure user is fully loaded if needed
+      if (user && user.id) {  // Check that user exists and has an id
+        console.log('Loading signatory data for user ID:', user.id);
+        setLoading(true); // Set loading state while fetching data
+        await loadSignatoryData();
+        // Add a small delay to ensure state is updated before fetching report data
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchReportData();
+        setLoading(false); // Stop loading after everything is loaded
+      } else {
+        console.log('User not available or invalid, skipping signatory data load');
+        // Still try to load from localStorage as fallback
+        const savedSignatories = localStorage.getItem(`signatories_${user?.id || 'unknown'}`);
+        if (savedSignatories) {
+          try {
+            const parsedSignatories = JSON.parse(savedSignatories);
+            setSignatoryData(parsedSignatories);
+            console.log('Loaded signatory data from localStorage as fallback:', parsedSignatories);
+          } catch (e) {
+            console.error('Error parsing localStorage signatory data:', e);
+          }
+        }
+        setLoading(false); // Make sure loading is stopped even if user is not available
+      }
+    };
+
+    loadAndFetch();
   }, [user]);
 
   const mockReportData = {
@@ -110,29 +244,43 @@ const PrintReport = () => {
         ]
       }
     ],
-    signatureSection: {
-      preparedBy: signatoryData.preparedBy,
-      reviewedBy: signatoryData.reviewedBy,
-      notedBy: signatoryData.notedBy
-    }
+    signatureSection: signatoryData
   };
 
+  // When signatory data changes, we need to refetch report data to update the pages
   useEffect(() => {
-    // In a real implementation, this would fetch from the API
-    fetchReportData();
-  }, []);
+    if (reportData) {
+      // Update the signature section of the existing report data
+      setReportData(prevData => ({
+        ...prevData,
+        signatureSection: signatoryData
+      }));
+    }
+  }, [signatoryData]);
 
   const fetchReportData = async () => {
     try {
       setLoading(true);
       // TODO: Replace with actual API call when backend is ready
       // const data = await reportsService.getReportData();
-      setReportData(mockReportData);
+      
+      // Create mock report data with current signatoryData
+      const currentMockReportData = {
+        ...mockReportData,
+        signatureSection: signatoryData
+      };
+
+      setReportData(currentMockReportData);
       setError(null);
     } catch (err) {
       console.error('Error fetching report data:', err);
       setError('Failed to fetch report data');
-      setReportData(mockReportData); // Use mock data as fallback
+      // Create mock report data with current signatoryData even in error case
+      const currentMockReportData = {
+        ...mockReportData,
+        signatureSection: signatoryData
+      };
+      setReportData(currentMockReportData); // Use mock data as fallback
     } finally {
       setLoading(false);
     }
@@ -158,12 +306,7 @@ const PrintReport = () => {
     );
 
     // Check if signature section exists and add it on a separate page
-    const hasSignature = reportData?.signatureSection.preparedBy.name ||
-                        reportData?.signatureSection.preparedBy.position ||
-                        reportData?.signatureSection.reviewedBy.name ||
-                        reportData?.signatureSection.reviewedBy.position ||
-                        reportData?.signatureSection.notedBy.name ||
-                        reportData?.signatureSection.notedBy.position;
+    const hasSignature = Array.isArray(signatoryData) && signatoryData.some(sig => sig.name || sig.position);
 
     if (hasSignature) {
       // Add a separate page for the signature section to prevent cutting
@@ -171,7 +314,7 @@ const PrintReport = () => {
     }
   }
 
-  if (loading) {
+  if (!user || loading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
@@ -191,15 +334,20 @@ const PrintReport = () => {
   }
 
   return (
-    <div 
+    <div
       className={`bg-gray-100 dark:bg-gray-800 flex flex-col min-h-screen ${pageSize === 'a4' ? 'paper-a4' : pageSize === 'letter' ? 'paper-letter' : 'paper-folio'}`}
       style={{ fontFamily: "'Bookman Old Style', serif" }}
     >
+      {/* Debug info - remove in production */}
+      <div className="debug-info fixed top-0 left-0 bg-yellow-200 p-2 text-xs z-50">
+        <div>Signatory Data: {JSON.stringify(signatoryData, null, 2)}</div>
+        <div>User: {user ? user.id : 'No user'}</div>
+      </div>
       {/* Print Controls (Hidden in print view) */}
       <div className="w-full max-w-7xl flex justify-end items-center px-4 py-4 no-print sticky top-0 z-50" style={{ backgroundColor: "transparent" }}>
         <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow">
           {/* Export to PDF Button - would need html2pdf.js implementation */}
-          <button 
+          <button
             className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded inline-flex items-center"
             onClick={() => alert('PDF export functionality would be implemented here')}
           >
@@ -209,13 +357,13 @@ const PrintReport = () => {
             </svg>
             <span>Export as PDF</span>
           </button>
-          
+
           {/* Page Size Dropdown */}
           <div>
             <label className="sr-only" htmlFor="page-size">Page Size</label>
-            <select 
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" 
-              id="page-size" 
+            <select
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              id="page-size"
               name="page-size"
               value={pageSize}
               onChange={handlePageSizeChange}
@@ -225,9 +373,9 @@ const PrintReport = () => {
               <option value="folio">Folio</option>
             </select>
           </div>
-          
+
           {/* Print Button */}
-          <button 
+          <button
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center"
             onClick={handlePrint}
           >
@@ -297,49 +445,71 @@ const PrintReport = () => {
 
                     {/* Signature section on its own page */}
                     <footer className="mt-12" style={{ breakInside: 'avoid' }}>
-                      {(reportData?.signatureSection.preparedBy.name || reportData?.signatureSection.preparedBy.position) && (
-                        <div className="flex justify-between" style={{ breakInside: 'avoid' }}>
-                          <div className="w-1/2" style={{ breakInside: 'avoid' }}>
-                            <p style={{ fontSize: '12pt' }}>Prepared by:</p>
-                            <div className="mt-8" style={{ breakInside: 'avoid' }}>
-                              {reportData?.signatureSection.preparedBy.name && (
-                                <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.preparedBy.name}</p>
-                              )}
-                              {reportData?.signatureSection.preparedBy.position && (
-                                <p className="mt-2" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.preparedBy.position}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="w-1/2" style={{ breakInside: 'avoid' }}>
-                            {(reportData?.signatureSection.reviewedBy.name || reportData?.signatureSection.reviewedBy.position) && (
-                              <>
-                                <p style={{ fontSize: '12pt' }}>Reviewed by:</p>
-                                <div className="mt-8" style={{ breakInside: 'avoid' }}>
-                                  {reportData?.signatureSection.reviewedBy.name && (
-                                    <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.reviewedBy.name}</p>
-                                  )}
-                                  {reportData?.signatureSection.reviewedBy.position && (
-                                    <p className="mt-2" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.reviewedBy.position}</p>
-                                  )}
+                      {/* Render signatories from the array */}
+                      {(() => {
+                        // Use the signatoryData array directly
+                        const signatories = Array.isArray(signatoryData) ? 
+                          signatoryData.filter(sig => sig.name || sig.position) : [];
+
+                        // Render signatories in pairs (left/right) with additional ones below
+                        const rows = [];
+                        for (let i = 0; i < signatories.length; i += 2) {
+                          const leftSig = signatories[i];
+                          const rightSig = signatories[i + 1];
+
+                          if (rightSig) {
+                            // Two signatories in this row
+                            rows.push(
+                              <div key={`row-${i}`} className="flex justify-between" style={{ breakInside: 'avoid' }}>
+                                <div className="w-1/2" style={{ breakInside: 'avoid' }}>
+                                  <p style={{ fontSize: '12pt' }}>{leftSig.title || `Signatory ${i + 1}`}</p>
+                                  <div className="mt-8" style={{ breakInside: 'avoid' }}>
+                                    {leftSig.name && (
+                                      <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{leftSig.name}</p>
+                                    )}
+                                    {leftSig.position && (
+                                      <p className="mt-2" style={{ fontSize: '12pt' }}>{leftSig.position}</p>
+                                    )}
+                                  </div>
                                 </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {(reportData?.signatureSection.notedBy.name || reportData?.signatureSection.notedBy.position) && (
-                        <div className="mt-8" style={{ breakInside: 'avoid' }}>
-                          <p style={{ fontSize: '12pt' }}>Noted by:</p>
-                          <div className="mt-8" style={{ breakInside: 'avoid' }}>
-                            {reportData?.signatureSection.notedBy.name && (
-                              <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.notedBy.name}</p>
-                            )}
-                            {reportData?.signatureSection.notedBy.position && (
-                              <p className="mt-2" style={{ fontSize: '12pt' }}>{reportData?.signatureSection.notedBy.position}</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                                <div className="w-1/2" style={{ breakInside: 'avoid' }}>
+                                  <p style={{ fontSize: '12pt' }}>{rightSig.title || `Signatory ${i + 2}`}</p>
+                                  <div className="mt-8" style={{ breakInside: 'avoid' }}>
+                                    {rightSig.name && (
+                                      <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{rightSig.name}</p>
+                                    )}
+                                    {rightSig.position && (
+                                      <p className="mt-2" style={{ fontSize: '12pt' }}>{rightSig.position}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // Single signatory in this row (left side only)
+                            rows.push(
+                              <div key={`row-${i}`} className="flex justify-between" style={{ breakInside: 'avoid' }}>
+                                <div className="w-1/2" style={{ breakInside: 'avoid' }}>
+                                  <p style={{ fontSize: '12pt' }}>{leftSig.title || `Signatory ${i + 1}`}</p>
+                                  <div className="mt-8" style={{ breakInside: 'avoid' }}>
+                                    {leftSig.name && (
+                                      <p className="font-bold mt-4" style={{ fontSize: '12pt' }}>{leftSig.name}</p>
+                                    )}
+                                    {leftSig.position && (
+                                      <p className="mt-2" style={{ fontSize: '12pt' }}>{leftSig.position}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="w-1/2" style={{ breakInside: 'avoid' }}>
+                                  {/* Empty space to maintain layout */}
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+
+                        return rows;
+                      })()}
                     </footer>
 
                     {/* Empty space to center the signature section */}
@@ -433,22 +603,22 @@ const PrintReport = () => {
         .text-12pt {
           font-size: 12pt !important;
         }
-        
+
         .paper-a4 {
           width: 210mm;
           min-height: 297mm;
         }
-        
+
         .paper-letter {
           width: 215.9mm;
           min-height: 279.4mm;
         }
-        
+
         .paper-folio {
           width: 215.9mm;
           min-height: 330.2mm;
         }
-        
+
         .page {
           position: relative;
           background: white;
@@ -458,13 +628,13 @@ const PrintReport = () => {
           flex-direction: column;
           break-inside: avoid;
         }
-        
+
         .page-header {
           padding: 1.5cm 1.5cm 0 1.5cm;
           flex-shrink: 0;
           border-bottom: 1px solid #e5e7eb;
         }
-        
+
         .page-footer {
           position: absolute;
           bottom: 0.5cm;
@@ -472,26 +642,26 @@ const PrintReport = () => {
           font-size: 10pt;
           padding: 0;
         }
-        
+
         .page-content {
           padding: 0 1.5cm 1.5cm 1.5cm;
           flex-grow: 1;
           display: flex;
           flex-direction: column;
         }
-        
+
         .page-break-after {
           page-break-after: always;
         }
-        
+
         .page-break-before {
           page-break-before: always;
         }
-        
+
         .no-print {
           background-color: #f3f4f6;
         }
-        
+
         /* Print-specific styles */
         @media print {
           body {
@@ -502,11 +672,11 @@ const PrintReport = () => {
             padding: 0;
             font-family: 'Bookman Old Style', serif;
           }
-          
+
           .no-print {
             display: none !important;
           }
-          
+
           .page {
             margin: 0 !important;
             padding: 0 !important;
@@ -518,11 +688,11 @@ const PrintReport = () => {
             position: relative !important;
             page-break-inside: auto !important;
           }
-          
+
           .page:not(:last-child) {
             page-break-after: always !important;
           }
-          
+
           .page-header {
             padding: 1.5cm 1.5cm 0 1.5cm !important;
             display: block !important;
@@ -531,11 +701,11 @@ const PrintReport = () => {
             box-sizing: border-box !important;
             border-bottom: 1px solid #e5e7eb !important;
           }
-          
+
           .page-header .text-10pt {
             font-size: 10pt !important;
           }
-          
+
           .page-content {
             display: block !important;
             position: static !important;
@@ -543,7 +713,7 @@ const PrintReport = () => {
             box-sizing: border-box !important;
             padding: 0 1.5cm 1.5cm 1.5cm !important;
           }
-          
+
           .page-footer {
             position: absolute !important;
             bottom: 0.2cm !important;
@@ -553,48 +723,48 @@ const PrintReport = () => {
             padding: 0 !important;
             font-size: 10pt !important;
           }
-          
+
           .page-header .text-10pt {
             font-size: 10pt !important;
           }
-          
+
           @page {
             margin: 0.5cm;
           }
-          
+
           @page :first {
             margin-top: 0.5cm;
           }
-          
-          thead { 
-            display: table-header-group; 
+
+          thead {
+            display: table-header-group;
           }
-          
-          tfoot { 
-            display: table-footer-group; 
+
+          tfoot {
+            display: table-footer-group;
           }
         }
-        
+
         /* Screen-specific layout adjustments */
         @media screen {
           body {
             background-color: #e5e7eb;
             padding: 1rem;
           }
-          
+
           .page-container {
             max-width: calc(215.9mm + 2rem);
             margin: 0 auto;
           }
         }
-        
+
         /* Responsive adjustments */
         @media screen and (max-width: 768px) {
           .page {
             width: 95% !important;
             margin: 0.5rem auto;
           }
-          
+
           .page-header, .page-content {
             padding: 1cm;
           }

@@ -26,11 +26,21 @@ async function createUser(userData) {
 
 // Get user by ID
 async function getUserById(id) {
-  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at FROM users WHERE id = ?';
+  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at, signatories FROM users WHERE id = ?';
   const params = [id];
 
   try {
     const user = await getRow(sql, params);
+    // Parse signatories if it exists and is a string
+    if (user && user.signatories) {
+      try {
+        user.signatories = JSON.parse(user.signatories);
+      } catch (parseError) {
+        console.error('Error parsing signatories:', parseError);
+        // If parsing fails, return as-is or set to empty array
+        user.signatories = [];
+      }
+    }
     return user;
   } catch (error) {
     throw new Error(`Error fetching user: ${error.message}`);
@@ -71,6 +81,14 @@ async function updateUser(id, userData) {
   if (userData.role !== undefined) {
     fields.push('role = ?');
     params.push(userData.role);
+  }
+  if (userData.signatories !== undefined) {
+    // Convert signatories object/array to JSON string for storage
+    const signatoriesJson = typeof userData.signatories === 'string' 
+      ? userData.signatories 
+      : JSON.stringify(userData.signatories);
+    fields.push('signatories = ?');
+    params.push(signatoriesJson);
   }
 
   // Add updated_at timestamp

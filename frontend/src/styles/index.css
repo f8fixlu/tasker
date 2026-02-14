@@ -42,6 +42,43 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;  /* Chrome, Safari, Opera*/
   }
+
+  /* Prevent ResizeObserver loop issues */
+  .resize-observer-stable {
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .signatory-form-container {
+    contain: layout style paint;
+    overflow: hidden;
+    transform: translateZ(0); /* Force hardware acceleration to prevent layout thrashing */
+  }
+
+  .signatory-tab-content {
+    height: 0;
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+    contain: layout;
+  }
+  
+  /* Additional containment for forms to prevent layout thrashing */
+  .form-container {
+    contain: layout;
+  }
+  
+  /* Containment for individual signatory items */
+  .signatory-item {
+    contain: layout style paint;
+    overflow: hidden;
+  }
+  
+  .settings-modal-content {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
 }
 
 /* Paper size styles */

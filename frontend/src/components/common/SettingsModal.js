@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 import Button from './Button';
@@ -9,23 +9,14 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
   const { user: authUser, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const fileInputRef = useRef(null);
-  const [signatoryData, setSignatoryData] = useState({
-    preparedBy: {
+  const [signatoryData, setSignatoryData] = useState([
+    {
+      id: 1,
       name: '',
-      position: '',
+      position: 'Staff',
       title: 'Prepared By'
-    },
-    reviewedBy: {
-      name: '',
-      position: '',
-      title: 'Reviewed By'
-    },
-    notedBy: {
-      name: '',
-      position: '',
-      title: 'Noted By'
     }
-  });
+  ]);
   const [loadingSignatories, setLoadingSignatories] = useState(true);
   const [profileData, setProfileData] = useState({
     fullName: authUser?.name || authUser?.full_name || '',
@@ -124,69 +115,137 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
   const loadSignatoryData = async () => {
     setLoadingSignatories(true);
     try {
-      // In a real implementation, this would fetch from an API
-      // For now, we'll use a mock implementation or retrieve from local storage
-      const savedSignatories = localStorage.getItem(`signatories_${authUser?.id}`);
-      if (savedSignatories) {
-        const parsedData = JSON.parse(savedSignatories);
-        // Ensure title properties exist for backward compatibility
-        setSignatoryData({
-          preparedBy: {
-            name: parsedData.preparedBy.name || '',
-            position: parsedData.preparedBy.position || '',
-            title: parsedData.preparedBy.title || 'Prepared By'
-          },
-          reviewedBy: {
-            name: parsedData.reviewedBy.name || '',
-            position: parsedData.reviewedBy.position || '',
-            title: parsedData.reviewedBy.title || 'Reviewed By'
-          },
-          notedBy: {
-            name: parsedData.notedBy.name || '',
-            position: parsedData.notedBy.position || '',
-            title: parsedData.notedBy.title || 'Noted By'
-          }
-        });
-      } else {
-        // Default values could be loaded from user profile settings
-        setSignatoryData({
-          preparedBy: {
-            name: authUser?.name || authUser?.full_name || '',
-            position: authUser?.position || 'Job Order',
-            title: 'Prepared By'
-          },
-          reviewedBy: {
-            name: '',
-            position: '',
-            title: 'Reviewed By'
-          },
-          notedBy: {
-            name: '',
-            position: '',
-            title: 'Noted By'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error loading signatory data:', error);
-      // Set default empty values
-      setSignatoryData({
-        preparedBy: {
-          name: '',
-          position: '',
-          title: 'Prepared By'
-        },
-        reviewedBy: {
-          name: '',
-          position: '',
-          title: 'Reviewed By'
-        },
-        notedBy: {
-          name: '',
-          position: '',
-          title: 'Noted By'
+      // Fetch user profile which may contain signatory data
+      const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/users/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`
         }
       });
+
+      let signatoryArray = [];
+      
+      if (response.ok) {
+        const responseJson = await response.json();
+        const userData = responseJson.user; // Extract user data from response
+
+        // Check if signatory data exists in user profile
+        if (userData.signatories && Array.isArray(userData.signatories)) {
+          // New format - array of signatories
+          signatoryArray = userData.signatories;
+        } else if (userData.signatories) {
+          // Old format - object with preparedBy, reviewedBy, notedBy
+          if (userData.signatories?.preparedBy) {
+            signatoryArray.push({
+              id: 1,
+              name: userData.signatories.preparedBy.name || '',
+              position: userData.signatories.preparedBy.position || '',
+              title: userData.signatories.preparedBy.title || 'Prepared By'
+            });
+          }
+
+          if (userData.signatories?.reviewedBy) {
+            signatoryArray.push({
+              id: 2,
+              name: userData.signatories.reviewedBy.name || '',
+              position: userData.signatories.reviewedBy.position || '',
+              title: userData.signatories.reviewedBy.title || 'Reviewed By'
+            });
+          }
+
+          if (userData.signatories?.notedBy) {
+            signatoryArray.push({
+              id: 3,
+              name: userData.signatories.notedBy.name || '',
+              position: userData.signatories.notedBy.position || '',
+              title: userData.signatories.notedBy.title || 'Noted By'
+            });
+          }
+        }
+      }
+      
+      // If no signatories found from API, try local storage
+      if (signatoryArray.length === 0) {
+        const savedSignatories = localStorage.getItem(`signatories_${authUser?.id}`);
+        if (savedSignatories) {
+          const parsedData = JSON.parse(savedSignatories);
+
+          // Handle both old and new format for backward compatibility
+          if (Array.isArray(parsedData)) {
+            // New format - array of signatories
+            signatoryArray = parsedData;
+          } else {
+            // Old format - object with preparedBy, reviewedBy, notedBy
+            if (parsedData.preparedBy) {
+              signatoryArray.push({
+                id: 1,
+                name: parsedData.preparedBy.name || '',
+                position: parsedData.preparedBy.position || '',
+                title: parsedData.preparedBy.title || 'Prepared By'
+              });
+            }
+
+            if (parsedData.reviewedBy) {
+              signatoryArray.push({
+                id: 2,
+                name: parsedData.reviewedBy.name || '',
+                position: parsedData.reviewedBy.position || '',
+                title: parsedData.reviewedBy.title || 'Reviewed By'
+              });
+            }
+
+            if (parsedData.notedBy) {
+              signatoryArray.push({
+                id: 3,
+                name: parsedData.notedBy.name || '',
+                position: parsedData.notedBy.position || '',
+                title: parsedData.notedBy.title || 'Noted By'
+              });
+            }
+          }
+        }
+      }
+      
+      // If still no signatories, use defaults
+      if (signatoryArray.length === 0) {
+        signatoryArray = [{
+          id: 1,
+          name: authUser?.name || authUser?.full_name || '',
+          position: authUser?.position || 'Staff',
+          title: 'Prepared By'
+        }];
+      }
+
+      setSignatoryData(signatoryArray);
+    } catch (error) {
+      console.error('Error loading signatory data:', error);
+      // Fallback to local storage if API fails
+      try {
+        const savedSignatories = localStorage.getItem(`signatories_${authUser?.id}`);
+        if (savedSignatories) {
+          setSignatoryData(JSON.parse(savedSignatories));
+        } else {
+          // Set default empty values
+          setSignatoryData([
+            {
+              id: 1,
+              name: '',
+              position: '',
+              title: 'Prepared By'
+            }
+          ]);
+        }
+      } catch (fallbackError) {
+        // If all else fails, set default values
+        setSignatoryData([
+          {
+            id: 1,
+            name: '',
+            position: 'Staff',
+            title: 'Prepared By'
+          }
+        ]);
+      }
     } finally {
       setLoadingSignatories(false);
     }
@@ -194,9 +253,51 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
 
   const saveSignatoryData = async () => {
     try {
-      // In a real implementation, this would save to an API
-      // For now, we'll save to local storage
+      // Convert signatory array to the format expected by Reports.js
+      const signatoryObject = {};
+      signatoryData.forEach((signatory, index) => {
+        if (index === 0) {
+          signatoryObject.preparedBy = {
+            name: signatory.name,
+            position: signatory.position,
+            title: signatory.title
+          };
+        } else if (index === 1) {
+          signatoryObject.reviewedBy = {
+            name: signatory.name,
+            position: signatory.position,
+            title: signatory.title
+          };
+        } else if (index === 2) {
+          signatoryObject.notedBy = {
+            name: signatory.name,
+            position: signatory.position,
+            title: signatory.title
+          };
+        }
+      });
+
+      // Update user profile with signatory data
+      const response = await fetch(`${process.env.REACT_APP_API_URL || '/api'}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          signatories: signatoryData,  // Save array format for SettingsModal
+          ...signatoryObject           // Also save object format for Reports.js compatibility
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      // Also save to local storage for cross-browser compatibility
       localStorage.setItem(`signatories_${authUser?.id}`, JSON.stringify(signatoryData));
+
       setSuccessMessage('Signatory data saved successfully!');
       setShowSuccessModal(true);
     } catch (error) {
@@ -205,6 +306,38 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
       setShowSuccessModal(true);
     }
   };
+
+  const addNewSignatory = useCallback(() => {
+    setSignatoryData(prev => {
+      const newId = Math.max(...prev.map(item => item.id), 0) + 1;
+      return [...prev, {
+        id: newId,
+        name: '',
+        position: '',
+        title: ''
+      }];
+    });
+  }, []);
+
+  const removeSignatory = useCallback((id) => {
+    setSignatoryData(prev => {
+      if (prev.length <= 1) {
+        // Don't allow removing the last signatory
+        return prev;
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  }, []);
+
+  const updateSignatoryField = useCallback((id, field, value) => {
+    setSignatoryData(prev => 
+      prev.map(signatory => 
+        signatory.id === id 
+          ? { ...signatory, [field]: value } 
+          : signatory
+      )
+    );
+  }, []);
 
   const handleBugReportSubmit = (e) => {
     e.preventDefault();
@@ -850,6 +983,85 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
     }
   };
 
+  // Memoized component for individual signatory items to prevent unnecessary re-renders
+  const SignatoryItem = React.memo(({ signatory, index, signatoryDataLength, removeSignatory, updateSignatoryField }) => {
+    // Memoize the change handlers to prevent recreation on each render
+    const handleTitleChange = useCallback((e) => {
+      updateSignatoryField(signatory.id, 'title', e.target.value);
+    }, [signatory.id, updateSignatoryField]);
+
+    const handleNameChange = useCallback((e) => {
+      updateSignatoryField(signatory.id, 'name', e.target.value);
+    }, [signatory.id, updateSignatoryField]);
+
+    const handlePositionChange = useCallback((e) => {
+      updateSignatoryField(signatory.id, 'position', e.target.value);
+    }, [signatory.id, updateSignatoryField]);
+
+    const handleRemoveClick = useCallback(() => {
+      removeSignatory(signatory.id);
+    }, [signatory.id, removeSignatory]);
+
+    return (
+      <div key={signatory.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 relative resize-observer-stable signatory-item">
+        {signatoryDataLength > 1 && (
+          <button
+            type="button"
+            onClick={handleRemoveClick}
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+            title="Remove signatory"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        )}
+        <div className="space-y-4">
+          <div>
+            <Input
+              label="Role Title"
+              id={`signatoryTitle-${signatory.id}`}
+              name={`signatoryTitle-${signatory.id}`}
+              type="text"
+              value={signatory.title}
+              onChange={handleTitleChange}
+              placeholder="e.g., Prepared By"
+            />
+          </div>
+          <div>
+            <Input
+              label="Name"
+              id={`signatoryName-${signatory.id}`}
+              name={`signatoryName-${signatory.id}`}
+              type="text"
+              value={signatory.name}
+              onChange={handleNameChange}
+              placeholder="Enter name"
+            />
+          </div>
+          <div>
+            <Input
+              label="Position"
+              id={`signatoryPosition-${signatory.id}`}
+              name={`signatoryPosition-${signatory.id}`}
+              type="text"
+              value={signatory.position}
+              onChange={handlePositionChange}
+              placeholder="Enter position"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // Custom comparison to only re-render when the specific signatory data changes
+    return (
+      prevProps.signatory.id === nextProps.signatory.id &&
+      prevProps.signatory.title === nextProps.signatory.title &&
+      prevProps.signatory.name === nextProps.signatory.name &&
+      prevProps.signatory.position === nextProps.signatory.position &&
+      prevProps.signatoryDataLength === nextProps.signatoryDataLength
+    );
+  });
+
   // Reset bug report state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -857,6 +1069,19 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
       setIsBugReportModalOpen(false);
     }
   }, [isOpen]);
+
+  // Clean up any resize observers when modal closes
+  useEffect(() => {
+    return () => {
+      // Clean up any pending resize observer operations when component unmounts
+      if (window.__resizeObserverErrors) {
+        // Decrement the error counter when component unmounts to allow fresh logging if reopened
+        window.__resizeObserverErrors = 0;
+      }
+    };
+  }, []);
+
+
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Settings" size="2xl">
@@ -1167,129 +1392,110 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
 
         {/* Signatories Tab */}
         {activeTab === 'signatories' && !(propsUser?.role === 'admin') && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-[#111418] dark:text-white pb-4">Report Signatories</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 signatory-tab-content" style={{ contain: 'layout' }}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-[#111418] dark:text-white">Report Signatories</h2>
+              <Button
+                variant="primary"
+                onClick={addNewSignatory}
+                className="flex items-center"
+              >
+                <span className="material-symbols-outlined mr-1">add</span>
+                Add Signatory
+              </Button>
+            </div>
             {loadingSignatories ? (
               <div className="flex justify-center items-center h-40">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <form className="space-y-6">
-                <div>
-                  <Input
-                    label="Role Title"
-                    id="preparedByTitle"
-                    name="preparedByTitle"
-                    type="text"
-                    value={signatoryData.preparedBy.title || 'Prepared By'}
-                    onChange={(e) => setSignatoryData(prev => ({
-                      ...prev,
-                      preparedBy: { ...prev.preparedBy, title: e.target.value }
-                    }))}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <Input
-                      label="Name"
-                      id="preparedByName"
-                      name="preparedByName"
-                      type="text"
-                      value={signatoryData.preparedBy.name}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        preparedBy: { ...prev.preparedBy, name: e.target.value }
-                      }))}
-                    />
-                    <Input
-                      label="Position"
-                      id="preparedByPosition"
-                      name="preparedByPosition"
-                      type="text"
-                      value={signatoryData.preparedBy.position}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        preparedBy: { ...prev.preparedBy, position: e.target.value }
-                      }))}
-                    />
-                  </div>
+              <form className="resize-observer-stable signatory-form-container form-container overflow-hidden">
+                <div className="space-y-4">
+                  {(() => {
+                    const totalSignatories = signatoryData.length;
+
+                    if (totalSignatories === 1) {
+                      // Single signatory: full width
+                      const signatory = signatoryData[0];
+                      return (
+                        <div key={signatory.id} className="w-full">
+                          <SignatoryItem
+                            signatory={signatory}
+                            index={0}
+                            signatoryDataLength={totalSignatories}
+                            removeSignatory={removeSignatory}
+                            updateSignatoryField={updateSignatoryField}
+                          />
+                        </div>
+                      );
+                    } else if (totalSignatories % 2 === 0) {
+                      // Even number of signatories: all equal width (side by side in pairs)
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {signatoryData.map((signatory, index) => (
+                            <div key={signatory.id} className="w-full">
+                              <SignatoryItem
+                                signatory={signatory}
+                                index={index}
+                                signatoryDataLength={totalSignatories}
+                                removeSignatory={removeSignatory}
+                                updateSignatoryField={updateSignatoryField}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    } else if (totalSignatories > 1) {
+                      // Odd number of signatories: pairs on top, last one full width at bottom
+                      const elements = [];
+
+                      // Add pairs (all except the last one)
+                      if (totalSignatories > 1) {
+                        const pairElements = [];
+
+                        for (let i = 0; i < totalSignatories - 1; i++) {
+                          const signatory = signatoryData[i];
+                          pairElements.push(
+                            <div key={signatory.id} className="w-full">
+                              <SignatoryItem
+                                signatory={signatory}
+                                index={i}
+                                signatoryDataLength={totalSignatories}
+                                removeSignatory={removeSignatory}
+                                updateSignatoryField={updateSignatoryField}
+                              />
+                            </div>
+                          );
+                        }
+
+                        // Create a grid container for the pairs
+                        elements.push(
+                          <div key="pairs-container" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {pairElements}
+                          </div>
+                        );
+                      }
+
+                      // Add the last signatory as full width
+                      const lastSignatory = signatoryData[totalSignatories - 1];
+                      elements.push(
+                        <div key={lastSignatory.id} className="w-full">
+                          <SignatoryItem
+                            signatory={lastSignatory}
+                            index={totalSignatories - 1}
+                            signatoryDataLength={totalSignatories}
+                            removeSignatory={removeSignatory}
+                            updateSignatoryField={updateSignatoryField}
+                          />
+                        </div>
+                      );
+
+                      return elements;
+                    }
+                  })()}
                 </div>
 
-                <div>
-                  <Input
-                    label="Role Title"
-                    id="reviewedByTitle"
-                    name="reviewedByTitle"
-                    type="text"
-                    value={signatoryData.reviewedBy.title || 'Reviewed By'}
-                    onChange={(e) => setSignatoryData(prev => ({
-                      ...prev,
-                      reviewedBy: { ...prev.reviewedBy, title: e.target.value }
-                    }))}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <Input
-                      label="Name"
-                      id="reviewedByName"
-                      name="reviewedByName"
-                      type="text"
-                      value={signatoryData.reviewedBy.name}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        reviewedBy: { ...prev.reviewedBy, name: e.target.value }
-                      }))}
-                    />
-                    <Input
-                      label="Position"
-                      id="reviewedByPosition"
-                      name="reviewedByPosition"
-                      type="text"
-                      value={signatoryData.reviewedBy.position}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        reviewedBy: { ...prev.reviewedBy, position: e.target.value }
-                      }))}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Input
-                    label="Role Title"
-                    id="notedByTitle"
-                    name="notedByTitle"
-                    type="text"
-                    value={signatoryData.notedBy.title || 'Noted By'}
-                    onChange={(e) => setSignatoryData(prev => ({
-                      ...prev,
-                      notedBy: { ...prev.notedBy, title: e.target.value }
-                    }))}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    <Input
-                      label="Name"
-                      id="notedByName"
-                      name="notedByName"
-                      type="text"
-                      value={signatoryData.notedBy.name}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        notedBy: { ...prev.notedBy, name: e.target.value }
-                      }))}
-                    />
-                    <Input
-                      label="Position"
-                      id="notedByPosition"
-                      name="notedByPosition"
-                      type="text"
-                      value={signatoryData.notedBy.position}
-                      onChange={(e) => setSignatoryData(prev => ({
-                        ...prev,
-                        notedBy: { ...prev.notedBy, position: e.target.value }
-                      }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-4">
+                <div className="flex justify-end gap-2 pt-6">
                   <Button variant="outline" type="button" onClick={onClose}>Cancel</Button>
                   <Button variant="primary" type="button" onClick={saveSignatoryData}>Save Changes</Button>
                 </div>

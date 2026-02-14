@@ -61,15 +61,15 @@ async function handleGetUser(req, res, userId) {
 async function handleGetProfile(req, res, userId) {
   try {
     const user = await getUserById(userId);
-    
+
     if (!user) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'User not found' }));
     }
-    
+
     // Return user info (excluding password hash)
     const { password_hash, ...userResponse } = user;
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ user: userResponse }));
   } catch (error) {
@@ -151,7 +151,7 @@ async function handleUpdateUser(req, res, userId) {
 // Handle updating user profile
 async function handleUpdateProfile(req, res, userId) {
   try {
-    const { full_name, profile_image_url } = req.body;
+    const { full_name, profile_image_url, signatories } = req.body;
 
     // If profile_image_url is provided and it's a relative path, convert it to full URL
     let processed_profile_image_url = profile_image_url;  // Initialize the variable
@@ -175,6 +175,7 @@ async function handleUpdateProfile(req, res, userId) {
     const userData = {
       full_name: full_name || undefined,
       profile_image_url: processed_profile_image_url || undefined,
+      signatories: signatories || undefined,
       email: undefined // Don't allow email changes through this endpoint
     };
 

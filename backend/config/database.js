@@ -357,12 +357,22 @@ function createOtherTablesAndColumns(callback) {
   });
 
   // Create an index for faster queries by user_id and changed_at
-  db.run(`CREATE INDEX IF NOT EXISTS idx_status_history_user_time 
+  db.run(`CREATE INDEX IF NOT EXISTS idx_status_history_user_time
     ON status_history(user_id, changed_at)`, (err) => {
     if (err) {
       console.log('Note: status_history index may already exist');
     } else {
       console.log('status_history index created successfully');
+    }
+  });
+
+  // Add signatories column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN signatories TEXT`, (err) => {
+    if (err) {
+      // Column might already exist, which is fine
+      console.log('Note: signatories column may already exist or table is not ready yet');
+    } else {
+      console.log('signatories column added to users table successfully');
     }
   });
 
