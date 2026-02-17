@@ -19,6 +19,21 @@
 - Subsequent updates directly modify DOM textContent and chart data without triggering React re-renders
 - `useCallback` used for `formatUptime` function to maintain stable reference
 
+## Signatories Tab Focus Fix
+
+### Fixed Input Focus Loss Issue
+- Fixed issue where input fields in signatories tab would lose focus after typing each character
+- Root cause: `SignatoryItem` component was defined inside `SettingsModal` component body, causing it to be re-created on every parent render
+- Solution: Moved `SignatoryItem` component definition outside of `SettingsModal` to module level
+- Used `React.memo` to prevent unnecessary re-renders when other signatories change
+- Removed unused `index` prop from component interface
+
+### Technical Details
+- Component moved to module scope (line 9) to maintain stable identity across renders
+- Added `displayName` for better debugging in React DevTools
+- Handlers memoized with `useCallback` to maintain referential stability
+- Only re-renders when its specific signatory's data changes
+
 ## Signatory System Improvements
 
 ### Dynamic Signatory Implementation

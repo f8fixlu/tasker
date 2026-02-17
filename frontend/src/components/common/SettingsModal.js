@@ -1,9 +1,81 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 import Button from './Button';
 import Input from './Input';
 import Modal from './Modal';
+
+// SignatoryItem component - defined outside SettingsModal to prevent re-creation on each render
+const SignatoryItem = memo(({ signatory, signatoryDataLength, removeSignatory, updateSignatoryField }) => {
+  // Memoize the change handlers to prevent recreation on each render
+  const handleTitleChange = useCallback((e) => {
+    updateSignatoryField(signatory.id, 'title', e.target.value);
+  }, [signatory.id, updateSignatoryField]);
+
+  const handleNameChange = useCallback((e) => {
+    updateSignatoryField(signatory.id, 'name', e.target.value);
+  }, [signatory.id, updateSignatoryField]);
+
+  const handlePositionChange = useCallback((e) => {
+    updateSignatoryField(signatory.id, 'position', e.target.value);
+  }, [signatory.id, updateSignatoryField]);
+
+  const handleRemoveClick = useCallback(() => {
+    removeSignatory(signatory.id);
+  }, [signatory.id, removeSignatory]);
+
+  return (
+    <div key={signatory.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 relative resize-observer-stable signatory-item">
+      {signatoryDataLength > 1 && (
+        <button
+          type="button"
+          onClick={handleRemoveClick}
+          className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+          title="Remove signatory"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
+      )}
+      <div className="space-y-4">
+        <div>
+          <Input
+            label="Role Title"
+            id={`signatoryTitle-${signatory.id}`}
+            name={`signatoryTitle-${signatory.id}`}
+            type="text"
+            value={signatory.title}
+            onChange={handleTitleChange}
+            placeholder="e.g., Prepared By"
+          />
+        </div>
+        <div>
+          <Input
+            label="Name"
+            id={`signatoryName-${signatory.id}`}
+            name={`signatoryName-${signatory.id}`}
+            type="text"
+            value={signatory.name}
+            onChange={handleNameChange}
+            placeholder="Enter name"
+          />
+        </div>
+        <div>
+          <Input
+            label="Position"
+            id={`signatoryPosition-${signatory.id}`}
+            name={`signatoryPosition-${signatory.id}`}
+            type="text"
+            value={signatory.position}
+            onChange={handlePositionChange}
+            placeholder="Enter position"
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+SignatoryItem.displayName = 'SignatoryItem';
 
 const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
   const { user: authUser, refreshUser } = useAuth();
@@ -983,85 +1055,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
     }
   };
 
-  // Memoized component for individual signatory items to prevent unnecessary re-renders
-  const SignatoryItem = React.memo(({ signatory, index, signatoryDataLength, removeSignatory, updateSignatoryField }) => {
-    // Memoize the change handlers to prevent recreation on each render
-    const handleTitleChange = useCallback((e) => {
-      updateSignatoryField(signatory.id, 'title', e.target.value);
-    }, [signatory.id, updateSignatoryField]);
-
-    const handleNameChange = useCallback((e) => {
-      updateSignatoryField(signatory.id, 'name', e.target.value);
-    }, [signatory.id, updateSignatoryField]);
-
-    const handlePositionChange = useCallback((e) => {
-      updateSignatoryField(signatory.id, 'position', e.target.value);
-    }, [signatory.id, updateSignatoryField]);
-
-    const handleRemoveClick = useCallback(() => {
-      removeSignatory(signatory.id);
-    }, [signatory.id, removeSignatory]);
-
-    return (
-      <div key={signatory.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 relative resize-observer-stable signatory-item">
-        {signatoryDataLength > 1 && (
-          <button
-            type="button"
-            onClick={handleRemoveClick}
-            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-            title="Remove signatory"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        )}
-        <div className="space-y-4">
-          <div>
-            <Input
-              label="Role Title"
-              id={`signatoryTitle-${signatory.id}`}
-              name={`signatoryTitle-${signatory.id}`}
-              type="text"
-              value={signatory.title}
-              onChange={handleTitleChange}
-              placeholder="e.g., Prepared By"
-            />
-          </div>
-          <div>
-            <Input
-              label="Name"
-              id={`signatoryName-${signatory.id}`}
-              name={`signatoryName-${signatory.id}`}
-              type="text"
-              value={signatory.name}
-              onChange={handleNameChange}
-              placeholder="Enter name"
-            />
-          </div>
-          <div>
-            <Input
-              label="Position"
-              id={`signatoryPosition-${signatory.id}`}
-              name={`signatoryPosition-${signatory.id}`}
-              type="text"
-              value={signatory.position}
-              onChange={handlePositionChange}
-              placeholder="Enter position"
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // Custom comparison to only re-render when the specific signatory data changes
-    return (
-      prevProps.signatory.id === nextProps.signatory.id &&
-      prevProps.signatory.title === nextProps.signatory.title &&
-      prevProps.signatory.name === nextProps.signatory.name &&
-      prevProps.signatory.position === nextProps.signatory.position &&
-      prevProps.signatoryDataLength === nextProps.signatoryDataLength
-    );
-  });
-
   // Reset bug report state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -1421,7 +1414,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                         <div key={signatory.id} className="w-full">
                           <SignatoryItem
                             signatory={signatory}
-                            index={0}
                             signatoryDataLength={totalSignatories}
                             removeSignatory={removeSignatory}
                             updateSignatoryField={updateSignatoryField}
@@ -1436,7 +1428,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                             <div key={signatory.id} className="w-full">
                               <SignatoryItem
                                 signatory={signatory}
-                                index={index}
                                 signatoryDataLength={totalSignatories}
                                 removeSignatory={removeSignatory}
                                 updateSignatoryField={updateSignatoryField}
@@ -1459,7 +1450,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                             <div key={signatory.id} className="w-full">
                               <SignatoryItem
                                 signatory={signatory}
-                                index={i}
                                 signatoryDataLength={totalSignatories}
                                 removeSignatory={removeSignatory}
                                 updateSignatoryField={updateSignatoryField}
@@ -1482,7 +1472,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                         <div key={lastSignatory.id} className="w-full">
                           <SignatoryItem
                             signatory={lastSignatory}
-                            index={totalSignatories - 1}
                             signatoryDataLength={totalSignatories}
                             removeSignatory={removeSignatory}
                             updateSignatoryField={updateSignatoryField}
