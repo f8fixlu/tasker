@@ -1880,9 +1880,6 @@ const generatePDF = async () => {
         }
       }
       
-      // Small delay to ensure state is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       const blob = await generatePDFBlob();
       const url = URL.createObjectURL(blob);
       setPdfPreviewUrl(url);

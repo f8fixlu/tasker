@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -34,19 +34,50 @@ const AdminStatsPage = () => {
   const [taskStats, setTaskStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Refs for live data elements to update without re-render
+  const uptimeRef = useRef(null);
+  const serverTimeRef = useRef(null);
+  const serverDateRef = useRef(null);
+  const activeSessionsRef = useRef(null);
+  const totalUsersRef = useRef(null);
+  const totalTasksRef = useRef(null);
+  const totalEventsRef = useRef(null);
+  const totalAttachmentsRef = useRef(null);
+  const recentUsersRef = useRef(null);
+  const activeUsersRef = useRef(null);
+  const overdueTasksRef = useRef(null);
+  const memoryChartRef = useRef(null);
+  const taskStatusChartRef = useRef(null);
+  const taskPriorityChartRef = useRef(null);
+
+  // Format uptime
+  const formatUptime = useCallback((seconds) => {
+    const days = Math.floor(seconds / (3600 * 24));
+    const hours = Math.floor((seconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${days}d ${hours}h ${minutes}m ${secs}s`;
+  }, []);
 
   useEffect(() => {
-    fetchStats();
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
+    fetchStats(true);
+    // Refresh stats every 30 seconds without flickering
+    const interval = setInterval(() => fetchStats(false), 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = async (initialLoad = false) => {
     try {
-      setLoading(true);
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (initialLoad) {
+        setLoading(true);
+      } else {
+        setIsUpdating(true);
+      }
       
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -79,15 +110,68 @@ const AdminStatsPage = () => {
         taskResponse.json()
       ]);
 
-      setStats(statsData);
-      setUserStats(userData);
-      setTaskStats(taskData);
-      setError(null);
+      // Update live data elements directly without full re-render
+      if (!initialLoad) {
+        // Update text elements
+        if (uptimeRef.current) uptimeRef.current.textContent = formatUptime(statsData.system.uptime);
+        if (serverTimeRef.current) serverTimeRef.current.textContent = new Date(statsData.system.timestamp).toLocaleTimeString();
+        if (serverDateRef.current) serverDateRef.current.textContent = new Date(statsData.system.timestamp).toLocaleDateString();
+        if (activeSessionsRef.current) activeSessionsRef.current.textContent = statsData.totals.activeSessions;
+        if (totalUsersRef.current) totalUsersRef.current.textContent = statsData.totals.users;
+        if (totalTasksRef.current) totalTasksRef.current.textContent = statsData.totals.tasks;
+        if (totalEventsRef.current) totalEventsRef.current.textContent = statsData.totals.events;
+        if (totalAttachmentsRef.current) totalAttachmentsRef.current.textContent = statsData.totals.attachments;
+        if (recentUsersRef.current) recentUsersRef.current.textContent = userData.recent;
+        if (activeUsersRef.current) activeUsersRef.current.textContent = userData.active;
+        if (overdueTasksRef.current) overdueTasksRef.current.textContent = taskData.overdue;
+
+        // Update charts without full re-render
+        updateCharts(statsData, taskData);
+        
+        setIsUpdating(false);
+      } else {
+        // Initial load - full render
+        setStats(statsData);
+        setUserStats(userData);
+        setTaskStats(taskData);
+        setError(null);
+        setLoading(false);
+      }
     } catch (err) {
       console.error('Error fetching admin stats:', err);
       setError('Failed to load statistics. Please try again later.');
-    } finally {
       setLoading(false);
+      setIsUpdating(false);
+    }
+  };
+
+  const updateCharts = (statsData, taskData) => {
+    // Update memory chart
+    if (memoryChartRef.current && memoryChartRef.current.chart) {
+      const chart = memoryChartRef.current.chart;
+      chart.data.datasets[0].data = [
+        statsData.system.memory.rss,
+        statsData.system.memory.heapTotal,
+        statsData.system.memory.heapUsed,
+        statsData.system.memory.external
+      ];
+      chart.update('none'); // 'none' mode prevents animation flicker
+    }
+
+    // Update task status chart
+    if (taskStatusChartRef.current && taskStatusChartRef.current.chart) {
+      const chart = taskStatusChartRef.current.chart;
+      chart.data.labels = Object.keys(taskData.byStatus);
+      chart.data.datasets[0].data = Object.values(taskData.byStatus);
+      chart.update('none');
+    }
+
+    // Update task priority chart
+    if (taskPriorityChartRef.current && taskPriorityChartRef.current.chart) {
+      const chart = taskPriorityChartRef.current.chart;
+      chart.data.labels = Object.keys(taskData.byPriority);
+      chart.data.datasets[0].data = Object.values(taskData.byPriority);
+      chart.update('none');
     }
   };
 
@@ -121,7 +205,7 @@ const AdminStatsPage = () => {
     );
   }
 
-  // System info chart options
+  // Chart options - static, won't change
   const chartOptions = {
     responsive: true,
     plugins: {
@@ -133,9 +217,10 @@ const AdminStatsPage = () => {
         text: 'System Overview',
       },
     },
+    animation: false, // Disable animation to prevent flickering on updates
   };
 
-  // Memory usage chart data
+  // Memory usage chart data - initial render only
   const memoryData = {
     labels: ['RSS', 'Heap Total', 'Heap Used', 'External'],
     datasets: [
@@ -164,7 +249,7 @@ const AdminStatsPage = () => {
     ],
   };
 
-  // Task status chart data
+  // Task status chart data - initial render only
   const taskStatusData = {
     labels: Object.keys(taskStats.byStatus),
     datasets: [
@@ -190,7 +275,7 @@ const AdminStatsPage = () => {
     ],
   };
 
-  // Task priority chart data
+  // Task priority chart data - initial render only
   const taskPriorityData = {
     labels: Object.keys(taskStats.byPriority),
     datasets: [
@@ -212,16 +297,6 @@ const AdminStatsPage = () => {
     ],
   };
 
-  // Format uptime
-  const formatUptime = (seconds) => {
-    const days = Math.floor(seconds / (3600 * 24));
-    const hours = Math.floor((seconds % (3600 * 24)) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    return `${days}d ${hours}h ${minutes}m ${secs}s`;
-  };
-
   return (
     <div className="layout-content-container">
       <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-8">System Administration Dashboard</h1>
@@ -230,14 +305,14 @@ const AdminStatsPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Database Status */}
         <div className={`p-6 rounded-lg shadow-md ${
-          stats.database.connected 
-            ? 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700' 
+          stats.database.connected
+            ? 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700'
             : 'bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700'
         }`}>
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Database</h3>
           <p className={`text-2xl font-bold ${
-            stats.database.connected 
-              ? 'text-green-600 dark:text-green-400' 
+            stats.database.connected
+              ? 'text-green-600 dark:text-green-400'
               : 'text-red-600 dark:text-red-400'
           }`}>
             {stats.database.connected ? 'Connected' : 'Disconnected'}
@@ -248,24 +323,24 @@ const AdminStatsPage = () => {
         {/* Uptime */}
         <div className="p-6 bg-blue-100 dark:bg-blue-900/30 rounded-lg shadow-md border border-blue-400 dark:border-blue-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">System Uptime</h3>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatUptime(stats.system.uptime)}</p>
+          <p ref={uptimeRef} className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatUptime(stats.system.uptime)}</p>
           <p className="text-sm mt-1 text-gray-600 dark:text-gray-300">Time since last restart</p>
         </div>
 
         {/* Active Sessions */}
         <div className="p-6 bg-purple-100 dark:bg-purple-900/30 rounded-lg shadow-md border border-purple-400 dark:border-purple-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Active Sessions</h3>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totals.activeSessions}</p>
+          <p ref={activeSessionsRef} className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totals.activeSessions}</p>
           <p className="text-sm mt-1 text-gray-600 dark:text-gray-300">Last 30 minutes</p>
         </div>
 
         {/* Server Timestamp */}
         <div className="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md border border-gray-400 dark:border-gray-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Server Time</h3>
-          <p className="text-xl font-bold text-gray-700 dark:text-gray-300">
+          <p ref={serverTimeRef} className="text-xl font-bold text-gray-700 dark:text-gray-300">
             {new Date(stats.system.timestamp).toLocaleTimeString()}
           </p>
-          <p className="text-sm mt-1 text-gray-600 dark:text-gray-300">{new Date(stats.system.timestamp).toLocaleDateString()}</p>
+          <p ref={serverDateRef} className="text-sm mt-1 text-gray-600 dark:text-gray-300">{new Date(stats.system.timestamp).toLocaleDateString()}</p>
         </div>
       </div>
 
@@ -273,23 +348,23 @@ const AdminStatsPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <div className="p-6 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg shadow-md border border-indigo-400 dark:border-indigo-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Total Users</h3>
-          <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totals.users}</p>
+          <p ref={totalUsersRef} className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totals.users}</p>
         </div>
         <div className="p-6 bg-teal-100 dark:bg-teal-900/30 rounded-lg shadow-md border border-teal-400 dark:border-teal-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Total Tasks</h3>
-          <p className="text-3xl font-bold text-teal-600 dark:text-teal-400">{stats.totals.tasks}</p>
+          <p ref={totalTasksRef} className="text-3xl font-bold text-teal-600 dark:text-teal-400">{stats.totals.tasks}</p>
         </div>
         <div className="p-6 bg-orange-100 dark:bg-orange-900/30 rounded-lg shadow-md border border-orange-400 dark:border-orange-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Total Events</h3>
-          <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.totals.events}</p>
+          <p ref={totalEventsRef} className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.totals.events}</p>
         </div>
         <div className="p-6 bg-pink-100 dark:bg-pink-900/30 rounded-lg shadow-md border border-pink-400 dark:border-pink-700">
           <p className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Total Attachments</p>
-          <p className="text-3xl font-bold text-pink-600 dark:text-pink-400">{stats.totals.attachments}</p>
+          <p ref={totalAttachmentsRef} className="text-3xl font-bold text-pink-600 dark:text-pink-400">{stats.totals.attachments}</p>
         </div>
         <div className="p-6 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg shadow-md border border-cyan-400 dark:border-cyan-700">
           <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-white">Recent Users</h3>
-          <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{userStats.recent}</p>
+          <p ref={recentUsersRef} className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{userStats.recent}</p>
         </div>
       </div>
 
@@ -298,13 +373,13 @@ const AdminStatsPage = () => {
         {/* Memory Usage Chart */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Memory Usage</h3>
-          <Bar data={memoryData} options={chartOptions} />
+          <Bar ref={memoryChartRef} data={memoryData} options={chartOptions} />
         </div>
 
         {/* Task Status Chart */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Tasks by Status</h3>
-          <Doughnut data={taskStatusData} options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }} />
+          <Doughnut ref={taskStatusChartRef} data={taskStatusData} options={{ responsive: true, plugins: { legend: { position: 'bottom' } }, animation: false }} />
         </div>
       </div>
 
@@ -313,7 +388,7 @@ const AdminStatsPage = () => {
         {/* Task Priority Chart */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Tasks by Priority</h3>
-          <Doughnut data={taskPriorityData} options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }} />
+          <Doughnut ref={taskPriorityChartRef} data={taskPriorityData} options={{ responsive: true, plugins: { legend: { position: 'bottom' } }, animation: false }} />
         </div>
 
         {/* System Info Card */}
@@ -325,8 +400,8 @@ const AdminStatsPage = () => {
             <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">CPU Model:</span> {stats.system.cpu.model}</p>
             <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Total Memory:</span> {(stats.system.os.totalMemory / (1024**3)).toFixed(2)} GB</p>
             <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Free Memory:</span> {(stats.system.os.freeMemory / (1024**3)).toFixed(2)} GB</p>
-            <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Active Users (24h):</span> {userStats.active}</p>
-            <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Overdue Tasks:</span> <span className="text-red-600 dark:text-red-400 font-bold">{taskStats.overdue}</span></p>
+            <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Active Users (24h):</span> <span ref={activeUsersRef}>{userStats.active}</span></p>
+            <p className="text-gray-700 dark:text-gray-300"><span className="font-medium">Overdue Tasks:</span> <span ref={overdueTasksRef} className="text-red-600 dark:text-red-400 font-bold">{taskStats.overdue}</span></p>
           </div>
         </div>
       </div>
@@ -334,10 +409,11 @@ const AdminStatsPage = () => {
       {/* Refresh Button */}
       <div className="flex justify-center">
         <button
-          onClick={fetchStats}
-          className="px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 focus:ring-offset-white"
+          onClick={() => fetchStats(false)}
+          disabled={isUpdating}
+          className="px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Refresh Stats
+          {isUpdating ? 'Updating...' : 'Refresh Stats'}
         </button>
       </div>
     </div>
