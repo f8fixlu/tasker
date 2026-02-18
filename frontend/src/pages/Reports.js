@@ -506,8 +506,21 @@ const Reports = () => {
             </div>
             <div className="bg-gray-50 p-4 rounded">
               <h3 className="text-center font-medium mb-2">Activity Breakdown</h3>
-              <div className="h-64">
-                <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
+              <div className="h-64 flex flex-row items-center">
+                <div className="w-1/2 h-48 flex items-center justify-center">
+                  <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
+                </div>
+                <div className="w-1/2 flex flex-col justify-center pl-2">
+                  {activityBreakdownChartData.labels.map((label, index) => (
+                    <div key={label} className="flex items-center my-0.5">
+                      <div
+                        className="w-2.5 h-2.5 mr-1.5 rounded-full"
+                        style={{ backgroundColor: activityBreakdownChartData.datasets[0].backgroundColor[index] }}
+                      ></div>
+                      <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -2163,18 +2176,18 @@ const generatePDF = async () => {
               <div className="h-64 sm:h-72">
                 <h3 className="text-lg font-medium text-[#617589] dark:text-gray-400 mb-2 text-left">Activity Breakdown</h3>
                 <div className="h-full">
-                  <div className="h-full flex items-center flex-col sm:flex-row">
-                    <div className="w-full sm:w-2/3 h-40 sm:h-56 flex items-center justify-start">
+                  <div className="h-full flex flex-row items-center">
+                    <div className="w-1/2 h-32 sm:h-40 flex items-center justify-center">
                       <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
                     </div>
-                    <div className="w-full sm:w-1/3 flex flex-col items-start justify-center pl-0 sm:pl-4 mt-2 sm:mt-0">
+                    <div className="w-1/2 flex flex-col justify-center pl-2 sm:pl-4">
                       {activityBreakdownChartData.labels.map((label, index) => (
-                        <div key={label} className="flex items-center my-1">
+                        <div key={label} className="flex items-center my-0.5 sm:my-1">
                           <div
-                            className="w-3 h-3 mr-2 rounded-full"
+                            className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1.5 sm:mr-2 rounded-full"
                             style={{ backgroundColor: activityBreakdownChartData.datasets[0].backgroundColor[index] }}
                           ></div>
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+                          <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">{label}</span>
                         </div>
                       ))}
                     </div>

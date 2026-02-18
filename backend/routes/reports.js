@@ -13,7 +13,7 @@ function reportingRoutes(req, res, parsedUrl) {
   // Parse the request body
   jsonParser(req, res, () => {
     if (method === 'GET' && path === '/api/reports/stats') {
-      handleGetDashboardStats(req, res, req.user.id);
+      handleGetDashboardStats(req, res, req.user.id, parsedUrl.query);
     } else if (method === 'GET' && path === '/api/reports/tasks-summary') {
       handleGetTasksSummary(req, res, req.user.id, parsedUrl.query);
     } else if (method === 'GET' && path === '/api/reports/events-summary') {

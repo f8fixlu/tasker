@@ -130,3 +130,34 @@
 
 ### Files Modified
 - `frontend/src/pages/Reports.js`: Replaced all spinners with skeleton loading in Task List, Event List, Consolidated Tasks, and Consolidated Events sections. Initial load shows 8 skeleton rows, "load more" shows 3 skeleton rows at bottom. Error messages replaced with skeleton loading.
+
+## Activity Breakdown Chart Mobile Layout
+
+### Responsive Legend Positioning
+- Changed Activity Breakdown chart legend to display beside the chart on all screen sizes (not below on mobile)
+- Chart and legend now use equal 50/50 width distribution (`w-1/2` each)
+- Applied consistent `flex flex-row` layout for both mobile and desktop views
+
+### Responsive Sizing Adjustments
+- **Chart height**: `h-32` on mobile, `h-40` on desktop (sm and up)
+- **Legend dot size**: `w-2.5 h-2.5` on mobile, `w-3 h-3` on desktop
+- **Legend text size**: `text-xs` on mobile, `text-sm` on desktop
+- **Spacing**: Smaller margins on mobile (`my-0.5`, `mr-1.5`) for compact display
+
+### Applied to Both Views
+- Updated main dashboard Performance Overview card
+- Updated print preview modal charts section
+
+### Files Modified
+- `frontend/src/pages/Reports.js`: Modified Activity Breakdown chart layout to show legend beside chart on all screen sizes
+
+## Backend Date Range Filtering Fix
+
+### Dashboard Stats Date Range
+- Fixed issue where activity breakdown chart was not filtering by selected date range
+- Added missing `parsedUrl.query` parameter to `handleGetDashboardStats` function call in backend
+- Frontend correctly passes `start_date` and `end_date` from date picker
+- Backend now properly receives and applies date range filtering to task statistics
+
+### Files Modified
+- `backend/routes/reports.js`: Added `parsedUrl.query` parameter to `handleGetDashboardStats` call (line 15)
