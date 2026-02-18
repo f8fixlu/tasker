@@ -87,12 +87,14 @@ const Reports = () => {
   // State for task type summary
   const [taskTypeSummary, setTaskTypeSummary] = useState([]);
   const [taskTypeSummaryLoading, setTaskTypeSummaryLoading] = useState(false);
+  const [taskTypeSummaryLoaded, setTaskTypeSummaryLoaded] = useState(false);
   const [taskTypeSummaryError, setTaskTypeSummaryError] = useState(null);
   const [taskTypeGrouping, setTaskTypeGrouping] = useState('combined'); // only 'combined' available now
 
   // State for event summary
   const [eventSummary, setEventSummary] = useState([]);
   const [eventSummaryLoading, setEventSummaryLoading] = useState(false);
+  const [eventSummaryLoaded, setEventSummaryLoaded] = useState(false);
   const [eventSummaryError, setEventSummaryError] = useState(null);
 
   // Format category name to have proper capitalization (WORK -> Work, personal -> Personal)
@@ -866,6 +868,7 @@ const Reports = () => {
   // State for sidebar event list
   const [sidebarEventList, setSidebarEventList] = useState([]);
   const [sidebarEventListLoading, setSidebarEventListLoading] = useState(false);
+  const [sidebarEventListLoaded, setSidebarEventListLoaded] = useState(false);
   const [sidebarEventListPage, setSidebarEventListPage] = useState(1);
   const [sidebarEventListHasMore, setSidebarEventListHasMore] = useState(true);
   const [sidebarEventTotal, setSidebarEventTotal] = useState(0);
@@ -875,6 +878,7 @@ const Reports = () => {
   // State for sidebar task list
   const [sidebarTaskList, setSidebarTaskList] = useState([]);
   const [sidebarTaskListLoading, setSidebarTaskListLoading] = useState(false);
+  const [sidebarTaskListLoaded, setSidebarTaskListLoaded] = useState(false);
   const [sidebarTaskListPage, setSidebarTaskListPage] = useState(1);
   const [sidebarTaskListHasMore, setSidebarTaskListHasMore] = useState(true);
   const [sidebarTaskListTotal, setSidebarTaskListTotal] = useState(0);
@@ -1088,7 +1092,7 @@ const Reports = () => {
     } else {
       setSidebarTaskListLoadingMore(true);
     }
-    
+
     try {
       // Fetch the actual paginated data
       const data = await reportsService.getTaskListForReport({
@@ -1103,6 +1107,7 @@ const Reports = () => {
 
       if (page === 1) {
         setSidebarTaskList(newTasks);
+        setSidebarTaskListLoaded(true);
       } else {
         setSidebarTaskList(prev => [...prev, ...newTasks]);
       }
@@ -1113,6 +1118,7 @@ const Reports = () => {
       console.error('Error fetching sidebar task list:', error);
       if (page === 1) {
         setSidebarTaskList([]); // Set to empty array on error
+        setSidebarTaskListLoaded(true);
       }
     } finally {
       setSidebarTaskListLoading(page === 1 ? false : false);
@@ -1162,6 +1168,7 @@ const Reports = () => {
 
       if (page === 1) {
         setSidebarEventList(newEvents);
+        setSidebarEventListLoaded(true);
       } else {
         setSidebarEventList(prev => [...prev, ...newEvents]);
       }
@@ -1172,6 +1179,7 @@ const Reports = () => {
       console.error('Error fetching sidebar event list:', error);
       if (page === 1) {
         setSidebarEventList([]); // Set to empty array on error
+        setSidebarEventListLoaded(true);
       }
     } finally {
       setSidebarEventListLoading(page === 1 ? false : false);
@@ -1182,6 +1190,12 @@ const Reports = () => {
   // Load task list when component mounts or date range/ category filters change
   useEffect(() => {
     if (!loading) {
+      // Reset loaded state when filters change to show skeleton during refresh
+      setSidebarTaskListLoaded(false);
+      setSidebarEventListLoaded(false);
+      setTaskTypeSummaryLoaded(false);
+      setEventSummaryLoaded(false);
+
       fetchTaskList();
       fetchEventList();  // Also fetch events
       fetchSidebarTaskList(1, false); // Fetch first page, don't append
@@ -1248,10 +1262,11 @@ const Reports = () => {
         grouping: taskTypeGrouping // Add grouping parameter
       });
       setTaskTypeSummary(data.taskTypeSummary || []);
+      setTaskTypeSummaryLoaded(true);
     } catch (error) {
       console.error('Error fetching task type summary:', error);
-      setTaskTypeSummaryError('Failed to load task type summary');
       setTaskTypeSummary([]);
+      setTaskTypeSummaryLoaded(true);
     } finally {
       setTaskTypeSummaryLoading(false);
     }
@@ -1268,10 +1283,11 @@ const Reports = () => {
         category_filters: JSON.stringify(formatCategoryFiltersForAPI())
       });
       setEventSummary(data.eventSummary || []);
+      setEventSummaryLoaded(true);
     } catch (error) {
       console.error('Error fetching event summary:', error);
-      setEventSummaryError('Failed to load event summary');
       setEventSummary([]);
+      setEventSummaryLoaded(true);
     } finally {
       setEventSummaryLoading(false);
     }
@@ -2183,37 +2199,51 @@ const generatePDF = async () => {
               className="custom-list-height overflow-y-auto scrollbar-hide pb-1"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {sidebarTaskList.length > 0 ? (
-                    sidebarTaskList.map((task, index) => (
-                      <tr key={task.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {task.task_date ? formatToLocalDateTime(task.task_date).split(',')[0] : (task.created_date ? formatToLocalDateTime(task.created_date).split(',')[0] : 'N/A')}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate" title={task.title}>
-                          {task.title || 'No title'}
-                        </td>
+              {sidebarTaskListLoading || !sidebarTaskListLoaded ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="flex gap-3 items-center">
+                      <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : sidebarTaskList.length > 0 ? (
+                <>
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="2" className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No tasks found
-                      </td>
-                    </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {sidebarTaskList.map((task, index) => (
+                        <tr key={task.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {task.task_date ? formatToLocalDateTime(task.task_date).split(',')[0] : (task.created_date ? formatToLocalDateTime(task.created_date).split(',')[0] : 'N/A')}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate" title={task.title}>
+                            {task.title || 'No title'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sidebarTaskListLoadingMore && sidebarTaskListHasMore && sidebarTaskList.length > 0 && (
+                    <div className="p-4 space-y-3 border-t border-gray-200 dark:border-gray-700">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex gap-3 items-center">
+                          <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </tbody>
-              </table>
-              {sidebarTaskListLoadingMore && (
-                <div className="flex justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </>
+              ) : (
+                <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No tasks found
                 </div>
               )}
             </div>
@@ -2234,37 +2264,51 @@ const generatePDF = async () => {
               className="custom-list-height overflow-y-auto scrollbar-hide pb-1"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {sidebarEventList.length > 0 ? (
-                    sidebarEventList.map((event, index) => (
-                      <tr key={event.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {event.start_date ? formatToLocalDateTime(event.start_date).split(',')[0] : (event.created_at ? formatToLocalDateTime(event.created_at).split(',')[0] : 'N/A')}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate" title={event.title}>
-                          {event.title || 'No title'}
-                        </td>
+              {sidebarEventListLoading || !sidebarEventListLoaded ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="flex gap-3 items-center">
+                      <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : sidebarEventList.length > 0 ? (
+                <>
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="2" className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No events found
-                      </td>
-                    </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {sidebarEventList.map((event, index) => (
+                        <tr key={event.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {event.start_date ? formatToLocalDateTime(event.start_date).split(',')[0] : (event.created_at ? formatToLocalDateTime(event.created_at).split(',')[0] : 'N/A')}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate" title={event.title}>
+                            {event.title || 'No title'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sidebarEventListLoadingMore && sidebarEventListHasMore && sidebarEventList.length > 0 && (
+                    <div className="p-4 space-y-3 border-t border-gray-200 dark:border-gray-700">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex gap-3 items-center">
+                          <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                          <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </tbody>
-              </table>
-              {sidebarEventListLoadingMore && (
-                <div className="flex justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </>
+              ) : (
+                <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No events found
                 </div>
               )}
             </div>
@@ -2290,13 +2334,21 @@ const generatePDF = async () => {
             </div>
           </div>
 
-          {taskTypeSummaryLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : taskTypeSummaryError ? (
-            <div className="text-center py-8 text-red-500">
-              {taskTypeSummaryError}
+          {(taskTypeSummaryLoading || !taskTypeSummaryLoaded) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-3 animate-pulse"></div>
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="flex justify-between">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8 animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : taskTypeSummary.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -2389,13 +2441,21 @@ const generatePDF = async () => {
             </div>
           </div>
 
-          {eventSummaryLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : eventSummaryError ? (
-            <div className="text-center py-8 text-red-500">
-              {eventSummaryError}
+          {(eventSummaryLoading || !eventSummaryLoaded) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-3 animate-pulse"></div>
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="flex justify-between">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8 animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : eventSummary.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">

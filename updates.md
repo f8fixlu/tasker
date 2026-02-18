@@ -63,3 +63,70 @@
 - Enhanced data loading to handle both legacy and new formats
 - Improved signature rendering logic for both HTML and PDF outputs
 - Optimized component re-renders to prevent unnecessary updates
+
+## Tasks Page Skeleton Loading Improvements
+
+### Seamless Table Loading Without Resize
+- Modified skeleton loading to prevent table resize when switching between loading and loaded states
+- Removed skeleton animation from table headers (Title, Category, Task Type, etc.) - now displays actual header text
+- Removed skeleton animation from action icons and checkbox columns - replaced with static placeholder shapes
+- Applied skeleton animation only to data cells to maintain layout stability
+
+### Responsive Table Layout
+- Changed table from `table-auto` to `table-fixed` layout to prevent horizontal scrolling
+- Removed `overflow-x-auto` wrapper as it's no longer needed
+- Removed `whitespace-nowrap` to allow text wrapping within cells on smaller screens
+- Table columns now automatically distribute available width evenly
+- Content wraps naturally within cells when screen width is reduced
+
+### Dynamic Dimension Matching
+- Implemented `useRef` to capture actual table DOM element after data loads
+- Added `useEffect` to measure column widths and row heights from rendered table
+- Stored dimensions in `tableDimensions` state for reuse during subsequent loads
+- Skeleton now applies exact same dimensions as the actual data table via inline styles
+- First load may resize once to capture dimensions, but subsequent loads maintain consistent layout
+
+### Technical Implementation
+- Updated `LoadingTableSkeleton` component to accept `tableDimensions` prop
+- Modified `DataTable` component to use `forwardRef` for parent component access
+- Added measurement logic that captures:
+  - Total table width
+  - Individual column widths from header cells
+  - Row heights from first 10 body rows (with fallback for fewer rows)
+- Skeleton applies dimensions via inline `style` attributes on table, th, and tr elements
+- Both skeleton and DataTable now use identical structure and styling classes
+
+### Files Modified
+- `frontend/src/pages/Tasks.js`: Updated `LoadingTableSkeleton` component, added dimension tracking state and ref
+- `frontend/src/components/common/DataTable.js`: Converted to `forwardRef`, changed to `table-fixed` layout, removed overflow wrapper
+
+## Reports Page Skeleton Loading Improvements
+
+### Replaced Spinners with Skeleton Loading
+- Replaced loading spinners with skeleton loading in Task List and Event List sections
+- Applied skeleton loading to sidebar task list (initial load state)
+- Applied skeleton loading to sidebar event list (initial load state)
+- Applied skeleton loading to Consolidated Tasks summary cards
+- Applied skeleton loading to Consolidated Events summary cards
+- Kept spinner for "load more" functionality during infinite scroll
+
+### Implementation Details
+- **Sidebar Task List**: Shows 8 skeleton rows with date and title placeholders when `sidebarTaskListLoading` is true and list is empty
+- **Sidebar Event List**: Shows 8 skeleton rows with date and title placeholders when `sidebarEventListLoading` is true and list is empty
+- **Consolidated Tasks**: Shows 8 skeleton cards matching the card grid layout, each with title and 3 data rows
+- **Consolidated Events**: Shows 8 skeleton cards matching the card grid layout, each with title and 3 data rows
+- Skeleton uses `animate-pulse` animation with gray backgrounds that adapt to dark mode
+
+### Technical Changes
+- Added conditional rendering to check `sidebarTaskListLoading || !sidebarTaskListLoaded` for initial load state
+- Added conditional rendering to check `sidebarEventListLoading || !sidebarEventListLoaded` for initial load state
+- Added `Loaded` state tracking for task/event summary to show skeleton on first load
+- Replaced single spinner div with skeleton grid layouts for task/event summary cards
+- Replaced "load more" spinner with skeleton rows in sidebar task list (3 skeleton rows at bottom when loading more)
+- Replaced "load more" spinner with skeleton rows in sidebar event list (3 skeleton rows at bottom when loading more)
+- Removed error text display ("Failed to load task/event summary") - shows skeleton instead
+- Maintained consistent skeleton styling with `animate-pulse` and dark mode support
+- Reset loaded states when filters change to show skeleton during refresh
+
+### Files Modified
+- `frontend/src/pages/Reports.js`: Replaced all spinners with skeleton loading in Task List, Event List, Consolidated Tasks, and Consolidated Events sections. Initial load shows 8 skeleton rows, "load more" shows 3 skeleton rows at bottom. Error messages replaced with skeleton loading.

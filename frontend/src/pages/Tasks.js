@@ -52,32 +52,66 @@ const StatusPill = ({ status }) => {
   return <div className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>{status}</div>;
 };
 
-const LoadingTableSkeleton = ({ columns }) => (
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-      <thead className="bg-gray-50 dark:bg-gray-700">
-        <tr>
-          {columns.map((col, i) => (
-            <th key={i} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300">
-              <Skeleton type="text" className="w-20 h-4" />
+const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <table className="w-full text-left table-fixed">
+        <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <tr>
+            <th className="px-4 py-3 w-10">
+              <input
+                type="checkbox"
+                className="rounded text-primary focus:ring-primary"
+                disabled
+              />
             </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-        {[...Array(6)].map((_, r) => (
-          <tr key={r} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-            {columns.map((_, c) => (
-              <td key={c} className="px-6 py-4 whitespace-nowrap">
-                <Skeleton type="text" className="w-24 h-4" />
-              </td>
+            {columns.map((col, i) => (
+              <th
+                key={i}
+                className="px-4 py-3 font-medium text-[#617589] dark:text-gray-400"
+                style={{ width: tableDimensions.columnWidths?.[i] || 'auto' }}
+              >
+                {col.header}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          {[...Array(10)].map((_, r) => (
+            <tr 
+              key={r} 
+              className="hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors duration-200"
+              style={{ height: tableDimensions.rowHeights?.[r] || 52 }}
+            >
+              <td className="px-4 py-4 w-10">
+                <input
+                  type="checkbox"
+                  className="rounded text-primary focus:ring-primary"
+                  disabled
+                />
+              </td>
+              {columns.map((col, c) => (
+                <td key={c} className="px-4 py-4 text-[#333333] dark:text-gray-200">
+                  {col.key === 'actions' ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+                    </div>
+                  ) : col.key === 'attachment_count' ? (
+                    <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+                  ) : (
+                    <Skeleton type="text" className="w-full h-4" />
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 const FilterDropdown = ({
   filters,
@@ -313,6 +347,8 @@ const Option2Tasks = () => {
 
   const [loading, setLoading] = useState(true);
   const [loadingDropdowns, setLoadingDropdowns] = useState({ categories: false, taskTypes: false, subTypes: false });
+  const [tableDimensions, setTableDimensions] = useState({ width: '100%', columnWidths: [], rowHeights: [] });
+  const tableRef = useRef(null);
 
   // These state variables now need to be updated when new items are created in the modals
   const [categories, setCategories] = useState([]);
@@ -729,6 +765,30 @@ const Option2Tasks = () => {
     };
     fetch();
   }, [currentPage, tasksPerPage, debouncedSearchTerm, debouncedFilters, sortConfig, taskUpdateTrigger]);
+
+  // Measure table dimensions after data loads
+  useEffect(() => {
+    if (!loading && tableRef.current && tasks.length > 0) {
+      const table = tableRef.current;
+      const headerRow = table.querySelector('thead tr');
+      const bodyRows = table.querySelectorAll('tbody tr');
+      
+      const headerCells = headerRow?.querySelectorAll('th') || [];
+      const firstBodyRow = bodyRows[0];
+
+      // Get column widths from actual table
+      const columnWidths = Array.from(headerCells).map(cell => cell.offsetWidth);
+      
+      // Get row heights from first 10 rows (or fewer if less data)
+      const rowHeights = Array.from(bodyRows).slice(0, 10).map(row => row.offsetHeight);
+
+      setTableDimensions({
+        width: table.offsetWidth,
+        columnWidths,
+        rowHeights: rowHeights.length >= 10 ? rowHeights : [...rowHeights, ...Array(10 - rowHeights.length).fill(52)]
+      });
+    }
+  }, [tasks, loading]);
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -1426,10 +1486,11 @@ const Option2Tasks = () => {
       </div>
 
       {loading ? (
-        <LoadingTableSkeleton columns={columns} />
+        <LoadingTableSkeleton columns={columns} tableDimensions={tableDimensions} />
       ) : (
         <>
           <DataTable
+            ref={tableRef}
             columns={columns}
             data={tasks}
             showSelectAll
