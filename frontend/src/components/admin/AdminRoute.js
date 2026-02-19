@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Navigate } from 'react-router-dom';
 
 const AdminRoute = ({ children }) => {
@@ -26,6 +27,10 @@ const AdminRoute = ({ children }) => {
     console.error('Error decoding token:', error);
     return <Navigate to="/login" replace />;
   }
+};
+
+AdminRoute.propTypes = {
+  children: PropTypes.node.isRequired
 };
 
 export default AdminRoute;

@@ -5,7 +5,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ModalProvider } from './context/ModalContext';
 import { TaskUpdateProvider } from './context/TaskUpdateContext';
 import { NotificationUpdateProvider } from './context/NotificationUpdateContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
 import AdminRoute from './components/admin/AdminRoute';
 import AdminRedirectRoute from './components/common/AdminRedirectRoute';
 import Layout from './components/layout/Layout';
@@ -22,10 +21,6 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const AdminStatsPage = lazy(() => import('./pages/admin/AdminStatsPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
-
-// Preload critical routes when user is authenticated
-const preloadDashboard = () => import('./pages/Dashboard');
-const preloadTasks = () => import('./pages/Tasks');
 
 import ModalRenderer from './components/modals/ModalRenderer';
 

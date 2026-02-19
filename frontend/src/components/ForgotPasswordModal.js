@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { authService } from '../services/authService';
 import Input from './common/Input';
 import Button from './common/Button';
@@ -115,6 +116,10 @@ const ForgotPasswordModal = ({ onClose }) => {
       </div>
     </div>
   );
+};
+
+ForgotPasswordModal.propTypes = {
+  onClose: PropTypes.func.isRequired
 };
 
 export default ForgotPasswordModal;

@@ -14,7 +14,7 @@ import { categoryService } from '../services/categoryService';
 import { taskTypeService } from '../services/taskTypeService';
 import { subTypeService } from '../services/subTypeService';
 import { attachmentService } from '../services/attachmentService';
-import { formatToLocalDateTime } from '../utils/date';
+import { formatToLocalDateTime, formatDateOnly } from '../utils/date';
 import Skeleton from '../components/common/Skeleton';
 
 /**
@@ -58,7 +58,7 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
       <table className="w-full text-left table-fixed">
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-4 py-3 w-10">
+            <th className="px-4 py-3 w-10 max-[768px]:w-auto max-[768px]:px-2">
               <input
                 type="checkbox"
                 className="rounded text-primary focus:ring-primary"
@@ -83,7 +83,7 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
               className="hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors duration-200"
               style={{ height: tableDimensions.rowHeights?.[r] || 52 }}
             >
-              <td className="px-4 py-4 w-10">
+              <td className="px-4 py-4 w-10 max-[768px]:w-auto max-[768px]:px-2">
                 <input
                   type="checkbox"
                   className="rounded text-primary focus:ring-primary"
@@ -293,6 +293,94 @@ const SortDropdown = ({ columns, onSort }) => (
   </div>
 );
 
+const ActionsDropdown = ({ 
+  task, 
+  loadingAttachmentTaskId, 
+  onAttachmentClick, 
+  onViewClick, 
+  onEditClick, 
+  onArchiveClick,
+  isOpen,
+  onClose,
+  dropdownRef
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      ref={dropdownRef}
+      className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-20 border border-gray-200 dark:border-gray-700 py-1"
+    >
+      <button
+        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+          task.attachment_count > 0
+            ? 'text-gray-700 dark:text-gray-300'
+            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (task.attachment_count > 0 && loadingAttachmentTaskId !== task.id) {
+            onAttachmentClick(task.id, e);
+          }
+          onClose();
+        }}
+        disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
+      >
+        <span className="material-symbols-outlined text-base">attach_file</span>
+        <span>
+          {loadingAttachmentTaskId === task.id 
+            ? 'Loading...' 
+            : `${task.attachment_count} attachment${task.attachment_count !== 1 ? 's' : ''}`
+          }
+        </span>
+      </button>
+      
+      <button
+        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          onViewClick(task);
+          onClose();
+        }}
+      >
+        <span className="material-symbols-outlined text-base">visibility</span>
+        <span>View Task</span>
+      </button>
+      
+      <button
+        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEditClick(task);
+          onClose();
+        }}
+      >
+        <span className="material-symbols-outlined text-base">edit</span>
+        <span>Edit Task</span>
+      </button>
+      
+      <button
+        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+          task.status === 'Archived'
+            ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+            : 'text-gray-700 dark:text-gray-300'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (task.status !== 'Archived') {
+            onArchiveClick(task.id);
+          }
+          onClose();
+        }}
+        disabled={task.status === 'Archived'}
+      >
+        <span className="material-symbols-outlined text-base">archive</span>
+        <span>{task.status === 'Archived' ? 'Already Archived' : 'Archive Task'}</span>
+      </button>
+    </div>
+  );
+};
+
 const Option2Tasks = () => {
   const { user } = useAuth();
   const { openNewTaskModal, openEditTaskModal, openViewTaskModal } = useModal();
@@ -462,16 +550,21 @@ const Option2Tasks = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showSearchOptionsDropdown, setShowSearchOptionsDropdown] = useState(false);
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const [activeTaskId, setActiveTaskId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const filterDropdownRef = useRef(null);
   const sortDropdownRef = useRef(null);
   const searchOptionsDropdownRef = useRef(null);
+  const actionsDropdownRef = useRef(null);
 
-  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef], () => {
+  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef, actionsDropdownRef], () => {
     setShowFilterDropdown(false);
     setShowSortDropdown(false);
     setShowSearchOptionsDropdown(false);
+    setShowActionsDropdown(false);
+    setActiveTaskId(null);
   });
 
   // State to track hover for search options dropdown
@@ -547,121 +640,164 @@ const Option2Tasks = () => {
     return fieldMap[frontendField] || frontendField;
   };
 
+  // Function to handle attachment icon click
+  const handleAttachmentClick = async (taskId, e) => {
+    e.stopPropagation(); // Prevent row click from triggering
+
+    if (!taskId) return;
+
+    try {
+      // Set loading state for this specific task
+      setLoadingAttachmentTaskId(taskId);
+
+      // Fetch attachments for the task
+      const response = await attachmentService.getAttachmentsByEntity(taskId, 'task');
+      const attachments = response.attachments || [];
+
+      if (attachments.length > 0) {
+        // Set the first attachment as the preview attachment
+        const firstAttachment = attachments[0];
+
+        // Download the attachment to create a preview
+        const blob = await attachmentService.downloadAttachment(firstAttachment.id);
+
+        // Create a temporary URL for the file for preview
+        const url = window.URL.createObjectURL(blob);
+
+        // Set the attachment and URL for preview
+        setPreviewAttachment({
+          ...firstAttachment,
+          previewUrl: url
+        });
+      } else {
+        setAlertModal({
+          isOpen: true,
+          title: 'No Attachments',
+          message: 'This task has no attachments.',
+          type: 'info'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching attachments:', error);
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to load attachments: ' + (error.message || 'Unknown error'),
+        type: 'error'
+      });
+    } finally {
+      // Reset loading state for this task
+      setLoadingAttachmentTaskId(null);
+    }
+  };
+
   // Columns memoized
   const columns = useMemo(() => ([
     {
       header: 'Title',
       key: 'title',
+      className: 'px-1 sm:px-2 py-3 min-w-[120px] max-[768px]:min-w-[100px] max-[781px]:px-0',
+      width: '40%',
       render: (v, task) => (
         <Tooltip content={task.description || 'No description provided'} position="top">
           <div className="flex items-center gap-2">
-            <span className="cursor-default">{task.title ? (task.title.length > 30 ? `${task.title.slice(0,30)}...` : task.title) : 'N/A'}</span>
+            <span
+              className="cursor-default truncate max-[768px]:truncate-none max-[768px]:whitespace-normal max-[768px]:break-words"
+              title={task.title || 'N/A'}
+            >
+              {task.title || 'N/A'}
+            </span>
           </div>
         </Tooltip>
       )
     },
-    { header: 'Category', key: 'category_name' },
-    { header: 'Task Type', key: 'type_name' },
-    { header: 'Sub Type', key: 'sub_type_name' },
-    { header: 'Quantity', key: 'quantity' },
+    {
+      header: 'Category',
+      key: 'category_name',
+      className: 'px-4 py-3 max-[781px]:hidden',
+      width: '20%'
+    },
     {
       header: 'Status',
       key: 'status',
+      className: 'px-2 sm:px-4 py-3 min-w-[90px] max-[768px]:min-w-[85px] max-[768px]:px-3 max-[425px]:min-w-[80px] max-[425px]:px-4',
+      width: '15%',
       render: (v) => <StatusPill status={v} />
     },
     {
       header: 'Task Date',
       key: 'task_date',
-      render: (v) => v ? formatToLocalDateTime(v) : 'N/A'
+      className: 'px-2 sm:px-4 py-3 min-w-[115px] max-[768px]:min-w-[110px] max-[768px]:px-3 max-[425px]:min-w-[105px] max-[425px]:px-4',
+      width: '15%',
+      render: (v) => v ? formatDateOnly(v) : 'N/A'
     },
     {
       header: 'Due Date',
       key: 'due_date',
-      render: (v) => v ? formatToLocalDateTime(v) : 'N/A'
+      className: 'px-4 py-3 max-[957px]:hidden',
+      width: '15%',
+      render: (v) => v ? formatDateOnly(v) : 'N/A'
     },
     {
-      header: 'Actions',
+      header: '',
       key: 'actions',
+      className: 'px-2 py-3 text-center',
+      width: '10%',
       render: (v, task) => (
-        <div className="flex items-center gap-2">
+        <div className="relative flex justify-center">
           <button
-            className={`${task.attachment_count > 0
-              ? (loadingAttachmentTaskId === task.id 
-                  ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                  : 'text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary')
-              : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'}`}
-            title={task.attachment_count > 0
-              ? (loadingAttachmentTaskId === task.id 
-                  ? 'Loading attachment...' 
-                  : `${task.attachment_count} attachment${task.attachment_count > 1 ? 's' : ''}`)
-              : 'No attachments'}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            title="Actions"
             onClick={(e) => {
-              e.stopPropagation(); // Prevent row click from triggering
-              if (task.attachment_count > 0 && loadingAttachmentTaskId !== task.id) {
-                handleAttachmentClick(task.id, e);
+              e.stopPropagation();
+              if (showActionsDropdown && activeTaskId === task.id) {
+                setShowActionsDropdown(false);
+                setActiveTaskId(null);
+              } else {
+                setShowActionsDropdown(true);
+                setActiveTaskId(task.id);
               }
             }}
-            disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
           >
-            {loadingAttachmentTaskId === task.id ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current"></div>
-              </div>
-            ) : (
-              <span className="material-symbols-outlined">attach_file</span>
-            )}
+            <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
           </button>
 
-          <button
-            className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary"
-            title="View Task"
-            onClick={() => {
-              const transformedTask = {
-                ...task,
-                taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',  // Updated to include task_date
-                dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
-                createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
-                editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
-                category: task.category_name,
-                type: task.type_name,
-                subType: task.sub_type_name
-              };
-              openViewTaskModal(transformedTask);
-            }}
-          >
-            <span className="material-symbols-outlined">visibility</span>
-          </button>
-
-          <button
-            className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary"
-            title="Edit Task"
-            onClick={() => openEditTaskModal(task)}
-          >
-            <span className="material-symbols-outlined">edit</span>
-          </button>
-
-          <button
-            className={`${
-              task.status === 'Archived'
-                ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-            title={task.status === 'Archived' ? 'Task already archived' : 'Archive Task'}
-            onClick={() => {
-              if (task.status !== 'Archived') {
-                setTaskToDelete(task.id);
+          {showActionsDropdown && activeTaskId === task.id && (
+            <ActionsDropdown
+              task={task}
+              loadingAttachmentTaskId={loadingAttachmentTaskId}
+              onAttachmentClick={handleAttachmentClick}
+              onViewClick={(task) => {
+                const transformedTask = {
+                  ...task,
+                  taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',
+                  dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
+                  createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
+                  editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
+                  category: task.category_name,
+                  type: task.type_name,
+                  subType: task.sub_type_name
+                };
+                openViewTaskModal(transformedTask);
+              }}
+              onEditClick={openEditTaskModal}
+              onArchiveClick={(taskId) => {
+                setTaskToDelete(taskId);
                 setActionType('archive');
                 setIsModalOpen(true);
-              }
-            }}
-            disabled={task.status === 'Archived'}
-          >
-            <span className="material-symbols-outlined">archive</span>
-          </button>
+              }}
+              isOpen={showActionsDropdown && activeTaskId === task.id}
+              onClose={() => {
+                setShowActionsDropdown(false);
+                setActiveTaskId(null);
+              }}
+              dropdownRef={actionsDropdownRef}
+            />
+          )}
         </div>
       )
     }
-  ]), [openEditTaskModal, openViewTaskModal]);
+  ]), [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId]);
 
   // Load dropdowns on mount
   useEffect(() => {
@@ -960,57 +1096,6 @@ const Option2Tasks = () => {
     triggerTaskUpdate();
   };
 
-  // Function to handle attachment icon click
-  const handleAttachmentClick = async (taskId, e) => {
-    e.stopPropagation(); // Prevent row click from triggering
-
-    if (!taskId) return;
-
-    try {
-      // Set loading state for this specific task
-      setLoadingAttachmentTaskId(taskId);
-      
-      // Fetch attachments for the task
-      const response = await attachmentService.getAttachmentsByEntity(taskId, 'task');
-      const attachments = response.attachments || [];
-
-      if (attachments.length > 0) {
-        // Set the first attachment as the preview attachment
-        const firstAttachment = attachments[0];
-
-        // Download the attachment to create a preview
-        const blob = await attachmentService.downloadAttachment(firstAttachment.id);
-
-        // Create a temporary URL for the file for preview
-        const url = window.URL.createObjectURL(blob);
-
-        // Set the attachment and URL for preview
-        setPreviewAttachment({
-          ...firstAttachment,
-          previewUrl: url
-        });
-      } else {
-        setAlertModal({
-          isOpen: true,
-          title: 'No Attachments',
-          message: 'This task has no attachments.',
-          type: 'info'
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching attachments:', error);
-      setAlertModal({
-        isOpen: true,
-        title: 'Error',
-        message: 'Failed to load attachments: ' + (error.message || 'Unknown error'),
-        type: 'error'
-      });
-    } finally {
-      // Reset loading state for this task
-      setLoadingAttachmentTaskId(null);
-    }
-  };
-
   // Function to get file icon based on type
   const getFileIcon = (type) => {
     if (type.includes('image')) return 'image';
@@ -1299,189 +1384,194 @@ const Option2Tasks = () => {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="w-80 relative">
-          <Input
-            id="search-tasks"
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="pr-10 h-[34px]" // Add padding to the right to make space for the clear icon
-          />
-          {searchTerm && searchTerm.length > 0 && (
-            <button
-              type="button"
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
-              onClick={() => {
-                setSearchTerm('');
-                setCurrentPage(1);
-              }}
-              aria-label="Clear search"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
-          )}
-        </div>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative w-full min-[768px]:w-auto">
+            <Input
+              id="search-tasks"
+              placeholder="Search tasks..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="pl-10 pr-10 h-[34px] w-full min-[768px]:w-80"
+            />
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 material-symbols-outlined text-sm">search</span>
+            {searchTerm && searchTerm.length > 0 && (
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                aria-label="Clear search"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            )}
+          </div>
 
-          <div className="relative"
-               onMouseEnter={() => setIsSearchOptionsHovered(true)}
-               onMouseLeave={() => setIsSearchOptionsHovered(false)}>
+          <div className="flex items-center gap-2 flex-wrap w-full min-[768px]:w-auto min-[768px]:flex-nowrap">
+            <div className="relative flex-shrink-0"
+                 onMouseEnter={() => setIsSearchOptionsHovered(true)}
+                 onMouseLeave={() => setIsSearchOptionsHovered(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px] whitespace-nowrap"
+                onClick={() => setShowSearchOptionsDropdown(s => !s)}
+                onMouseEnter={() => setIsSearchOptionsHovered(true)}
+              >
+                <span className="material-symbols-outlined text-sm">tune</span>
+                <span className="text-sm max-[1231px]:hidden">View</span>
+              </Button>
+              {showSearchOptionsDropdown && (
+                <div
+                  ref={searchOptionsDropdownRef}
+                  onMouseEnter={() => setIsSearchOptionsHovered(true)}
+                  onMouseLeave={() => setIsSearchOptionsHovered(false)}
+                >
+                  <SearchOptionsDropdown
+                    filters={filters}
+                    onChange={handleFilterChange}
+                  />
+                </div>
+              )}
+            </div>
+
             <Button
               variant="outline"
               size="sm"
-              className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px]"
-              onClick={() => setShowSearchOptionsDropdown(s => !s)}
-              onMouseEnter={() => setIsSearchOptionsHovered(true)}
+              className="text-xs h-[34px] text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0"
+              onClick={() => {
+                const today = getTodayDate();
+                handleFilterChange('date_from', today);
+                handleFilterChange('date_to', today);
+              }}
+              title="Today"
             >
-              <span className="material-symbols-outlined text-sm">tune</span>
-              <span className="text-sm">View</span>
+              <span className="material-symbols-outlined text-sm">today</span>
+              <span className="text-sm max-[1231px]:hidden">Today</span>
             </Button>
-            {showSearchOptionsDropdown && (
-              <div
-                ref={searchOptionsDropdownRef}
-                onMouseEnter={() => setIsSearchOptionsHovered(true)}
-                onMouseLeave={() => setIsSearchOptionsHovered(false)}
-              >
-                <SearchOptionsDropdown
-                  filters={filters}
-                  onChange={handleFilterChange}
-                />
-              </div>
-            )}
-          </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs h-[34px] text-gray-500 dark:text-gray-400"
-            onClick={() => {
-              const today = getTodayDate();
-              handleFilterChange('date_from', today);
-              handleFilterChange('date_to', today);
-            }}
-          >
-            Today
-          </Button>
+            <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden flex-shrink-0">
+              <input
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => handleFilterChange('date_from', e.target.value)}
+                max={getTodayDate()}
+                className="w-32 max-[957px]:w-10 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white max-[957px]:text-transparent max-[957px]:px-1"
+              />
+              <span className="px-2 text-gray-500 dark:text-gray-400 max-[1231px]:hidden">-</span>
+              <input
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => handleFilterChange('date_to', e.target.value)}
+                max={getTodayDate()}
+                className="w-32 max-[957px]:w-10 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white max-[957px]:text-transparent max-[957px]:px-1"
+              />
+            </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
-            <input
-              type="date"
-              value={filters.date_from}
-              onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              max={getTodayDate()} // Disable future dates
-              className="w-36 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
-            />
-            <span className="px-2 text-gray-500 dark:text-gray-400">-</span>
-            <input
-              type="date"
-              value={filters.date_to}
-              onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              max={getTodayDate()} // Disable future dates
-              className="w-36 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="relative"
-               onMouseEnter={() => setIsFilterHovered(true)}
-               onMouseLeave={() => setIsFilterHovered(false)}>
-            <Button
-              variant="outline"
-              size="md"
-              className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px]"
-              onClick={() => setShowFilterDropdown(s => !s)}
-              onMouseEnter={() => setIsFilterHovered(true)}
-            >
-              <span className="material-symbols-outlined text-sm">filter_list</span>
-              <span className="text-sm">Filter</span>
-            </Button>
-            {showFilterDropdown && (
-              <div
-                ref={filterDropdownRef}
+            <div className="relative flex-shrink-0"
+                 onMouseEnter={() => setIsFilterHovered(true)}
+                 onMouseLeave={() => setIsFilterHovered(false)}>
+              <Button
+                variant="outline"
+                size="md"
+                className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px] whitespace-nowrap"
+                onClick={() => setShowFilterDropdown(s => !s)}
                 onMouseEnter={() => setIsFilterHovered(true)}
-                onMouseLeave={() => setIsFilterHovered(false)}
               >
-                <FilterDropdown
-                  filters={filters}
-                  categories={categories}
-                  taskTypes={taskTypes}
-                  subTypes={subTypes}
-                  loadingDropdowns={loadingDropdowns}
-                  onChange={handleFilterChange}
-                  onClear={clearFilters}
-                />
-              </div>
-            )}
-          </div>
+                <span className="material-symbols-outlined text-sm">filter_list</span>
+                <span className="text-sm max-[1231px]:hidden">Filter</span>
+              </Button>
+              {showFilterDropdown && (
+                <div
+                  ref={filterDropdownRef}
+                  onMouseEnter={() => setIsFilterHovered(true)}
+                  onMouseLeave={() => setIsFilterHovered(false)}
+                >
+                  <FilterDropdown
+                    filters={filters}
+                    categories={categories}
+                    taskTypes={taskTypes}
+                    subTypes={subTypes}
+                    loadingDropdowns={loadingDropdowns}
+                    onChange={handleFilterChange}
+                    onClear={clearFilters}
+                  />
+                </div>
+              )}
+            </div>
 
-          <div className="relative"
-               onMouseEnter={() => setIsSortHovered(true)}
-               onMouseLeave={() => setIsSortHovered(false)}>
-            <Button
-              variant="outline"
-              size="md"
-              className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px]"
-              onClick={() => setShowSortDropdown(s => !s)}
-              onMouseEnter={() => setIsSortHovered(true)}
-            >
-              <span className="material-symbols-outlined text-sm">sort</span>
-              <span className="text-sm">Sort</span>
-            </Button>
-            {showSortDropdown && (
-              <div
-                ref={sortDropdownRef}
+            <div className="relative flex-shrink-0"
+                 onMouseEnter={() => setIsSortHovered(true)}
+                 onMouseLeave={() => setIsSortHovered(false)}>
+              <Button
+                variant="outline"
+                size="md"
+                className="flex items-center gap-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 h-[34px] whitespace-nowrap"
+                onClick={() => setShowSortDropdown(s => !s)}
                 onMouseEnter={() => setIsSortHovered(true)}
-                onMouseLeave={() => setIsSortHovered(false)}
               >
-                <SortDropdown columns={columns} onSort={handleSort} />
-              </div>
-            )}
+                <span className="material-symbols-outlined text-sm">sort</span>
+                <span className="text-sm max-[1231px]:hidden">Sort</span>
+              </Button>
+              {showSortDropdown && (
+                <div
+                  ref={sortDropdownRef}
+                  onMouseEnter={() => setIsSortHovered(true)}
+                  onMouseLeave={() => setIsSortHovered(false)}
+                >
+                  <SortDropdown columns={columns} onSort={handleSort} />
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="primary"
+              size="md"
+              className="bg-red-500 hover:bg-red-600 h-[34px] whitespace-nowrap flex-shrink-0"
+              onClick={() => {
+                if (selectedTasks.length > 0) {
+                  setActionType('delete');
+                  setIsModalOpen(true);
+                }
+              }}
+              disabled={selectedTasks.length === 0}
+              title="Delete"
+            >
+              <span className="material-symbols-outlined text-sm">delete</span>
+              <span className="text-sm font-medium max-[1231px]:hidden">
+                Delete{selectedTasks.length > 0 ? ` (${selectedTasks.length})` : ''}
+              </span>
+            </Button>
+
+            <Button
+              variant="primary"
+              size="md"
+              className="bg-gray-500 hover:bg-gray-600 h-[34px] whitespace-nowrap flex-shrink-0"
+              onClick={() => {
+                if (selectedTasks.length > 0) {
+                  setActionType('archive');
+                  setIsModalOpen(true);
+                }
+              }}
+              disabled={selectedTasks.length === 0 || selectedTasks.every(taskId => {
+                const task = tasks.find(t => t.id === taskId);
+                return task && task.status === 'Archived';
+              })}
+              title="Archive"
+            >
+              <span className="material-symbols-outlined text-sm">archive</span>
+              <span className="text-sm font-medium max-[1231px]:hidden">
+                Archive{selectedTasks.length > 0 ?
+                  ` (${selectedTasks.filter(taskId => {
+                    const task = tasks.find(t => t.id === taskId);
+                    return task && task.status !== 'Archived';
+                  }).length})`.replace(' (0)', '') : ''}
+              </span>
+            </Button>
           </div>
-
-          <Button
-            variant="primary"
-            size="md"
-            className="bg-red-500 hover:bg-red-600 h-[34px]"
-            onClick={() => {
-              if (selectedTasks.length > 0) {
-                setActionType('delete');
-                setIsModalOpen(true);
-              }
-            }}
-            disabled={selectedTasks.length === 0}
-          >
-            <span className="material-symbols-outlined text-sm">delete</span>
-            <span className="text-sm font-medium">
-              Delete{selectedTasks.length > 0 ? ` (${selectedTasks.length})` : ''}
-            </span>
-          </Button>
-
-          <Button
-            variant="primary"
-            size="md"
-            className="bg-gray-500 hover:bg-gray-600 h-[34px]"
-            onClick={() => {
-              if (selectedTasks.length > 0) {
-                setActionType('archive');
-                setIsModalOpen(true);
-              }
-            }}
-            disabled={selectedTasks.length === 0 || selectedTasks.every(taskId => {
-              const task = tasks.find(t => t.id === taskId);
-              return task && task.status === 'Archived';
-            })}
-          >
-            <span className="material-symbols-outlined text-sm">archive</span>
-            <span className="text-sm font-medium">
-              Archive{selectedTasks.length > 0 ?
-                ` (${selectedTasks.filter(taskId => {
-                  const task = tasks.find(t => t.id === taskId);
-                  return task && task.status !== 'Archived';
-                }).length})`.replace(' (0)', '') : ''}
-            </span>
-          </Button>
         </div>
       </div>
 
