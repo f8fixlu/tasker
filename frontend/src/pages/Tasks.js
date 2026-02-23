@@ -58,7 +58,7 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
       <table className="w-full text-left table-fixed">
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-4 py-3 w-10 max-[768px]:w-auto max-[768px]:px-2">
+            <th className="pl-4 pr-2 py-3 w-10 max-[768px]:w-auto max-[768px]:px-2">
               <input
                 type="checkbox"
                 className="rounded text-primary focus:ring-primary"
@@ -721,7 +721,7 @@ const Option2Tasks = () => {
       header: 'Status',
       key: 'status',
       className: 'px-2 sm:px-4 py-3 min-w-[90px] max-[768px]:min-w-[85px] max-[768px]:px-3 max-[425px]:min-w-[80px] max-[425px]:px-4',
-      width: '15%',
+      width: '25%',
       render: (v) => <StatusPill status={v} />
     },
     {
@@ -1459,7 +1459,7 @@ const Option2Tasks = () => {
                 value={filters.date_from}
                 onChange={(e) => handleFilterChange('date_from', e.target.value)}
                 max={getTodayDate()}
-                className="w-32 max-[957px]:w-10 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white max-[957px]:text-transparent max-[957px]:px-1"
+                className="w-32 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               />
               <span className="px-2 text-gray-500 dark:text-gray-400 max-[1231px]:hidden">-</span>
               <input
@@ -1467,7 +1467,7 @@ const Option2Tasks = () => {
                 value={filters.date_to}
                 onChange={(e) => handleFilterChange('date_to', e.target.value)}
                 max={getTodayDate()}
-                className="w-32 max-[957px]:w-10 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white max-[957px]:text-transparent max-[957px]:px-1"
+                className="w-32 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               />
             </div>
 

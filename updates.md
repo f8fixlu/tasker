@@ -161,3 +161,46 @@
 
 ### Files Modified
 - `backend/routes/reports.js`: Added `parsedUrl.query` parameter to `handleGetDashboardStats` call (line 15)
+
+## Report Preview Signatories Fix
+
+### Issue
+- Signatories were missing in the report preview when using a new browser
+- Users had to save changes in the Signatories tab (Settings modal) to make signatories appear
+- Root cause: `Reports.js` only loaded signatory data from localStorage, not from the database API
+
+### Solution
+- Updated `Reports.js` to fetch signatory data from the API first (`/users/profile` endpoint)
+- Added localStorage as a fallback when API data is unavailable or fails
+- Applied the same fix to both `loadSignatoryData` (page load) and `showPdfPreview` (preview modal) functions
+- Now matches the behavior already implemented in `PrintReport.js`
+
+### Technical Implementation
+- Added `api` service import to `Reports.js`
+- Enhanced `loadSignatoryData` function to:
+  - Fetch user profile from API on component mount
+  - Parse signatories from API response (supports both array and object formats)
+  - Fall back to localStorage if API doesn't have signatories
+  - Fall back to localStorage if API request fails
+  - Only update state when data has actually changed (prevents unnecessary re-renders)
+- Enhanced `showPdfPreview` function to:
+  - Fetch fresh signatory data from API when preview is opened
+  - Parse and convert signatory data to array format if needed
+  - Fall back to localStorage if API is unavailable
+  - Ensure preview always displays the latest signatory data from the database
+
+### Data Format Support
+- Array format (new): `[{name, position, title}, ...]`
+- Object format with numbered signatories: `{signatory1: {...}, signatory2: {...}}`
+- Legacy format: `{preparedBy: {...}, reviewedBy: {...}, notedBy: {...}}`
+
+### Files Modified
+- `frontend/src/pages/Reports.js`: 
+  - Added `import api from '../services/api'` (line 8)
+  - Updated `loadSignatoryData` function (lines 241-399)
+  - Updated `showPdfPreview` function (lines 2002-2101)
+
+### Result
+- Signatories now appear correctly in report preview on new browsers
+- No need to save changes in Settings modal to display signatories
+- Users always see the most current signatory data from the database
