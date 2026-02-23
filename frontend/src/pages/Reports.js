@@ -5,6 +5,7 @@ import Modal from '../components/common/Modal';
 import { reportsService } from '../services/reportsService';
 import { categoryService } from '../services/categoryService';
 import { eventCategoryService } from '../services/eventCategoryService';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { formatToLocalDateTime } from '../utils/date';
@@ -238,10 +239,81 @@ const Reports = () => {
     };
   });
 
-  // Load signatory data from local storage or API (using only dynamic signatory format)
+  // Load signatory data from API first, fallback to local storage (using only dynamic signatory format)
   const loadSignatoryData = async () => {
     if (user) {
       try {
+        // First try to get from API via user profile
+        console.log('Loading signatory data from API...');
+        const userData = await api.get('/users/profile');
+        console.log('User data received:', userData);
+
+        // Check if signatory data exists in user profile
+        if (userData.user?.signatories) {
+          console.log('Signatories found in user data:', userData.user.signatories);
+          let newData = [];
+          
+          // If signatories is an array (like from DB), use it directly
+          if (Array.isArray(userData.user.signatories)) {
+            newData = userData.user.signatories;
+            console.log('Loaded signatory data from API (array format):', newData);
+          } else if (typeof userData.user.signatories === 'object') {
+            // If it's in object format, convert to array format
+            const signatoryArray = [];
+
+            // Handle signatory1, signatory2, etc. format
+            let signatoryIndex = 1;
+            while (userData.user.signatories[`signatory${signatoryIndex}`]) {
+              const signatoryField = userData.user.signatories[`signatory${signatoryIndex}`];
+              if (signatoryField && (signatoryField.name || signatoryField.position)) {
+                signatoryArray.push({
+                  title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: signatoryField.name || '',
+                  position: signatoryField.position || ''
+                });
+              }
+              signatoryIndex++;
+            }
+
+            // Also handle legacy format (preparedBy, reviewedBy, notedBy) if they exist
+            if (userData.user.signatories.preparedBy && (userData.user.signatories.preparedBy.name || userData.user.signatories.preparedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.preparedBy.name || '',
+                position: userData.user.signatories.preparedBy.position || ''
+              });
+            }
+
+            if (userData.user.signatories.reviewedBy && (userData.user.signatories.reviewedBy.name || userData.user.signatories.reviewedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.reviewedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.reviewedBy.name || '',
+                position: userData.user.signatories.reviewedBy.position || ''
+              });
+            }
+
+            if (userData.user.signatories.notedBy && (userData.user.signatories.notedBy.name || userData.user.signatories.notedBy.position)) {
+              signatoryArray.push({
+                title: userData.user.signatories.notedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                name: userData.user.signatories.notedBy.name || '',
+                position: userData.user.signatories.notedBy.position || ''
+              });
+            }
+
+            newData = signatoryArray;
+            console.log('Loaded signatory data from API (object format):', newData);
+          }
+
+          // Only update state if the data has actually changed
+          if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
+            setSignatoryData(newData);
+          }
+          return; // Exit early since we got data from API
+        } else {
+          console.log('No signatories in API response, trying localStorage');
+        }
+
+        // If no signatories in API, try localStorage as fallback
         const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
         if (savedSignatories) {
           const parsedData = JSON.parse(savedSignatories);
@@ -277,6 +349,7 @@ const Reports = () => {
           if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
             setSignatoryData(newData);
           }
+          console.log('Loaded signatory data from localStorage:', newData);
         } else {
           // If no data in localStorage, set to empty array only if current state is not already empty
           if (JSON.stringify(signatoryData) !== JSON.stringify([])) {
@@ -284,7 +357,43 @@ const Reports = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading signatory data:', error);
+        console.error('Error loading signatory data from API:', error);
+        // Fallback to localStorage if API fails
+        console.log('Falling back to localStorage due to API error');
+        try {
+          const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
+          if (savedSignatories) {
+            const parsedData = JSON.parse(savedSignatories);
+            let newData = [];
+            
+            if (Array.isArray(parsedData)) {
+              newData = parsedData;
+            } else {
+              const signatoryArray = [];
+              let signatoryIndex = 1;
+              while (parsedData[`signatory${signatoryIndex}`]) {
+                const signatoryField = parsedData[`signatory${signatoryIndex}`];
+                if (signatoryField && (signatoryField.name || signatoryField.position)) {
+                  signatoryArray.push({
+                    title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
+                    name: signatoryField.name || '',
+                    position: signatoryField.position || ''
+                  });
+                }
+                signatoryIndex++;
+              }
+              newData = signatoryArray;
+            }
+            
+            if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
+              setSignatoryData(newData);
+            }
+            console.log('Loaded signatory data from localStorage (fallback):', newData);
+          }
+        } catch (localStorageError) {
+          console.error('Error loading from localStorage:', localStorageError);
+        }
+        
         // Set default empty array if there's an error, only if current state is not already empty
         if (JSON.stringify(signatoryData) !== JSON.stringify([])) {
           setSignatoryData([]);
@@ -1893,22 +2002,100 @@ const generatePDF = async () => {
 
   const showPdfPreview = async () => {
     try {
-      // Fetch fresh signatory data from localStorage when opening preview
+      // Fetch fresh signatory data from API first, then localStorage when opening preview
       if (user) {
-        const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
-        if (savedSignatories) {
-          try {
-            const freshSignatoryData = JSON.parse(savedSignatories);
+        try {
+          // First try to get from API via user profile
+          console.log('Fetching fresh signatory data from API for preview...');
+          const userData = await api.get('/users/profile');
+          
+          if (userData.user?.signatories) {
+            console.log('Signatories found in user data:', userData.user.signatories);
+            let freshSignatoryData = [];
+            
+            // If signatories is an array (like from DB), use it directly
+            if (Array.isArray(userData.user.signatories)) {
+              freshSignatoryData = userData.user.signatories;
+              console.log('Loaded fresh signatory data from API (array format):', freshSignatoryData);
+            } else if (typeof userData.user.signatories === 'object') {
+              // If it's in object format, convert to array format
+              const signatoryArray = [];
+
+              // Handle signatory1, signatory2, etc. format
+              let signatoryIndex = 1;
+              while (userData.user.signatories[`signatory${signatoryIndex}`]) {
+                const signatoryField = userData.user.signatories[`signatory${signatoryIndex}`];
+                if (signatoryField && (signatoryField.name || signatoryField.position)) {
+                  signatoryArray.push({
+                    title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
+                    name: signatoryField.name || '',
+                    position: signatoryField.position || ''
+                  });
+                }
+                signatoryIndex++;
+              }
+
+              // Also handle legacy format (preparedBy, reviewedBy, notedBy) if they exist
+              if (userData.user.signatories.preparedBy && (userData.user.signatories.preparedBy.name || userData.user.signatories.preparedBy.position)) {
+                signatoryArray.push({
+                  title: userData.user.signatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: userData.user.signatories.preparedBy.name || '',
+                  position: userData.user.signatories.preparedBy.position || ''
+                });
+              }
+
+              if (userData.user.signatories.reviewedBy && (userData.user.signatories.reviewedBy.name || userData.user.signatories.reviewedBy.position)) {
+                signatoryArray.push({
+                  title: userData.user.signatories.reviewedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: userData.user.signatories.reviewedBy.name || '',
+                  position: userData.user.signatories.reviewedBy.position || ''
+                });
+              }
+
+              if (userData.user.signatories.notedBy && (userData.user.signatories.notedBy.name || userData.user.signatories.notedBy.position)) {
+                signatoryArray.push({
+                  title: userData.user.signatories.notedBy.title || `Signatory ${signatoryArray.length + 1}`,
+                  name: userData.user.signatories.notedBy.name || '',
+                  position: userData.user.signatories.notedBy.position || ''
+                });
+              }
+
+              freshSignatoryData = signatoryArray;
+              console.log('Loaded fresh signatory data from API (object format):', freshSignatoryData);
+            }
+
             // Only update state if data is different to prevent unnecessary re-renders
             if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
               setSignatoryData(freshSignatoryData);
             }
-          } catch (parseError) {
-            console.error('Error parsing fresh signatory data:', parseError);
+          } else {
+            console.log('No signatories in API response, trying localStorage');
+            // Fallback to localStorage
+            const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
+            if (savedSignatories) {
+              const freshSignatoryData = JSON.parse(savedSignatories);
+              if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
+                setSignatoryData(freshSignatoryData);
+              }
+            }
+          }
+        } catch (apiError) {
+          console.error('Error fetching signatory data from API, trying localStorage:', apiError);
+          // Fallback to localStorage if API fails
+          const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
+          if (savedSignatories) {
+            try {
+              const freshSignatoryData = JSON.parse(savedSignatories);
+              if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
+                setSignatoryData(freshSignatoryData);
+              }
+            } catch (parseError) {
+              console.error('Error parsing fresh signatory data:', parseError);
+            }
           }
         }
       }
-      
+
       const blob = await generatePDFBlob();
       const url = URL.createObjectURL(blob);
       setPdfPreviewUrl(url);
