@@ -77,3 +77,6 @@ backend/build/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Rclone config
+rclone.conf

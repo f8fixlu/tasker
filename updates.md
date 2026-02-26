@@ -1,5 +1,81 @@
 # Tasker Application Updates
 
+## Version 2.0.0 Release
+
+### Version Update
+- Updated application version from 1.0.0 to 2.0.0 across all package.json files
+- Reflects significant improvements and feature additions since initial release
+
+### About Modal Cleanup
+- Removed "System Information" section from About modal
+  - Removed display of: Platform, Language, Screen Resolution, Color Depth, Timezone, Online Status, Cookies Enabled, Browser
+- Removed "User Agent" section from About modal
+  - Removed display of browser user agent string
+- Simplified modal to show only essential application information:
+  - Application name, version, and description
+  - Contact information for support
+
+### Files Modified
+- `package.json`: Updated version to 2.0.0
+- `backend/package.json`: Updated version to 2.0.0
+- `frontend/package.json`: Updated version to 2.0.0
+- `frontend/src/components/modals/AboutModal.js`: Removed system info and user agent sections, updated displayed version to 2.0.0
+
+---
+
+## Tasks Page Actions Dropdown Fix
+
+### Fixed Dropdown Clipping Issue
+- Fixed issue where Actions dropdown (three dots menu) was being clipped by the `layout-content-container`
+- Dropdown was not appearing on top of the table container due to overflow and z-index constraints
+
+### Solution
+- Changed ActionsDropdown z-index from `z-20` to `z-50` (highest Tailwind z-index level)
+- Added explicit `position: 'absolute'` inline style to ensure proper stacking context
+- Changed DataTable container from `overflow-hidden` to allow overflow visibility
+- Changed inner wrapper from `overflow-x-auto` to `overflow-x-visible` to allow dropdown to extend beyond table boundaries
+
+### Technical Details
+- **ActionsDropdown component** (`frontend/src/pages/Tasks.js`):
+  - Updated className from `z-20` to `z-50`
+  - Added `style={{ position: 'absolute' }}` for explicit positioning
+
+- **DataTable component** (`frontend/src/components/common/DataTable.js`):
+  - Removed `overflow-hidden` from outer container div
+  - Changed `overflow-x-auto` to `overflow-x-visible` on inner wrapper div
+  - This allows dropdown menus to render above the table container without being clipped
+
+### Files Modified
+- `frontend/src/pages/Tasks.js`: Updated ActionsDropdown z-index and positioning (line 313)
+- `frontend/src/components/common/DataTable.js`: Updated overflow settings to allow dropdown visibility (lines 47-49)
+
+### Result
+- Actions dropdown now appears on top of the layout-content-container
+- Dropdown is fully visible and not clipped by parent container boundaries
+- All action options (attachments, view, edit, archive) are now accessible
+
+---
+
+## Tasks Page Improvements
+
+### Fixed Column Widths
+- Set Title column width to 40% for better content display
+- Set Status column width to 25% to accommodate status pill layout
+- Table uses `table-fixed` layout for consistent column widths across screen sizes
+
+### Date Picker Fixed Width
+- Removed responsive width changes from date picker inputs
+- Date pickers now maintain fixed width (`w-32` / 128px) on all screen sizes
+- Removed `max-[957px]:w-10`, `max-[957px]:text-transparent`, and `max-[957px]:px-1` classes
+- Prevents date picker from resizing or hiding text on smaller screens
+
+### Checkbox Column Padding
+- Updated checkbox column heading padding to `pl-4 pr-2` for better alignment
+- Maintains 1rem (16px) padding-left on checkbox header
+
+### Files Modified
+- `frontend/src/pages/Tasks.js`: Updated column widths, date picker classes, and checkbox padding
+
 ## Admin Dashboard Improvements
 
 ### Live Refresh Without Flickering

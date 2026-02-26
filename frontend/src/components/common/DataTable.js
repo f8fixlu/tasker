@@ -44,8 +44,8 @@ const DataTable = forwardRef(({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-      <div className="overflow-x-auto scrollbar-hide">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+      <div className="overflow-x-visible scrollbar-hide">
         <table ref={ref} className="w-full text-left table-fixed">
           <thead className="bg-gray-50 dark:bg-gray-900/50 w-full">
             <tr className="w-full">
