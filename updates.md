@@ -1,5 +1,109 @@
 # Tasker Application Updates
 
+## Tasks Page Column Visibility Dropdown Positioning Fix
+
+### Fixed Dropdown Position at Screen Edge
+- Fixed issue where the show/hide column dropdown was positioned at the edge of the screen
+- Dropdown now appears directly below the filter_list icon in the Actions column header
+- Changed from fixed positioning with calculated coordinates to absolute positioning within the table header
+
+### Implementation Changes
+- **DataTable.js**: 
+  - Added `columnVisibilityDropdown` prop to accept dropdown content as a render prop
+  - Added `columnVisibilityDropdownRef` prop for outside click detection
+  - Wrapped filter_list button in a `relative inline-block` container
+  - Dropdown positioned with `absolute right-0 top-full mt-1` classes
+  - Dropdown renders inside the table header, directly below the toggle button
+- **Tasks.js**:
+  - Removed `columnDropdownPosition` state (no longer needed for fixed positioning)
+  - Removed `columnVisibilityDropdownRef` from `useOutsideClick` cleanup, then re-added it properly
+  - Simplified `handleColumnToggleClick` to only toggle visibility state
+  - Passed `ColumnVisibilityDropdown` component as `columnVisibilityDropdown` prop to DataTable
+  - Passed `columnVisibilityDropdownRef` to DataTable for proper outside click handling
+
+### User Experience
+- Dropdown stays open when clicking checkboxes to toggle columns
+- Dropdown closes only when clicking outside of it
+- No more dropdown appearing at screen edge or being cut off
+- Consistent positioning relative to the filter_list icon
+
+### Files Modified
+- `frontend/src/components/common/DataTable.js`: Added columnVisibilityDropdown and columnVisibilityDropdownRef props, restructured filter_list button with relative positioning, added absolute positioned dropdown container
+- `frontend/src/pages/Tasks.js`: Removed fixed positioning logic, simplified toggle handler, passed dropdown as prop to DataTable
+
+---
+
+## Column Visibility Toggle Feature
+
+### Added Column Show/Hide Functionality
+- Added column visibility toggle feature to Tasks page
+- Users can now show/hide individual table columns via:
+  - **view_column icon** in the Actions column header - Click to open dropdown with checkboxes for each column
+- Dropdown shows all available columns:
+  - Title, Category, Task Type, Sub Type, Status, Priority, Task Date, Due Date, Created Date
+- Default visible columns: Title, Category, Status, Task Date, Due Date
+- Default hidden columns: Task Type, Sub Type, Priority, Created Date
+- Added new `ColumnVisibilityDropdown` component with checkbox list for all columns
+- Added `visibleColumns` state to track which columns are shown/hidden
+- Columns can be toggled individually without affecting other columns
+- Actions column is always visible and cannot be hidden
+- Dropdown position is dynamically calculated based on the button position
+- Checkbox click behavior improved - only checkbox toggles, text is not clickable
+
+### Table Header Styling
+- Changed table header text from uppercase to capitalize (only first letter capitalized)
+- Replaced `uppercase` class with `capitalize` class in DataTable component
+- Headers now display as: "Title", "Category", "Task Type" instead of "TITLE", "CATEGORY", "TASK TYPE"
+
+### Column Visibility Icon Updates
+- Changed icon from `view_column` to `filter_list` for better visual clarity
+- Icon placed ONLY in Actions column header (th), centered with header text
+- Icon and header text centered together using `justify-center gap-2`
+- Icon sized to `text-base` for visual consistency
+- Dropdown positions directly below the filter_list icon in header
+- Position calculated dynamically using `getBoundingClientRect()` on button ref
+- On screens <=1024px, dropdown hides advanced columns:
+  - Task Type, Sub Type, Priority, and Created Date options are hidden
+  - Only basic columns (Title, Category, Status, Task Date, Due Date) shown in dropdown
+  - Uses Tailwind `hidden lg:flex` responsive classes
+
+### Column Visibility Dropdown Features
+- Title column is read-only (cannot be hidden)
+  - Checkbox is disabled with `disabled` attribute
+  - Visual styling: gray background, reduced opacity, `cursor-not-allowed`
+  - Text appears in gray with medium font weight
+  - Checkbox and text are not interactive
+- Other columns can be toggled on/off freely
+- Dropdown aligned directly below filter_list icon in Actions column header
+
+### Technical Implementation
+- **Tasks.js changes**:
+  - Created `allColumnsDefinition` constant with all 9 data columns (excluding actions)
+  - Added `visibleColumns` state object tracking visibility for each column key
+  - Added `handleToggleColumn` function to toggle individual column visibility
+  - Added `handleColumnToggleClick` function to open/close dropdown with position calculation
+  - Added `showColumnVisibilityDropdown` state for dropdown visibility
+  - Added `columnDropdownPosition` state for dynamic positioning
+  - Added `columnTogglebuttonRef` for button position reference
+  - Added `columnVisibilityDropdownRef` for outside click detection
+  - Modified `columns` useMemo to filter from `allColumnsDefinition` based on `visibleColumns` state
+  - Added Actions column separately to filtered columns
+  - Added Columns dropdown positioned using fixed positioning with calculated coordinates
+  - Updated `ColumnVisibilityDropdown` to use `allColumnsDefinition` prop
+  - Checkbox onClick handler prevents event propagation to avoid toggling via label
+
+- **DataTable.js changes**:
+  - Added `onColumnToggle`, `visibleColumns`, and `columnTogglebuttonRef` props
+  - Added `view_column` icon button in Actions column header only
+  - Button ref attached for position calculation
+  - Updated PropTypes to include new props
+
+### Files Modified
+- `frontend/src/pages/Tasks.js`: Added column visibility state, handlers, dropdown component, dynamic positioning, and all columns definition
+- `frontend/src/components/common/DataTable.js`: Added visibility toggle icon in Actions header, new props
+
+---
+
 ## Version 2.0.0 Release
 
 ### Version Update

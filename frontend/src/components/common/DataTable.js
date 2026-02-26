@@ -10,7 +10,12 @@ const DataTable = forwardRef(({
   onSelectAll,
   showSelectAll = false,
   isLoading = false,
-  emptyMessage = 'No records found'
+  emptyMessage = 'No records found',
+  onColumnToggle,
+  visibleColumns = {},
+  columnTogglebuttonRef,
+  columnVisibilityDropdown,
+  columnVisibilityDropdownRef
 }, ref) => {
   const handleRowClick = useCallback((item, index) => {
     if (onRowClick) {
@@ -61,10 +66,35 @@ const DataTable = forwardRef(({
               {columns.map((column, index) => (
                 <th
                   key={index}
-                  className={`px-4 py-3 font-medium text-[#617589] dark:text-gray-400 uppercase ${column.className || 'px-4 py-3'}`}
+                  className={`px-4 py-3 font-medium text-[#617589] dark:text-gray-400 capitalize ${column.key === 'actions' ? '' : 'text-left'} ${column.className || 'px-4 py-3'}`}
                   style={{ width: column.width || 'auto' }}
                 >
-                  {column.header}
+                  <div className={`flex items-center ${column.key === 'actions' ? 'justify-center' : 'justify-start'}`}>
+                    <span>{column.header}</span>
+                    {column.key === 'actions' && onColumnToggle && (
+                      <div className="relative inline-block">
+                        <button
+                          ref={columnTogglebuttonRef}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onColumnToggle(e);
+                          }}
+                          className="flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                          title="Show/Hide Columns"
+                        >
+                          <span className="material-symbols-outlined text-base">filter_list</span>
+                        </button>
+                        {columnVisibilityDropdown && (
+                          <div
+                            ref={columnVisibilityDropdownRef}
+                            className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 p-3 border border-gray-200 dark:border-gray-700"
+                          >
+                            {columnVisibilityDropdown}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -135,7 +165,18 @@ DataTable.propTypes = {
   onSelectAll: PropTypes.func,
   showSelectAll: PropTypes.bool,
   isLoading: PropTypes.bool,
-  emptyMessage: PropTypes.string
+  emptyMessage: PropTypes.string,
+  onColumnToggle: PropTypes.func,
+  visibleColumns: PropTypes.object,
+  columnTogglebuttonRef: PropTypes.oneOfType([
+    PropTypes.func,
+    PropTypes.shape({ current: PropTypes.object })
+  ]),
+  columnVisibilityDropdown: PropTypes.node,
+  columnVisibilityDropdownRef: PropTypes.oneOfType([
+    PropTypes.func,
+    PropTypes.shape({ current: PropTypes.object })
+  ])
 };
 
 DataTable.displayName = 'DataTable';

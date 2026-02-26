@@ -293,6 +293,49 @@ const SortDropdown = ({ columns, onSort }) => (
   </div>
 );
 
+const ColumnVisibilityDropdown = ({ allColumns, visibleColumns, onToggleColumn }) => {
+  // Columns to hide on mobile (<=1024px)
+  const mobileHiddenColumns = ['type_name', 'sub_type_name', 'priority', 'created_date'];
+  
+  // Columns that cannot be hidden (read-only)
+  const readOnlyColumns = ['title'];
+  
+  return (
+    <>
+      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Show/Hide Columns</h4>
+      <div className="space-y-2">
+        {allColumns.map((col, idx) => {
+          // Check if this column should be hidden on mobile
+          const isMobileHidden = mobileHiddenColumns.includes(col.key);
+          // Check if this column is read-only (cannot be hidden)
+          const isReadOnly = readOnlyColumns.includes(col.key);
+          return (
+            <div
+              key={idx}
+              className={`flex items-center gap-3 p-2 rounded ${isReadOnly ? 'bg-gray-50 dark:bg-gray-800/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} ${isMobileHidden ? 'hidden lg:flex' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={visibleColumns[col.key] !== false}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (!isReadOnly) {
+                    onToggleColumn(col.key);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                disabled={isReadOnly}
+                className={`rounded text-primary focus:ring-primary ${isReadOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              />
+              <span className={`text-sm ${isReadOnly ? 'text-gray-500 dark:text-gray-400 font-medium' : 'text-gray-700 dark:text-gray-300'} select-none`}>{col.header}</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+};
+
 const ActionsDropdown = ({
   task,
   loadingAttachmentTaskId,
@@ -552,19 +595,36 @@ const Option2Tasks = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showSearchOptionsDropdown, setShowSearchOptionsDropdown] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const [showColumnVisibilityDropdown, setShowColumnVisibilityDropdown] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Column visibility state - track which columns are visible
+  const [visibleColumns, setVisibleColumns] = useState({
+    title: true,
+    category_name: true,
+    type_name: false,
+    sub_type_name: false,
+    status: true,
+    priority: false,
+    task_date: true,
+    due_date: true,
+    created_date: false
+  });
 
   const filterDropdownRef = useRef(null);
   const sortDropdownRef = useRef(null);
   const searchOptionsDropdownRef = useRef(null);
   const actionsDropdownRef = useRef(null);
+  const columnTogglebuttonRef = useRef(null);
+  const columnVisibilityDropdownRef = useRef(null);
 
-  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef, actionsDropdownRef], () => {
+  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef, actionsDropdownRef, columnVisibilityDropdownRef], () => {
     setShowFilterDropdown(false);
     setShowSortDropdown(false);
     setShowSearchOptionsDropdown(false);
     setShowActionsDropdown(false);
+    setShowColumnVisibilityDropdown(false);
     setActiveTaskId(null);
   });
 
@@ -692,8 +752,8 @@ const Option2Tasks = () => {
     }
   };
 
-  // Columns memoized
-  const columns = useMemo(() => ([
+  // All available columns definition (used for both table and column visibility dropdown)
+  const allColumnsDefinition = useMemo(() => [
     {
       header: 'Title',
       key: 'title',
@@ -719,11 +779,29 @@ const Option2Tasks = () => {
       width: '20%'
     },
     {
+      header: 'Task Type',
+      key: 'type_name',
+      className: 'px-4 py-3 max-[1100px]:hidden',
+      width: '15%'
+    },
+    {
+      header: 'Sub Type',
+      key: 'sub_type_name',
+      className: 'px-4 py-3 max-[1200px]:hidden',
+      width: '15%'
+    },
+    {
       header: 'Status',
       key: 'status',
       className: 'px-2 sm:px-4 py-3 min-w-[90px] max-[768px]:min-w-[85px] max-[768px]:px-3 max-[425px]:min-w-[80px] max-[425px]:px-4',
       width: '25%',
       render: (v) => <StatusPill status={v} />
+    },
+    {
+      header: 'Priority',
+      key: 'priority',
+      className: 'px-4 py-3 max-[900px]:hidden',
+      width: '12%'
     },
     {
       header: 'Task Date',
@@ -740,65 +818,79 @@ const Option2Tasks = () => {
       render: (v) => v ? formatDateOnly(v) : 'N/A'
     },
     {
-      header: '',
-      key: 'actions',
-      className: 'px-2 py-3 text-center',
-      width: '10%',
-      render: (v, task) => (
-        <div className="relative flex justify-center">
-          <button
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title="Actions"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (showActionsDropdown && activeTaskId === task.id) {
-                setShowActionsDropdown(false);
-                setActiveTaskId(null);
-              } else {
-                setShowActionsDropdown(true);
-                setActiveTaskId(task.id);
-              }
-            }}
-          >
-            <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
-          </button>
-
-          {showActionsDropdown && activeTaskId === task.id && (
-            <ActionsDropdown
-              task={task}
-              loadingAttachmentTaskId={loadingAttachmentTaskId}
-              onAttachmentClick={handleAttachmentClick}
-              onViewClick={(task) => {
-                const transformedTask = {
-                  ...task,
-                  taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',
-                  dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
-                  createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
-                  editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
-                  category: task.category_name,
-                  type: task.type_name,
-                  subType: task.sub_type_name
-                };
-                openViewTaskModal(transformedTask);
-              }}
-              onEditClick={openEditTaskModal}
-              onArchiveClick={(taskId) => {
-                setTaskToDelete(taskId);
-                setActionType('archive');
-                setIsModalOpen(true);
-              }}
-              isOpen={showActionsDropdown && activeTaskId === task.id}
-              onClose={() => {
-                setShowActionsDropdown(false);
-                setActiveTaskId(null);
-              }}
-              dropdownRef={actionsDropdownRef}
-            />
-          )}
-        </div>
-      )
+      header: 'Created Date',
+      key: 'created_date',
+      className: 'px-4 py-3 max-[1300px]:hidden',
+      width: '15%',
+      render: (v) => v ? formatDateOnly(v) : 'N/A'
     }
-  ]), [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId]);
+  ], []);
+
+  // Columns memoized - filters visible columns and adds actions column
+  const columns = useMemo(() => {
+    // Filter columns based on visibility, but always include actions column
+    return allColumnsDefinition.filter(col => visibleColumns[col.key] !== false).concat([
+      {
+        header: '',
+        key: 'actions',
+        className: 'px-2 py-3 text-center',
+        width: '10%',
+        render: (v, task) => (
+          <div className="relative">
+            <button
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              title="Actions"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (showActionsDropdown && activeTaskId === task.id) {
+                  setShowActionsDropdown(false);
+                  setActiveTaskId(null);
+                } else {
+                  setShowActionsDropdown(true);
+                  setActiveTaskId(task.id);
+                }
+              }}
+            >
+              <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+            </button>
+
+            {showActionsDropdown && activeTaskId === task.id && (
+              <ActionsDropdown
+                task={task}
+                loadingAttachmentTaskId={loadingAttachmentTaskId}
+                onAttachmentClick={handleAttachmentClick}
+                onViewClick={(task) => {
+                  const transformedTask = {
+                    ...task,
+                    taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',
+                    dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
+                    createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
+                    editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
+                    category: task.category_name,
+                    type: task.type_name,
+                    subType: task.sub_type_name
+                  };
+                  openViewTaskModal(transformedTask);
+                }}
+                onEditClick={openEditTaskModal}
+                onArchiveClick={(taskId) => {
+                  setTaskToDelete(taskId);
+                  setActionType('archive');
+                  setIsModalOpen(true);
+                }}
+                isOpen={showActionsDropdown && activeTaskId === task.id}
+                onClose={() => {
+                  setShowActionsDropdown(false);
+                  setActiveTaskId(null);
+                }}
+                dropdownRef={actionsDropdownRef}
+              />
+            )}
+          </div>
+        )
+      }
+    ]);
+  }, [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId, visibleColumns, allColumnsDefinition]);
 
   // Load dropdowns on mount
   useEffect(() => {
@@ -930,6 +1022,20 @@ const Option2Tasks = () => {
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
+  };
+
+  // Toggle column visibility dropdown
+  const handleColumnToggleClick = (e) => {
+    e.stopPropagation();
+    setShowColumnVisibilityDropdown(prev => !prev);
+  };
+
+  // Toggle individual column visibility
+  const handleToggleColumn = (columnKey) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [columnKey]: prev[columnKey] === undefined ? false : !prev[columnKey]
+    }));
   };
 
   const loadTaskTypesByCategory = async (categoryId) => {
@@ -1588,6 +1694,17 @@ const Option2Tasks = () => {
             onSelectAll={handleSelectAll}
             onRowSelect={handleTaskSelect}
             selectedRows={selectedTasks}
+            onColumnToggle={handleColumnToggleClick}
+            visibleColumns={visibleColumns}
+            columnTogglebuttonRef={columnTogglebuttonRef}
+            columnVisibilityDropdownRef={columnVisibilityDropdownRef}
+            columnVisibilityDropdown={showColumnVisibilityDropdown ? (
+              <ColumnVisibilityDropdown
+                allColumns={allColumnsDefinition}
+                visibleColumns={visibleColumns}
+                onToggleColumn={handleToggleColumn}
+              />
+            ) : null}
           />
 
           {totalTasks > 0 && (
