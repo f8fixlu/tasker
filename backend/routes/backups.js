@@ -75,25 +75,34 @@ async function handleGetBackupStatus(req, res) {
 
       // Read status file if it exists
       if (fs.existsSync(STATUS_FILE)) {
-        const data = fs.readFileSync(STATUS_FILE, 'utf8');
-        const parsed = JSON.parse(data);
-        
-        // Webapp backup status
-        if (parsed.status) {
-          status.webapp = {
-            status: parsed.status,
-            last_run: parsed.last_run,
-            duration_seconds: parsed.duration_seconds
-          };
+        try {
+          const data = fs.readFileSync(STATUS_FILE, 'utf8');
+          console.log('Status file content:', data);
+          
+          const parsed = JSON.parse(data);
+          console.log('Parsed status:', parsed);
+
+          // Webapp backup status
+          if (parsed.status) {
+            status.webapp = {
+              status: parsed.status,
+              last_run: parsed.last_run,
+              duration_seconds: parsed.duration_seconds
+            };
+          }
+
+          // Database backup status
+          if (parsed.db_status) {
+            status.database = {
+              status: parsed.db_status,
+              last_run: parsed.db_last_run
+            };
+          }
+        } catch (parseError) {
+          console.error('Error parsing status file:', parseError);
         }
-        
-        // Database backup status
-        if (parsed.db_status) {
-          status.database = {
-            status: parsed.db_status,
-            last_run: parsed.db_last_run
-          };
-        }
+      } else {
+        console.log('Status file does not exist:', STATUS_FILE);
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
