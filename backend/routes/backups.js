@@ -379,23 +379,28 @@ async function handleGetServicesStatus(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
-      // Check both services
-      exec('systemctl is-active tasker-backup.service && systemctl is-active tasker-db-watch.service', (error, stdout, stderr) => {
-        const output = stdout.trim().split('\n');
-        const webappStatus = output[0] || 'inactive';
-        const dbStatus = output[1] || 'inactive';
+      // Check both services separately to avoid issues with one failing
+      exec('sudo systemctl is-active tasker-backup.service 2>&1', (error, stdout, stderr) => {
+        const webappStatus = stdout.trim() || 'inactive';
+        
+        exec('sudo systemctl is-active tasker-db-watch.service 2>&1', (error2, stdout2, stderr2) => {
+          const dbStatus = stdout2.trim() || 'inactive';
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          webapp: {
-            active: webappStatus === 'active',
-            status: webappStatus
-          },
-          database: {
-            active: dbStatus === 'active',
-            status: dbStatus
-          }
-        }));
+          console.log('Webapp backup service status:', webappStatus);
+          console.log('Database backup service status:', dbStatus);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            webapp: {
+              active: webappStatus === 'active',
+              status: webappStatus
+            },
+            database: {
+              active: dbStatus === 'active',
+              status: dbStatus
+            }
+          }));
+        });
       });
     });
   } catch (error) {
@@ -416,10 +421,19 @@ async function handleStartWebappService(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
-      exec('systemctl start tasker-backup.service', (error, stdout, stderr) => {
+      console.log('Attempting to start webapp backup service...');
+      exec('sudo systemctl start tasker-backup.service 2>&1', (error, stdout, stderr) => {
+        console.log('Start webapp result:', { error, stdout, stderr });
+        
         if (error) {
+          console.error('Webapp backup service start error:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Failed to start webapp backup service', details: error.message }));
+          return res.end(JSON.stringify({ 
+            error: 'Failed to start webapp backup service', 
+            details: error.message,
+            stderr: stderr,
+            stdout: stdout
+          }));
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -444,10 +458,19 @@ async function handleStopWebappService(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
-      exec('systemctl stop tasker-backup.service', (error, stdout, stderr) => {
+      console.log('Attempting to stop webapp backup service...');
+      exec('sudo systemctl stop tasker-backup.service 2>&1', (error, stdout, stderr) => {
+        console.log('Stop webapp result:', { error, stdout, stderr });
+        
         if (error) {
+          console.error('Webapp backup service stop error:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Failed to stop webapp backup service', details: error.message }));
+          return res.end(JSON.stringify({ 
+            error: 'Failed to stop webapp backup service', 
+            details: error.message,
+            stderr: stderr,
+            stdout: stdout
+          }));
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -472,10 +495,19 @@ async function handleStartDatabaseService(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
-      exec('systemctl start tasker-db-watch.service', (error, stdout, stderr) => {
+      console.log('Attempting to start database backup service...');
+      exec('sudo systemctl start tasker-db-watch.service 2>&1', (error, stdout, stderr) => {
+        console.log('Start db-watch result:', { error, stdout, stderr });
+        
         if (error) {
+          console.error('Database backup service start error:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Failed to start database backup service', details: error.message }));
+          return res.end(JSON.stringify({ 
+            error: 'Failed to start database backup service', 
+            details: error.message,
+            stderr: stderr,
+            stdout: stdout
+          }));
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -500,10 +532,19 @@ async function handleStopDatabaseService(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
-      exec('systemctl stop tasker-db-watch.service', (error, stdout, stderr) => {
+      console.log('Attempting to stop database backup service...');
+      exec('sudo systemctl stop tasker-db-watch.service 2>&1', (error, stdout, stderr) => {
+        console.log('Stop db-watch result:', { error, stdout, stderr });
+        
         if (error) {
+          console.error('Database backup service stop error:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'Failed to stop database backup service', details: error.message }));
+          return res.end(JSON.stringify({ 
+            error: 'Failed to stop database backup service', 
+            details: error.message,
+            stderr: stderr,
+            stdout: stdout
+          }));
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

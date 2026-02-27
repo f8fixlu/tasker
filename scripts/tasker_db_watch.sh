@@ -51,30 +51,45 @@ perform_backup() {
     # WAL Checkpoint (WAL-aware)
     #########################################
 
-    sqlite3 "$DB_PATH" "PRAGMA wal_checkpoint(FULL);" >> "$LOG" 2>&1
+    # Only run if sqlite3 is available
+    if command -v sqlite3 &> /dev/null; then
+        sqlite3 "$DB_PATH" "PRAGMA wal_checkpoint(FULL);" >> "$LOG" 2>&1
 
-    #########################################
-    # Integrity Check
-    #########################################
+        #########################################
+        # Integrity Check
+        #########################################
 
-    INTEGRITY=$(sqlite3 "$DB_PATH" "PRAGMA integrity_check;")
+        INTEGRITY=$(sqlite3 "$DB_PATH" "PRAGMA integrity_check;")
 
-    if [ "$INTEGRITY" != "ok" ]; then
-        echo "Integrity check FAILED: $INTEGRITY" >> "$LOG"
-        update_status "DB_CORRUPTED"
-        return
+        if [ "$INTEGRITY" != "ok" ]; then
+            echo "Integrity check FAILED: $INTEGRITY" >> "$LOG"
+            update_status "DB_CORRUPTED"
+            return
+        fi
+    else
+        echo "sqlite3 not found, skipping WAL checkpoint and integrity check" >> "$LOG"
     fi
 
     #########################################
     # Safe Snapshot
     #########################################
 
-    sqlite3 "$DB_PATH" ".backup '$TMP_BACKUP'"
+    if command -v sqlite3 &> /dev/null; then
+        sqlite3 "$DB_PATH" ".backup '$TMP_BACKUP'"
 
-    if [ $? -ne 0 ]; then
-        echo "SQLite backup failed!" >> "$LOG"
-        update_status "DB_BACKUP_FAILED"
-        return
+        if [ $? -ne 0 ]; then
+            echo "SQLite backup failed!" >> "$LOG"
+            update_status "DB_BACKUP_FAILED"
+            return
+        fi
+    else
+        # Fallback: simple copy (less safe for active databases)
+        cp "$DB_PATH" "$TMP_BACKUP"
+        if [ $? -ne 0 ]; then
+            echo "File copy failed!" >> "$LOG"
+            update_status "DB_BACKUP_FAILED"
+            return
+        fi
     fi
 
     #########################################
