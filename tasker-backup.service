@@ -7,6 +7,7 @@ Type=oneshot
 User=pi
 Group=pi
 WorkingDirectory=/home/pi/apps/tasker/scripts
+Environment="RCLONE_CONFIG=/home/pi/.config/rclone/rclone.conf"
 ExecStart=/bin/bash /home/pi/apps/tasker/scripts/tasker_backup.sh
 StandardOutput=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
 StandardError=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
@@ -24,7 +25,7 @@ IOSchedulingPriority=7
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status
+ReadWritePaths=/home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status /home/pi/.config/rclone
 
 [Install]
 WantedBy=multi-user.target

@@ -78,24 +78,45 @@ const BackupStatusPage = () => {
         throw new Error('No authentication token found');
       }
 
+      console.log('Fetching backup status with token:', token ? 'Present' : 'Missing');
+      console.log('API URL:', process.env.REACT_APP_API_URL || '/api');
+
       const [statusResponse, servicesResponse] = await Promise.all([
         fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/backups/status`, {
-          headers: { 'Authorization': `Bearer ${token}` },
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }),
         fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/backups/services/status`, {
-          headers: { 'Authorization': `Bearer ${token}` },
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         })
       ]);
 
+      console.log('Status response status:', statusResponse.status);
+      console.log('Services response status:', servicesResponse.status);
+
       if (!statusResponse.ok) {
-        throw new Error('Failed to fetch backup status');
+        const errorData = await statusResponse.json();
+        console.error('Status error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch backup status');
       }
       if (!servicesResponse.ok) {
-        throw new Error('Failed to fetch services status');
+        const errorData = await servicesResponse.json();
+        console.error('Services error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch services status');
       }
 
       const statusData = await statusResponse.json();
       const servicesData = await servicesResponse.json();
+
+      console.log('Backup status data:', statusData);
+      console.log('Services status data:', servicesData);
 
       setBackupStatus(statusData);
       setServicesStatus(servicesData);
