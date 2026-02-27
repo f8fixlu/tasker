@@ -1,0 +1,3 @@
+# Backup status directory
+# This directory is intentionally kept empty in git
+# Status files are generated at runtime by backup services

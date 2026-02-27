@@ -21,6 +21,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const AdminStatsPage = lazy(() => import('./pages/admin/AdminStatsPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
+const BackupStatusPage = lazy(() => import('./pages/admin/BackupStatusPage'));
 
 import ModalRenderer from './components/modals/ModalRenderer';
 
@@ -191,6 +192,22 @@ function App() {
                             </div>
                           }>
                             <UserManagementPage />
+                          </Suspense>
+                        </Layout>
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/backups"
+                    element={
+                      <AdminRoute>
+                        <Layout>
+                          <Suspense fallback={
+                            <div className="flex justify-center items-center h-screen">
+                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                            </div>
+                          }>
+                            <BackupStatusPage />
                           </Suspense>
                         </Layout>
                       </AdminRoute>

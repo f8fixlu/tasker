@@ -139,3 +139,116 @@ Ensure your application is structured as follows:
 - Both services will automatically restart if they crash
 - Logs are available through the systemd journal
 - Frontend communicates with backend via API calls
+
+## Backup Services Setup
+
+Tasker includes automated backup services for both the webapp and database using rclone.
+
+### Prerequisites for Backup
+
+- rclone installed and configured on your Raspberry Pi
+- Remote storage configured (e.g., Google Drive with encryption)
+- `inotify-tools` installed for database watch functionality (`sudo apt install inotify-tools`)
+
+### Backup Scripts Location
+
+The backup scripts are located in `/home/pi/apps/tasker/scripts/`:
+- `tasker_backup.sh` - Webapp backup script
+- `tasker_db_watch.sh` - Database real-time backup script
+
+### Logs and Status
+
+- Logs: `/home/pi/apps/tasker/scripts/logs/`
+- Status file: `/home/pi/apps/tasker/status/tasker_backup_status.json`
+
+### Copy Backup Service Files
+
+```bash
+# Copy the backup service files to systemd directory
+sudo cp tasker-backup.service /etc/systemd/system/
+sudo cp tasker-db-watch.service /etc/systemd/system/
+```
+
+### Enable and Start Backup Services
+
+```bash
+# Reload systemd to recognize new services
+sudo systemctl daemon-reload
+
+# Enable and start the webapp backup service (runs on schedule)
+sudo systemctl enable tasker-backup
+sudo systemctl start tasker-backup
+
+# Enable and start the database watch service (runs continuously)
+sudo systemctl enable tasker-db-watch
+sudo systemctl start tasker-db-watch
+```
+
+### Backup Service Management Commands
+
+```bash
+# Check backup service status
+sudo systemctl status tasker-backup
+sudo systemctl status tasker-db-watch
+
+# View backup logs
+sudo journalctl -u tasker-backup -f
+sudo journalctl -u tasker-db-watch -f
+
+# Restart backup services
+sudo systemctl restart tasker-backup
+sudo systemctl restart tasker-db-watch
+
+# Stop backup services
+sudo systemctl stop tasker-backup
+sudo systemctl stop tasker-db-watch
+
+# View backup status in dashboard
+# Navigate to: https://your-domain.com/admin/backups
+```
+
+### Backup Configuration
+
+**Webapp Backup:**
+- Backs up `/home/pi/apps/tasker/` to remote storage
+- Uses incremental sync with versioning
+- Retention: 30 days
+- Logs: `scripts/logs/tasker_backup.log`
+
+**Database Backup:**
+- Watches `/home/pi/apps/tasker/backend/database/tasker.db` for changes
+- Performs real-time backups on database modifications
+- Uses WAL checkpoint for safe snapshots
+- Integrity check before each backup
+- Retention: 14 days
+- Logs: `scripts/logs/tasker_db_watch.log`
+
+### Remote Storage Configuration
+
+Update the `REMOTE_CURRENT` and `REMOTE_VERSIONS` variables in the backup scripts to match your rclone remote configuration:
+
+```bash
+# Example configuration (update with your remote name)
+REMOTE_CURRENT="gdrive_f8fixlu_crypt:current"
+REMOTE_VERSIONS="gdrive_f8fixlu_crypt:versions"
+```
+
+### Exclude File
+
+Create an exclude file at `/home/pi/tasker_exclude.txt` to specify files/folders to exclude from backup:
+
+```
+node_modules/
+.git/
+*.log
+scripts/logs/
+status/
+```
+
+### Monitoring Backups
+
+You can monitor backup status through:
+1. **Admin Dashboard**: Navigate to `/admin/backups` in your browser
+2. **Status file**: Check `/home/pi/apps/tasker/status/tasker_backup_status.json`
+3. **Logs**: View logs in `scripts/logs/` directory
+4. **Systemd**: Use `journalctl` commands shown above

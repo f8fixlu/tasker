@@ -37,6 +37,7 @@ const eventTypeRoutes = require('./routes/eventTypes');
 const databaseRoutes = require('./routes/database');
 const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
+const backupRoutes = require('./routes/backups');
 const statusTrackingRoutes = require('./routes/statusTracking');
 
 // Import session management utilities
@@ -217,8 +218,8 @@ const server = http.createServer((req, res) => {
             notificationRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/database')) {
             databaseRoutes(req, res, parsedUrl);
-          } else if (pathname.startsWith('/api/dashboard')) {
-            dashboardRoutes(req, res, parsedUrl);
+          } else if (pathname.startsWith('/api/admin/backups')) {
+            backupRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/admin')) {
             adminRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/status-tracking')) {

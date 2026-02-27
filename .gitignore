@@ -80,3 +80,9 @@ Thumbs.db
 
 # Rclone config
 rclone.conf
+
+# Backup logs and status (keep directory structure)
+scripts/logs/*
+status/*
+!scripts/logs/.gitkeep
+!status/.gitkeep

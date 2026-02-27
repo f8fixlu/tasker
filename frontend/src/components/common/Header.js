@@ -173,6 +173,12 @@ const Header = () => {
               >
                 User Management
               </Link>
+              <Link
+                className={`text-sm font-medium ${location.pathname === '/admin/backups' ? 'text-primary-600 dark:text-primary-400' : 'text-text-light dark:text-text-dark'}`}
+                to="/admin/backups"
+              >
+                Backups
+              </Link>
             </>
           )}
         </div>
