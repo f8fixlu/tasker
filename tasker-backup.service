@@ -1,0 +1,30 @@
+[Unit]
+Description=Tasker Webapp Backup Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/apps/tasker/scripts
+ExecStart=/bin/bash /home/pi/apps/tasker/scripts/tasker_backup.sh
+StandardOutput=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
+StandardError=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
+
+# Run daily at 2 AM
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+# Lower I/O and CPU priority to minimize impact on running app
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status
+
+[Install]
+WantedBy=multi-user.target

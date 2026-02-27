@@ -1,3 +1,63 @@
-node_modules/**
-.git/**
+# Tasker Backup Exclusion File
+# Location: /home/pi/tasker_exclude.txt
+# Used by: tasker_backup.sh
+
+# === Runtime Directories (don't backup, can cause file lock issues) ===
+node_modules/
+.git/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Build Directories (can be regenerated) ===
+build/
+dist/
+out/
+frontend/build/
+backend/build/
+
+# === Logs and Status (transient data) ===
+scripts/logs/
+status/
 *.log
+logs/
+
+# === Environment and Config (sensitive, backup separately if needed) ===
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# === OS Files ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# === Editor/IDE Files ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Temporary Files ===
+tmp/
+temp/
+*.tmp
+*.pid
+*.pid.lock
+
+# === Uploads Directory (backup separately if needed) ===
+# backend/uploads/
+
+# === Database (backed up separately by tasker_db_watch.sh) ===
+backend/database/*.db
+backend/database/*.db-journal
+backend/database/*.wal
+backend/database/*.shm

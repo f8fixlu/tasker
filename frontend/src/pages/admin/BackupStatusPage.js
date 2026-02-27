@@ -16,6 +16,7 @@ const BackupStatusPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
   const [activeTab, setActiveTab] = useState('status'); // 'status' or 'logs'
   const [activeLogType, setActiveLogType] = useState('webapp'); // 'webapp' or 'database'
   const [actionInProgress, setActionInProgress] = useState(null);
@@ -98,6 +99,7 @@ const BackupStatusPage = () => {
 
       setBackupStatus(statusData);
       setServicesStatus(servicesData);
+      setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       console.error('Error fetching backup status:', err);
@@ -223,13 +225,14 @@ const BackupStatusPage = () => {
     <div className="layout-content-container">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Backup Management</h1>
-        <button
-          onClick={() => fetchBackupStatus(false)}
-          disabled={isRefreshing}
-          className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          {isRefreshing && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">● Updating...</span>
+          )}
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </span>
+        </div>
       </div>
 
       {error && (

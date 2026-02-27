@@ -5,12 +5,23 @@ const path = require('path');
 // Paths for backup scripts and status files
 const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
 const LOGS_DIR = path.join(SCRIPTS_DIR, 'logs');
-const STATUS_FILE = path.join(SCRIPTS_DIR, '../status/tasker_backup_status.json');
+const STATUS_DIR = path.join(__dirname, '../../status');
+const STATUS_FILE = path.join(STATUS_DIR, 'tasker_backup_status.json');
 
 const WEBAPP_BACKUP_SCRIPT = path.join(SCRIPTS_DIR, 'tasker_backup.sh');
 const DB_BACKUP_SCRIPT = path.join(SCRIPTS_DIR, 'tasker_db_watch.sh');
 const WEBAPP_LOG = path.join(LOGS_DIR, 'tasker_backup.log');
 const DB_LOG = path.join(LOGS_DIR, 'tasker_db_watch.log');
+
+// Log paths for debugging (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Backup routes initialized:');
+  console.log('  SCRIPTS_DIR:', SCRIPTS_DIR);
+  console.log('  LOGS_DIR:', LOGS_DIR);
+  console.log('  STATUS_DIR:', STATUS_DIR);
+  console.log('  STATUS_FILE:', STATUS_FILE);
+  console.log('  WEBAPP_BACKUP_SCRIPT:', WEBAPP_BACKUP_SCRIPT);
+}
 
 // Backup routes handler
 function backupRoutes(req, res, parsedUrl) {
@@ -106,19 +117,34 @@ async function handleTriggerWebappBackup(req, res) {
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
       }
 
+      // Check if script exists
+      if (!fs.existsSync(WEBAPP_BACKUP_SCRIPT)) {
+        console.error('Webapp backup script not found:', WEBAPP_BACKUP_SCRIPT);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({
+          error: 'Webapp backup script not found',
+          path: WEBAPP_BACKUP_SCRIPT
+        }));
+      }
+
       // Execute the backup script once (not the scheduled service)
-      exec(`bash "${WEBAPP_BACKUP_SCRIPT}"`, (error, stdout, stderr) => {
+      exec(`bash "${WEBAPP_BACKUP_SCRIPT}"`, { timeout: 300000 }, (error, stdout, stderr) => {
         if (error) {
           console.error('Webapp backup error:', error);
+          console.error('Webapp backup stderr:', stderr);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ 
-            error: 'Webapp backup failed', 
-            details: error.message 
+          return res.end(JSON.stringify({
+            error: 'Webapp backup failed',
+            details: error.message,
+            stderr: stderr,
+            code: error.code,
+            signal: error.signal
           }));
         }
-        
+
+        console.log('Webapp backup stdout:', stdout);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
           message: 'Webapp backup triggered successfully',
           output: stdout || 'Backup completed'
         }));
@@ -140,6 +166,16 @@ async function handleTriggerDatabaseBackup(req, res) {
       if (!isAdmin(req.user)) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'Access denied: Admin privileges required' }));
+      }
+
+      // Check if source script exists
+      if (!fs.existsSync(DB_BACKUP_SCRIPT)) {
+        console.error('Database backup script not found:', DB_BACKUP_SCRIPT);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({
+          error: 'Database backup script not found',
+          path: DB_BACKUP_SCRIPT
+        }));
       }
 
       // Create a temporary one-time backup script
@@ -228,21 +264,32 @@ update_status() {
 
       fs.writeFileSync(tempScript, onceScript, { mode: 0o755 });
 
-      exec(`bash "${tempScript}"`, (error, stdout, stderr) => {
+      exec(`bash "${tempScript}"`, { timeout: 300000 }, (error, stdout, stderr) => {
         // Clean up temp script
-        fs.unlinkSync(tempScript);
-        
+        try {
+          if (fs.existsSync(tempScript)) {
+            fs.unlinkSync(tempScript);
+          }
+        } catch (unlinkErr) {
+          console.error('Error cleaning up temp script:', unlinkErr);
+        }
+
         if (error) {
           console.error('Database backup error:', error);
+          console.error('Database backup stderr:', stderr);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ 
-            error: 'Database backup failed', 
-            details: error.message 
+          return res.end(JSON.stringify({
+            error: 'Database backup failed',
+            details: error.message,
+            stderr: stderr,
+            code: error.code,
+            signal: error.signal
           }));
         }
-        
+
+        console.log('Database backup stdout:', stdout);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
           message: 'Database backup triggered successfully',
           output: stdout || 'Backup completed'
         }));

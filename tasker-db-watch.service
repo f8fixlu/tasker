@@ -1,0 +1,33 @@
+[Unit]
+Description=Tasker Database Watch Backup Service
+After=network.target tasker-backend.service
+Wants=tasker-backend.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/apps/tasker/scripts
+ExecStart=/bin/bash /home/pi/apps/tasker/scripts/tasker_db_watch.sh
+StandardOutput=append:/home/pi/apps/tasker/scripts/logs/tasker_db_watch.log
+StandardError=append:/home/pi/apps/tasker/scripts/logs/tasker_db_watch.log
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Watchdog settings
+WatchdogSec=300
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/apps/tasker/backend/database /home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status /tmp
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target
