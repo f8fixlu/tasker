@@ -1,35 +1,33 @@
 # Tasker Services Setup
 
-This guide explains how to set up Tasker as a systemd service on your Raspberry Pi.
-The application is configured with the backend serving both the API and frontend files.
+This guide explains how to set up Tasker as systemd services on your Raspberry Pi.
+The application is configured with separate services for the backend and frontend.
 
 ## Prerequisites
 
 - Raspberry Pi with systemd (most modern Linux distributions)
 - Tasker application deployed at `/home/pi/apps/tasker/`
-- Frontend built and copied to backend's public folder
+- Frontend built and ready to serve
 - Node.js and npm installed
 
 ## Setup Instructions
 
-### 1. Build and Deploy Frontend
+### 1. Build Frontend
 
-First, build the frontend and copy it to the backend's public folder:
+First, build the frontend:
 
 ```bash
 # Build the frontend
 cd /home/pi/apps/tasker/frontend
-npm run build
-
-# Copy build files to backend's public folder
-cp -r build/* /home/pi/apps/tasker/backend/public/
+npm run build:prod
 ```
 
-### 2. Copy Service File
+### 2. Copy Service Files
 
 ```bash
-# Copy the main service file to systemd directory
-sudo cp tasker-main.service /etc/systemd/system/
+# Copy the service files to systemd directory
+sudo cp tasker-backend.service /etc/systemd/system/
+sudo cp tasker-frontend.service /etc/systemd/system/
 ```
 
 ### 3. Install Dependencies
@@ -39,7 +37,7 @@ sudo cp tasker-main.service /etc/systemd/system/
 cd /home/pi/apps/tasker/backend
 npm install
 
-# Install frontend dependencies (if needed for build)
+# Install frontend dependencies
 cd /home/pi/apps/tasker/frontend
 npm install
 ```
@@ -50,61 +48,73 @@ npm install
 sudo systemctl daemon-reload
 ```
 
-### 5. Enable and Start Service
+### 5. Enable and Start Services
 
 ```bash
-# Enable and start the main service
-sudo systemctl enable tasker-main
-sudo systemctl start tasker-main
+# Enable and start the backend service
+sudo systemctl enable tasker-backend
+sudo systemctl start tasker-backend
+
+# Enable and start the frontend service
+sudo systemctl enable tasker-frontend
+sudo systemctl start tasker-frontend
 ```
 
 ## Service Management Commands
 
 ```bash
 # Check service status
-sudo systemctl status tasker-main
+sudo systemctl status tasker-backend
+sudo systemctl status tasker-frontend
 
 # View service logs
-sudo journalctl -u tasker-main -f
+sudo journalctl -u tasker-backend -f
+sudo journalctl -u tasker-frontend -f
 
-# Restart service
-sudo systemctl restart tasker-main
+# Restart services
+sudo systemctl restart tasker-backend
+sudo systemctl restart tasker-frontend
 
-# Stop service
-sudo systemctl stop tasker-main
+# Stop services
+sudo systemctl stop tasker-backend
+sudo systemctl stop tasker-frontend
 
-# Disable service (stop on boot)
-sudo systemctl disable tasker-main
+# Disable services (stop on boot)
+sudo systemctl disable tasker-backend
+sudo systemctl disable tasker-frontend
 ```
 
 ## Verification
 
-After starting the service, verify it is running:
+After starting the services, verify they are running:
 
 ```bash
-# Check if process is running
+# Check if processes are running
 ps aux | grep node
 
-# Check if port is listening
-sudo netstat -tlnp | grep :5000  # Backend with frontend
+# Check if ports are listening
+sudo netstat -tlnp | grep :5000  # Backend
+sudo netstat -tlnp | grep :3000  # Frontend
 
 # Check service logs
-sudo journalctl -u tasker-main --no-pager -l
+sudo journalctl -u tasker-backend --no-pager -l
+sudo journalctl -u tasker-frontend --no-pager -l
 
 # Test the application
-curl http://localhost:5000
+curl http://localhost:5000/api  # Backend API
+curl http://localhost:3000      # Frontend
 ```
 
 ## Troubleshooting
 
-1. **Service fails to start**: Check logs with `journalctl -u tasker-main -f`
+1. **Service fails to start**: Check logs with `journalctl -u tasker-backend -f` or `journalctl -u tasker-frontend -f`
 2. **Permission errors**: Ensure the pi user owns the application directory
    ```bash
    sudo chown -R pi:pi /home/pi/apps/tasker/
    ```
-3. **Port conflicts**: Verify no other processes are using port 5000
+3. **Port conflicts**: Verify no other processes are using ports 5000 (backend) or 3000 (frontend)
 4. **Dependency issues**: Make sure all Node.js dependencies are installed
-5. **Frontend not loading**: Verify build files are in `/home/pi/apps/tasker/backend/public/`
+5. **Frontend not loading**: Verify build exists in `/home/pi/apps/tasker/frontend/build/`
 
 ## Directory Structure
 
@@ -114,18 +124,18 @@ Ensure your application is structured as follows:
 ├── backend/
 │   ├── package.json
 │   ├── server.js
-│   ├── public/ (contains frontend build files)
 │   └── node_modules/
 └── frontend/
     ├── package.json
-    ├── server.js (optimized Express server - optional)
-    └── build/ (temporary build directory)
+    ├── server.js
+    ├── build/ (contains built frontend files)
+    └── node_modules/
 ```
 
 ## Notes
 
-- The backend serves both the API on `/api/*` routes and frontend files on other routes
-- The service will automatically restart if it crashes
+- The backend service runs on port 5000 and serves the API on `/api/*` routes
+- The frontend service runs on port 3000 and serves the React application
+- Both services will automatically restart if they crash
 - Logs are available through the systemd journal
-- Port 5000 serves both API and frontend
-- Frontend build files are served from the backend's public directory
+- Frontend communicates with backend via API calls
