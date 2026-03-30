@@ -25,6 +25,7 @@
     "concurrently": "^8.0.1"
   },
   "dependencies": {
+    "qwen": "^0.0.0",
     "sharp": "^0.34.5",
     "sqlite3": "^5.1.7",
     "to-ico": "^1.1.5"

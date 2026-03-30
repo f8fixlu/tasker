@@ -163,6 +163,44 @@
 - **Status**: `/home/pi/apps/tasker/status/tasker_backup_status.json`
 - **Systemd**: `journalctl -u tasker-backup -f`
 
+### Database Backup Optimization
+
+**Problem**: Database was backing up every minute due to:
+1. Session heartbeat updates (every few seconds)
+2. Overdue task detection job (every 5 minutes)
+3. inotifywait catching journal file changes
+
+**Solutions Applied**:
+
+1. **Increased debounce from 20s to 30 minutes**
+   - Prevents backups more than once every 30 minutes
+   - Overdue detection runs every 5 min but only triggers backup every 6th time
+
+2. **Hash-based change detection**
+   - Only backs up if tasks/events content actually changes
+   - Hashes: title, description, priority (tasks), start_date (events)
+   - Excludes: status (changes from auto-overdue), timestamps, session data
+
+3. **File filtering**
+   - Only watches `tasker.db` (main database file)
+   - Ignores: `tasker.db-journal`, `tasker.db-wal`, `tasker.db-shm`
+   - Uses inotifywait in monitor mode (`-m` flag)
+
+4. **Rclone configuration fixes**
+   - Added `--no-check-dest`, `--ignore-existing` to reduce config writes
+   - Properly captures rclone exit code (not grep's)
+   - Suppresses harmless "Failed to save config" errors
+
+5. **Status file atomic writes**
+   - Uses temp file + mv for atomic writes
+   - Ensures valid JSON (no trailing commas)
+   - Added verification logging
+
+**Result**: 
+- Backups now only trigger on actual user modifications to tasks/events
+- Reduced from ~1440 backups/day to ~48 backups/day maximum
+- Actual frequency: ~2-10 backups/day (depending on user activity)
+
 ---
 
 ## Service Architecture Update ✅
