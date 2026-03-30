@@ -15,26 +15,25 @@ import { GlobalWorkerOptions } from 'pdfjs-dist';
 // Initialize pdfjs worker
 GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Dynamically import pdfmake to ensure proper browser loading
+// Import pdfmake dynamically - prefer CDN version if available
 let pdfMake = null;
+let isCdnVersion = false;
 const loadPdfMake = async () => {
   if (!pdfMake) {
-    // Prefer CDN version loaded in index.html
-    if (window.pdfMake) {
-      console.log('Using CDN pdfMake');
+    // Check if CDN version is available (window.pdfMake)
+    if (window.pdfMake && window.pdfMake.vfs) {
       pdfMake = window.pdfMake;
-      // vfs_fonts is also loaded from CDN as pdfMake.vfs
-      if (window.pdfMake.vfs) {
-        console.log('Using CDN vfs_fonts');
-      }
+      isCdnVersion = true;
     } else {
       // Fallback to npm package
-      console.log('Loading pdfMake from npm package');
-      const module = await import('pdfmake/build/pdfmake');
-      const fonts = await import('pdfmake/build/vfs_fonts');
+      const [module, fonts] = await Promise.all([
+        import('pdfmake/build/pdfmake'),
+        import('pdfmake/build/vfs_fonts')
+      ]);
+      
       pdfMake = module.default;
-      // In v0.3.x, vfs_fonts exports the VFS object directly
       pdfMake.vfs = fonts.default || fonts;
+      isCdnVersion = false;
     }
   }
   return pdfMake;
@@ -1702,18 +1701,13 @@ const Reports = () => {
 
   // Function to create PDFMake document definition for the report
   const createReportDefinition = async () => {
-    console.log('createReportDefinition called');
     return new Promise(async (resolve) => {
-      // Start building the content array
       let content = [];
 
-      // Load logo images as base64
       let leftLogoImage = null;
       let rightLogoImage = null;
 
       try {
-        console.log('Loading left logo...');
-        // Fetch and convert left logo to base64
         const leftLogoResponse = await fetch('/logo/logoleft.png');
         if (leftLogoResponse.ok) {
           const leftLogoBlob = await leftLogoResponse.blob();
@@ -1723,15 +1717,12 @@ const Reports = () => {
             reader.onerror = reject;
             reader.readAsDataURL(leftLogoBlob);
           });
-          console.log('Left logo loaded:', !!leftLogoImage);
         }
       } catch (error) {
-        console.warn('Failed to load left logo image:', error);
+        // Ignore logo loading errors
       }
 
       try {
-        console.log('Loading right logo...');
-        // Fetch and convert right logo to base64
         const rightLogoResponse = await fetch('/logo/logoright.png');
         if (rightLogoResponse.ok) {
           const rightLogoBlob = await rightLogoResponse.blob();
@@ -1741,10 +1732,9 @@ const Reports = () => {
             reader.onerror = reject;
             reader.readAsDataURL(rightLogoBlob);
           });
-          console.log('Right logo loaded:', !!rightLogoImage);
         }
       } catch (error) {
-        console.warn('Failed to load right logo image:', error);
+        // Ignore logo loading errors
       }
 
       // Header section
@@ -2000,7 +1990,7 @@ const Reports = () => {
           };
         },
         defaultStyle: {
-          font: 'Roboto', // PDFMake default font
+          font: 'Roboto',
           fontSize: 12
         },
         styles: {
@@ -2013,22 +2003,16 @@ const Reports = () => {
         }
       };
 
-      console.log('Doc definition created with fonts');
       resolve(docDefinition);
     });
   };
 
 const generatePDF = async () => {
     try {
-      console.log('Generating PDF for download...');
       const pdfMakeInstance = await loadPdfMake();
-      console.log('pdfMake loaded');
       const docDefinition = await createReportDefinition();
-      console.log('PDF definition created');
       const pdf = pdfMakeInstance.createPdf(docDefinition);
-      console.log('PDF created, starting download...');
       pdf.download('accomplishment_report.pdf');
-      console.log('Download initiated');
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF: ' + error.message);
@@ -2038,30 +2022,55 @@ const generatePDF = async () => {
   // Function to generate PDF blob for preview
   const generatePDFBlob = async () => {
     try {
-      console.log('Generating PDF definition...');
       const pdfMakeInstance = await loadPdfMake();
-      console.log('pdfMake loaded, vfs:', !!pdfMakeInstance.vfs);
       const docDefinition = await createReportDefinition();
-      console.log('PDF definition created, generating blob...');
-      
-      // Create PDF
+
       const pdf = pdfMakeInstance.createPdf(docDefinition);
-      console.log('PDF created, getting blob...');
-      
+
       return new Promise((resolve, reject) => {
-        pdf.getBlob((blob) => {
-          if (!blob) {
-            reject(new Error('getBlob returned null/undefined'));
-            return;
-          }
-          console.log('Blob generated successfully:', blob);
-          resolve(blob);
-        });
+        if (isCdnVersion) {
+          // CDN version (0.2.x) uses callback API
+          pdf.getDataUrl((dataUrl) => {
+            try {
+              const blob = dataURLToBlob(dataUrl);
+              resolve(blob);
+            } catch (blobErr) {
+              reject(new Error('Failed to convert dataUrl to blob: ' + blobErr.message));
+            }
+          });
+        } else {
+          // npm version (0.3.x) uses promise API
+          pdf.getDataUrl().then((dataUrl) => {
+            try {
+              const blob = dataURLToBlob(dataUrl);
+              resolve(blob);
+            } catch (blobErr) {
+              reject(new Error('Failed to convert dataUrl to blob: ' + blobErr.message));
+            }
+          }).catch(err => {
+            reject(new Error('getDataUrl failed: ' + err.message));
+          });
+        }
       });
     } catch (error) {
-      console.error('Error generating PDF blob:', error);
+      console.error('Error generating PDF preview:', error);
       return Promise.reject(error);
     }
+  };
+
+  // Helper function to convert dataURL to Blob without using fetch
+  const dataURLToBlob = (dataURL) => {
+    const parts = dataURL.split(';base64,');
+    const type = parts[0].split(':')[1];
+    const raw = atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    
+    return new Blob([uInt8Array], { type: type });
   };
 
   // Function to show PDF preview
@@ -2071,28 +2080,20 @@ const generatePDF = async () => {
 
   const showPdfPreview = async () => {
     setIsPreviewLoading(true);
-    console.log('showPdfPreview called');
     try {
       // Fetch fresh signatory data from API first, then localStorage when opening preview
       if (user) {
         try {
-          // First try to get from API via user profile
-          console.log('Fetching fresh signatory data from API for preview...');
           const userData = await api.get('/users/profile');
-          
+
           if (userData.user?.signatories) {
-            console.log('Signatories found in user data:', userData.user.signatories);
             let freshSignatoryData = [];
-            
-            // If signatories is an array (like from DB), use it directly
+
             if (Array.isArray(userData.user.signatories)) {
               freshSignatoryData = userData.user.signatories;
-              console.log('Loaded fresh signatory data from API (array format):', freshSignatoryData);
             } else if (typeof userData.user.signatories === 'object') {
-              // If it's in object format, convert to array format
               const signatoryArray = [];
 
-              // Handle signatory1, signatory2, etc. format
               let signatoryIndex = 1;
               while (userData.user.signatories[`signatory${signatoryIndex}`]) {
                 const signatoryField = userData.user.signatories[`signatory${signatoryIndex}`];
@@ -2106,7 +2107,6 @@ const generatePDF = async () => {
                 signatoryIndex++;
               }
 
-              // Also handle legacy format (preparedBy, reviewedBy, notedBy) if they exist
               if (userData.user.signatories.preparedBy && (userData.user.signatories.preparedBy.name || userData.user.signatories.preparedBy.position)) {
                 signatoryArray.push({
                   title: userData.user.signatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
@@ -2132,16 +2132,12 @@ const generatePDF = async () => {
               }
 
               freshSignatoryData = signatoryArray;
-              console.log('Loaded fresh signatory data from API (object format):', freshSignatoryData);
             }
 
-            // Only update state if data is different to prevent unnecessary re-renders
             if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
               setSignatoryData(freshSignatoryData);
             }
           } else {
-            console.log('No signatories in API response, trying localStorage');
-            // Fallback to localStorage
             const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
             if (savedSignatories) {
               const freshSignatoryData = JSON.parse(savedSignatories);
@@ -2151,8 +2147,6 @@ const generatePDF = async () => {
             }
           }
         } catch (apiError) {
-          console.error('Error fetching signatory data from API, trying localStorage:', apiError);
-          // Fallback to localStorage if API fails
           const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
           if (savedSignatories) {
             try {
@@ -2161,21 +2155,16 @@ const generatePDF = async () => {
                 setSignatoryData(freshSignatoryData);
               }
             } catch (parseError) {
-              console.error('Error parsing fresh signatory data:', parseError);
+              // Ignore parse errors
             }
           }
         }
       }
 
-      console.log('Calling generatePDFBlob...');
       const blob = await generatePDFBlob();
-      console.log('PDF blob generated, creating object URL...');
       const url = URL.createObjectURL(blob);
-      console.log('Object URL created:', url);
       setPdfPreviewUrl(url);
-      console.log('Setting showPdfPreviewModal to true...');
       setShowPdfPreviewModal(true);
-      console.log('showPdfPreview completed successfully');
     } catch (error) {
       console.error('Error generating PDF preview:', error);
       alert('Failed to generate PDF preview: ' + error.message);
