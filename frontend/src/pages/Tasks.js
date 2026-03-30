@@ -71,10 +71,10 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
                 className={`px-4 py-3 font-medium text-[#617589] dark:text-gray-400 capitalize ${col.className || 'px-4 py-3'}`}
                 style={{ width: tableDimensions.columnWidths?.[i] || col.width || 'auto' }}
               >
-                <div className={`flex items-center ${col.key === 'actions' ? 'justify-center gap-2' : 'justify-start'}`}>
+                <div className={`flex items-center ${col.key === 'actions' ? 'justify-end gap-1' : 'justify-start'}`}>
                   <span>{col.header}</span>
                   {col.key === 'actions' && (
-                    <span className="material-symbols-outlined text-base text-gray-400">filter_list</span>
+                    <span className="material-symbols-outlined text-base text-gray-400 pr-2">filter_list</span>
                   )}
                 </div>
               </th>
