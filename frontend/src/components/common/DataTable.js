@@ -69,7 +69,7 @@ const DataTable = forwardRef(({
                   className={`px-4 py-3 font-medium text-[#617589] dark:text-gray-400 capitalize ${column.key === 'actions' ? '' : 'text-left'} ${column.className || 'px-4 py-3'}`}
                   style={{ width: column.width || 'auto' }}
                 >
-                  <div className={`flex items-center ${column.key === 'actions' ? 'justify-center' : 'justify-start'}`}>
+                  <div className={`flex items-center ${column.key === 'actions' ? 'justify-end gap-1' : 'justify-start'}`}>
                     <span>{column.header}</span>
                     {column.key === 'actions' && onColumnToggle && (
                       <div className="relative inline-block">
@@ -79,7 +79,7 @@ const DataTable = forwardRef(({
                             e.stopPropagation();
                             onColumnToggle(e);
                           }}
-                          className="flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                          className="flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors pr-2"
                           title="Show/Hide Columns"
                         >
                           <span className="material-symbols-outlined text-base">filter_list</span>

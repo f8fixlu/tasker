@@ -98,7 +98,8 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
               {columns.map((col, c) => (
                 <td key={c} className={`px-4 py-4 text-[#333333] dark:text-gray-200 align-middle ${col.className || 'px-4 py-4'}`} style={{ width: tableDimensions.columnWidths?.[c] || col.width || 'auto' }}>
                   {col.key === 'actions' ? (
-                    <div className="flex items-center gap-2 justify-center">
+                    <div className="flex items-center justify-end gap-1">
+                      <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700"></div>
                       <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700"></div>
                     </div>
                   ) : (
@@ -357,30 +358,6 @@ const ActionsDropdown = ({
       style={{ position: 'absolute' }}
     >
       <button
-        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-          task.attachment_count > 0
-            ? 'text-gray-700 dark:text-gray-300'
-            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-        }`}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (task.attachment_count > 0 && loadingAttachmentTaskId !== task.id) {
-            onAttachmentClick(task.id, e);
-          }
-          onClose();
-        }}
-        disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
-      >
-        <span className="material-symbols-outlined text-base">attach_file</span>
-        <span>
-          {loadingAttachmentTaskId === task.id 
-            ? 'Loading...' 
-            : `${task.attachment_count} attachment${task.attachment_count !== 1 ? 's' : ''}`
-          }
-        </span>
-      </button>
-      
-      <button
         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         onClick={(e) => {
           e.stopPropagation();
@@ -391,7 +368,7 @@ const ActionsDropdown = ({
         <span className="material-symbols-outlined text-base">visibility</span>
         <span>View Task</span>
       </button>
-      
+
       <button
         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         onClick={(e) => {
@@ -403,7 +380,7 @@ const ActionsDropdown = ({
         <span className="material-symbols-outlined text-base">edit</span>
         <span>Edit Task</span>
       </button>
-      
+
       <button
         className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
           task.status === 'Archived'
@@ -834,64 +811,87 @@ const Option2Tasks = () => {
       {
         header: '',
         key: 'actions',
-        className: 'px-2 py-3 text-center',
+        className: 'px-2 py-3 text-right',
         width: '10%',
         render: (v, task) => (
-          <div className="relative">
+          <div className="relative flex items-center justify-end gap-1">
             <button
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Actions"
+              className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors ${
+                task.attachment_count > 0
+                  ? 'text-gray-700 dark:text-gray-300 cursor-pointer'
+                  : 'text-gray-300 dark:text-gray-600 cursor-default'
+              }`}
+              title={`${task.attachment_count} attachment${task.attachment_count !== 1 ? 's' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
-                if (showActionsDropdown && activeTaskId === task.id) {
-                  setShowActionsDropdown(false);
-                  setActiveTaskId(null);
-                } else {
-                  setShowActionsDropdown(true);
-                  setActiveTaskId(task.id);
+                if (task.attachment_count > 0 && loadingAttachmentTaskId !== task.id) {
+                  handleAttachmentClick(task.id, e);
                 }
               }}
+              disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
             >
-              <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+              {loadingAttachmentTaskId === task.id ? (
+                <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+              ) : (
+                <span className="material-symbols-outlined text-base">attach_file</span>
+              )}
             </button>
+            <div className="relative inline-block">
+              <button
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Actions"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (showActionsDropdown && activeTaskId === task.id) {
+                    setShowActionsDropdown(false);
+                    setActiveTaskId(null);
+                  } else {
+                    setShowActionsDropdown(true);
+                    setActiveTaskId(task.id);
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+              </button>
 
-            {showActionsDropdown && activeTaskId === task.id && (
-              <ActionsDropdown
-                task={task}
-                loadingAttachmentTaskId={loadingAttachmentTaskId}
-                onAttachmentClick={handleAttachmentClick}
-                onViewClick={(task) => {
-                  const transformedTask = {
-                    ...task,
-                    taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',
-                    dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
-                    createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
-                    editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
-                    category: task.category_name,
-                    type: task.type_name,
-                    subType: task.sub_type_name
-                  };
-                  openViewTaskModal(transformedTask);
-                }}
-                onEditClick={openEditTaskModal}
-                onArchiveClick={(taskId) => {
-                  setTaskToDelete(taskId);
-                  setActionType('archive');
-                  setIsModalOpen(true);
-                }}
-                isOpen={showActionsDropdown && activeTaskId === task.id}
-                onClose={() => {
-                  setShowActionsDropdown(false);
-                  setActiveTaskId(null);
-                }}
-                dropdownRef={actionsDropdownRef}
-              />
-            )}
+              {showActionsDropdown && activeTaskId === task.id && (
+                <ActionsDropdown
+                  task={task}
+                  loadingAttachmentTaskId={loadingAttachmentTaskId}
+                  onAttachmentClick={handleAttachmentClick}
+                  onViewClick={(task) => {
+                    const transformedTask = {
+                      ...task,
+                      taskDate: task.task_date ? formatToLocalDateTime(task.task_date) : 'N/A',
+                      dueDate: task.due_date ? formatToLocalDateTime(task.due_date) : 'N/A',
+                      createdDate: task.created_date ? formatToLocalDateTime(task.created_date) : 'N/A',
+                      editedDate: task.edited_date ? formatToLocalDateTime(task.edited_date) : 'N/A',
+                      category: task.category_name,
+                      type: task.type_name,
+                      subType: task.sub_type_name
+                    };
+                    openViewTaskModal(transformedTask);
+                  }}
+                  onEditClick={openEditTaskModal}
+                  onArchiveClick={(taskId) => {
+                    setTaskToDelete(taskId);
+                    setActionType('archive');
+                    setIsModalOpen(true);
+                  }}
+                  isOpen={showActionsDropdown && activeTaskId === task.id}
+                  onClose={() => {
+                    setShowActionsDropdown(false);
+                    setActiveTaskId(null);
+                  }}
+                  dropdownRef={actionsDropdownRef}
+                />
+              )}
+            </div>
           </div>
         )
       }
     ]);
-  }, [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId, visibleColumns, allColumnsDefinition]);
+  }, [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId, visibleColumns, allColumnsDefinition, handleAttachmentClick]);
 
   // Load dropdowns on mount
   useEffect(() => {
