@@ -68,18 +68,23 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
             {columns.map((col, i) => (
               <th
                 key={i}
-                className="px-4 py-3 font-medium text-[#617589] dark:text-gray-400"
-                style={{ width: tableDimensions.columnWidths?.[i] || 'auto' }}
+                className={`px-4 py-3 font-medium text-[#617589] dark:text-gray-400 capitalize ${col.className || 'px-4 py-3'}`}
+                style={{ width: tableDimensions.columnWidths?.[i] || col.width || 'auto' }}
               >
-                {col.header}
+                <div className={`flex items-center ${col.key === 'actions' ? 'justify-center gap-2' : 'justify-start'}`}>
+                  <span>{col.header}</span>
+                  {col.key === 'actions' && (
+                    <span className="material-symbols-outlined text-base text-gray-400">filter_list</span>
+                  )}
+                </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {[...Array(10)].map((_, r) => (
-            <tr 
-              key={r} 
+            <tr
+              key={r}
               className="hover:bg-gray-50 dark:hover:bg-gray-900/20 transition-colors duration-200"
               style={{ height: tableDimensions.rowHeights?.[r] || 52 }}
             >
@@ -91,15 +96,11 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
                 />
               </td>
               {columns.map((col, c) => (
-                <td key={c} className="px-4 py-4 text-[#333333] dark:text-gray-200">
+                <td key={c} className={`px-4 py-4 text-[#333333] dark:text-gray-200 align-middle ${col.className || 'px-4 py-4'}`} style={{ width: tableDimensions.columnWidths?.[c] || col.width || 'auto' }}>
                   {col.key === 'actions' ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+                    <div className="flex items-center gap-2 justify-center">
+                      <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700"></div>
                     </div>
-                  ) : col.key === 'attachment_count' ? (
-                    <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700"></div>
                   ) : (
                     <Skeleton type="text" className="w-full h-4" />
                   )}
@@ -1001,13 +1002,13 @@ const Option2Tasks = () => {
       const table = tableRef.current;
       const headerRow = table.querySelector('thead tr');
       const bodyRows = table.querySelectorAll('tbody tr');
-      
+
       const headerCells = headerRow?.querySelectorAll('th') || [];
       const firstBodyRow = bodyRows[0];
 
-      // Get column widths from actual table
-      const columnWidths = Array.from(headerCells).map(cell => cell.offsetWidth);
-      
+      // Get column widths from actual table (skip checkbox column at index 0)
+      const columnWidths = Array.from(headerCells).slice(1).map(cell => cell.offsetWidth);
+
       // Get row heights from first 10 rows (or fewer if less data)
       const rowHeights = Array.from(bodyRows).slice(0, 10).map(row => row.offsetHeight);
 

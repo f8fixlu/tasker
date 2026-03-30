@@ -34,12 +34,12 @@ const createMemoizedFormatter = () => {
           case 'timeOnly':
             result = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             break;
-          case 'fullDateWithDay': // New format: "February 02, 2026, Monday"
+          case 'fullDateWithDay': // New format: "March 30, 2026 - Monday"
             const month = date.toLocaleString('en-US', { month: 'long' });
-            const day = date.getDate().toString().padStart(2, '0');
+            const day = date.getDate();
             const year = date.getFullYear();
             const dayOfWeek = date.toLocaleString('en-US', { weekday: 'long' });
-            result = `${month} ${day}, ${year}, ${dayOfWeek}`;
+            result = `${month} ${day}, ${year} - ${dayOfWeek}`;
             break;
           case 'full':
           default:
