@@ -9,12 +9,36 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { formatToLocalDateTime } from '../utils/date';
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
-pdfMake.vfs = pdfFonts;
 import * as pdfjsLib from 'pdfjs-dist';
 import { GlobalWorkerOptions } from 'pdfjs-dist';
+
+// Initialize pdfjs worker
 GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Dynamically import pdfmake to ensure proper browser loading
+let pdfMake = null;
+const loadPdfMake = async () => {
+  if (!pdfMake) {
+    // Prefer CDN version loaded in index.html
+    if (window.pdfMake) {
+      console.log('Using CDN pdfMake');
+      pdfMake = window.pdfMake;
+      // vfs_fonts is also loaded from CDN as pdfMake.vfs
+      if (window.pdfMake.vfs) {
+        console.log('Using CDN vfs_fonts');
+      }
+    } else {
+      // Fallback to npm package
+      console.log('Loading pdfMake from npm package');
+      const module = await import('pdfmake/build/pdfmake');
+      const fonts = await import('pdfmake/build/vfs_fonts');
+      pdfMake = module.default;
+      // In v0.3.x, vfs_fonts exports the VFS object directly
+      pdfMake.vfs = fonts.default || fonts;
+    }
+  }
+  return pdfMake;
+};
 
 import {
   Chart as ChartJS,
@@ -1678,6 +1702,7 @@ const Reports = () => {
 
   // Function to create PDFMake document definition for the report
   const createReportDefinition = async () => {
+    console.log('createReportDefinition called');
     return new Promise(async (resolve) => {
       // Start building the content array
       let content = [];
@@ -1687,6 +1712,7 @@ const Reports = () => {
       let rightLogoImage = null;
 
       try {
+        console.log('Loading left logo...');
         // Fetch and convert left logo to base64
         const leftLogoResponse = await fetch('/logo/logoleft.png');
         if (leftLogoResponse.ok) {
@@ -1697,12 +1723,14 @@ const Reports = () => {
             reader.onerror = reject;
             reader.readAsDataURL(leftLogoBlob);
           });
+          console.log('Left logo loaded:', !!leftLogoImage);
         }
       } catch (error) {
         console.warn('Failed to load left logo image:', error);
       }
 
       try {
+        console.log('Loading right logo...');
         // Fetch and convert right logo to base64
         const rightLogoResponse = await fetch('/logo/logoright.png');
         if (rightLogoResponse.ok) {
@@ -1713,6 +1741,7 @@ const Reports = () => {
             reader.onerror = reject;
             reader.readAsDataURL(rightLogoBlob);
           });
+          console.log('Right logo loaded:', !!rightLogoImage);
         }
       } catch (error) {
         console.warn('Failed to load right logo image:', error);
@@ -1941,14 +1970,33 @@ const Reports = () => {
       const docDefinition = {
         pageSize: pageSize.toLowerCase() === 'folio' ? { width: 612, height: 936 } : // 8.5in x 13in in points (72 points per inch)
                    pageSize.toLowerCase() === 'letter' ? 'LETTER' : 'A4',
-        pageMargins: [60, 60, 60, 80], // Increased bottom margin to prevent content bleeding
+        pageMargins: [60, 36, 60, 36], // 0.5 inches top and bottom (36 points), 0.83 inches left and right (60 points)
         content: content,
+        fonts: {
+          Roboto: {
+            normal: 'Roboto-Regular.ttf',
+            bold: 'Roboto-Medium.ttf',
+            italics: 'Roboto-Italic.ttf',
+            bolditalics: 'Roboto-MediumItalic.ttf'
+          }
+        },
         footer: (currentPage, pageCount) => {
           return {
-            text: `Page ${currentPage} of ${pageCount}`,
-            alignment: 'right',
-            margin: [0, 0, 60, 10],
-            fontSize: 10
+            columns: [
+              {
+                text: 'This report is system generated',
+                fontSize: 9,
+                italics: true,
+                color: '#6b7280',
+                margin: [60, 0, 0, 10]
+              },
+              {
+                text: `Page ${currentPage} of ${pageCount}`,
+                alignment: 'right',
+                fontSize: 10,
+                margin: [0, 0, 60, 10]
+              }
+            ]
           };
         },
         defaultStyle: {
@@ -1965,14 +2013,22 @@ const Reports = () => {
         }
       };
 
+      console.log('Doc definition created with fonts');
       resolve(docDefinition);
     });
   };
 
 const generatePDF = async () => {
     try {
+      console.log('Generating PDF for download...');
+      const pdfMakeInstance = await loadPdfMake();
+      console.log('pdfMake loaded');
       const docDefinition = await createReportDefinition();
-      pdfMake.createPdf(docDefinition).download('accomplishment_report.pdf');
+      console.log('PDF definition created');
+      const pdf = pdfMakeInstance.createPdf(docDefinition);
+      console.log('PDF created, starting download...');
+      pdf.download('accomplishment_report.pdf');
+      console.log('Download initiated');
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF: ' + error.message);
@@ -1982,12 +2038,24 @@ const generatePDF = async () => {
   // Function to generate PDF blob for preview
   const generatePDFBlob = async () => {
     try {
+      console.log('Generating PDF definition...');
+      const pdfMakeInstance = await loadPdfMake();
+      console.log('pdfMake loaded, vfs:', !!pdfMakeInstance.vfs);
       const docDefinition = await createReportDefinition();
+      console.log('PDF definition created, generating blob...');
+      
+      // Create PDF
+      const pdf = pdfMakeInstance.createPdf(docDefinition);
+      console.log('PDF created, getting blob...');
+      
       return new Promise((resolve, reject) => {
-        pdfMake.createPdf(docDefinition).getBlob((blob) => {
+        pdf.getBlob((blob) => {
+          if (!blob) {
+            reject(new Error('getBlob returned null/undefined'));
+            return;
+          }
+          console.log('Blob generated successfully:', blob);
           resolve(blob);
-        }, (error) => {
-          reject(error);
         });
       });
     } catch (error) {
@@ -1999,8 +2067,11 @@ const generatePDF = async () => {
   // Function to show PDF preview
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const showPdfPreview = async () => {
+    setIsPreviewLoading(true);
+    console.log('showPdfPreview called');
     try {
       // Fetch fresh signatory data from API first, then localStorage when opening preview
       if (user) {
@@ -2096,13 +2167,20 @@ const generatePDF = async () => {
         }
       }
 
+      console.log('Calling generatePDFBlob...');
       const blob = await generatePDFBlob();
+      console.log('PDF blob generated, creating object URL...');
       const url = URL.createObjectURL(blob);
+      console.log('Object URL created:', url);
       setPdfPreviewUrl(url);
+      console.log('Setting showPdfPreviewModal to true...');
       setShowPdfPreviewModal(true);
+      console.log('showPdfPreview completed successfully');
     } catch (error) {
       console.error('Error generating PDF preview:', error);
       alert('Failed to generate PDF preview: ' + error.message);
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -2293,9 +2371,14 @@ const generatePDF = async () => {
             variant="outline"
             className="flex items-center gap-2 h-[34px]"
             onClick={showPdfPreview}
+            disabled={isPreviewLoading}
           >
-            <span className="material-symbols-outlined">visibility</span>
-            Preview Report
+            {isPreviewLoading ? (
+              <span className="material-symbols-outlined animate-spin">progress_activity</span>
+            ) : (
+              <span className="material-symbols-outlined">visibility</span>
+            )}
+            <span>Preview Report</span>
           </Button>
                     <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
             <input
