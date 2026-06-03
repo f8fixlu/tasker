@@ -39,6 +39,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
 const backupRoutes = require('./routes/backups');
 const statusTrackingRoutes = require('./routes/statusTracking');
+const holidayRoutes = require('./routes/holidays');
 
 // Import session management utilities
 const { startSessionCleanupJob } = require('./utils/sessionManagement');
@@ -224,6 +225,8 @@ const server = http.createServer((req, res) => {
             adminRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/status-tracking')) {
             statusTrackingRoutes(req, res, parsedUrl);
+          } else if (pathname.startsWith('/api/holidays')) {
+            holidayRoutes(req, res, parsedUrl);
           } else {
             // API route not found - return JSON error instead of static file
             res.writeHead(404, { 'Content-Type': 'application/json' });

@@ -1,5 +1,40 @@
 # Tasker Application Updates
 
+## Google Calendar API - Philippine Holidays Integration
+
+### Added Philippine Holiday Auto-Population
+- Integrated Google Calendar API to fetch and display Philippine public holidays on the Calendar page
+- Uses the public Google Calendar `en.philippines#holiday@group.v.calendar.google.com`
+- Holidays are fetched on page load and auto-refresh when the viewed year changes
+- Displays holidays alongside user events in month, week, and day views with distinct red styling and "Holiday" badge
+- Hover popup shows holiday name, description, and date
+
+### Save as Event Feature
+- Added "Save as Event" button on holiday hover popup to convert an API holiday into a real editable event
+- Saved events can be edited, categorized, and managed like any user-created event
+- Tracks saved holidays via `savedHolidayKeys` state to prevent duplicates
+
+### Auto-Deduplication
+- API holidays are automatically hidden when a user event already exists on the same date
+- Prevents duplicate entries (e.g., "Independence Day" showing twice on June 12)
+- Deduplication is date-based: any user event on a holiday date hides the API version
+
+### Configuration Required
+- Added `GOOGLE_API_KEY` environment variable to `.env` (both root and `backend/.env`)
+- Requires a free Google API key with the Google Calendar API enabled
+- Env var must be set before the backend server starts
+
+### Files Modified
+- `frontend/src/pages/Calendar.js`: Added holiday fetching, deduplication logic, "Save as Event" popup button, and date-based duplicate filtering across all views
+- `frontend/src/services/holidayService.js`: API service for `/holidays/philippines` endpoint
+- `backend/routes/holidays.js`: Backend route that proxies Google Calendar API for Philippine holidays
+- `backend/server.js`: Registered `/api/holidays` route (line 228)
+- `.env` (root): Added `GOOGLE_API_KEY` variable
+
+---
+
+# Tasker Application Updates
+
 ## Tasks Page Column Visibility Dropdown Positioning Fix
 
 ### Fixed Dropdown Position at Screen Edge

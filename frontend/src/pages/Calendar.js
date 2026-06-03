@@ -3,6 +3,7 @@ import Button from '../components/common/Button';
 import NewEventModal from '../components/modals/NewEventModal';
 import ViewEventModal from '../components/modals/ViewEventModal';
 import { eventService } from '../services/eventService';
+import { holidayService } from '../services/holidayService';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { useNotifications } from '../hooks/useNotifications';
 
@@ -33,14 +34,13 @@ const Calendar = () => {
   const [isViewEventModalOpen, setIsViewEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [events, setEvents] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [newEventPrefillData, setNewEventPrefillData] = useState({});
   const [calendarEventPopup, setCalendarEventPopup] = useState(null);
   const popupTimeoutRef = useRef(null);
-
-  const { updateTrigger: taskUpdateTrigger, triggerTaskUpdate, dropdownUpdateTrigger } = useTaskUpdate();
-  const { fetchNotifications } = useNotifications();
+  const [savedHolidayKeys, setSavedHolidayKeys] = useState(new Set());
 
   // Function to fetch events from the database
   const fetchEvents = async () => {
@@ -60,6 +60,35 @@ const Calendar = () => {
     }
   };
 
+  // Fetch Philippine holidays from the backend
+  const fetchHolidays = async () => {
+    const year = currentDate.getFullYear();
+    const data = await holidayService.getPhilippineHolidays(year);
+    setHolidays(data);
+  };
+
+  // Convert a holiday object to an event-like object for display
+  const holidayToEvent = (holiday) => ({
+    id: `holiday-${holiday.date}-${holiday.name.replace(/\s+/g, '-')}`,
+    title: holiday.name,
+    isHoliday: true,
+    color_class: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
+    start_date: holiday.date,
+    end_date: holiday.date,
+    description: holiday.description || `${holiday.name} - Philippine Public Holiday`
+  });
+
+  const isDateOccupiedByEvent = (date) => {
+    return events.some(event => {
+      const eventDate = event.startDate || event.start_date;
+      if (!eventDate) return false;
+      const d = new Date(eventDate);
+      if (isNaN(d.getTime())) return false;
+      const eventDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return eventDateStr === date;
+    });
+  };
+
   const formatDateOnly = (dateStr) => {
     if (!dateStr) return 'N/A';
     const d = new Date(dateStr);
@@ -67,10 +96,18 @@ const Calendar = () => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  // Effect to load events when component mounts
+  // Effect to load events and holidays when component mounts
   useEffect(() => {
     fetchEvents();
+    fetchHolidays();
   }, []);
+
+  // Re-fetch holidays when the viewed year changes
+  useEffect(() => {
+    if (initialLoadComplete) {
+      fetchHolidays();
+    }
+  }, [currentDate.getFullYear()]);
 
   // Function to check if a date is in the past
   const isDateInPast = (date) => {
@@ -150,9 +187,9 @@ const Calendar = () => {
     return days;
   };
 
-  // Helper function to filter events for a specific date
+  // Helper function to filter events and holidays for a specific date
   const getEventsForDate = (date) => {
-    return events.filter(event => {
+    const eventResults = events.filter(event => {
       const eventDate = new Date(event.startDate || event.start_date);
       return (
         eventDate.getDate() === date.getDate() &&
@@ -160,6 +197,20 @@ const Calendar = () => {
         eventDate.getFullYear() === date.getFullYear()
       );
     });
+
+    const holidayResults = holidays
+      .filter(h => {
+        const hDate = new Date(h.date + 'T00:00:00');
+        return (
+          hDate.getDate() === date.getDate() &&
+          hDate.getMonth() === date.getMonth() &&
+          hDate.getFullYear() === date.getFullYear()
+        );
+      })
+      .filter(h => !isDateOccupiedByEvent(h.date))
+      .map(h => holidayToEvent(h));
+
+    return [...holidayResults, ...eventResults];
   };
 
   // Function to update an event's dates only (preserving times)
@@ -231,6 +282,26 @@ const Calendar = () => {
     }
   };
 
+  const handleSaveHolidayAsEvent = async (holidayEvent) => {
+    const date = holidayEvent.start_date?.slice(0, 10) || holidayEvent.date;
+    const name = holidayEvent.title || holidayEvent.name;
+    try {
+      const eventData = {
+        title: name,
+        description: holidayEvent.description || `${name} - Philippine Public Holiday`,
+        start_date: date + 'T00:00:00.000Z',
+        end_date: date + 'T00:00:00.000Z',
+        is_whole_day: true
+      };
+      await eventService.createEvent(eventData);
+      setSavedHolidayKeys(prev => new Set([...prev, `${date}-${name}`]));
+      await fetchEvents();
+      triggerTaskUpdate();
+      setTimeout(() => fetchNotifications(), 100);
+    } catch (error) {
+      console.error('Error saving holiday as event:', error);
+    }
+  };
 
   return (
     <>
@@ -548,9 +619,9 @@ const Calendar = () => {
                             key={idx}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEventClick(event);
+                              if (!event.isHoliday) handleEventClick(event);
                             }}
-                            draggable={view === 'month' || view === 'week'} // Enable dragging only in month and week views
+                            draggable={!event.isHoliday && (view === 'month' || view === 'week')}
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', JSON.stringify({
                                 eventId: event.id,
@@ -563,26 +634,23 @@ const Calendar = () => {
                               e.currentTarget.classList.remove('dragging');
                             }}
                             onDragOver={(e) => {
-                              e.preventDefault(); // Necessary to allow dropping
+                              e.preventDefault();
                             }}
                             onDrop={async (e) => {
                               e.preventDefault();
-                              if (view !== 'month' && view !== 'week') return; // Only for month and week views
+                              if (view !== 'month' && view !== 'week') return;
 
                               const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-                              if (dragData.eventId !== event.id) return; // Only process drop on the same event
+                              if (dragData.eventId !== event.id) return;
 
-                              // Calculate new date based on the day being dropped on
                               const newDate = new Date(day.date);
 
-                              // Get the original event from the state to get the full event object
                               const originalEvent = events.find(ev => ev.id === dragData.eventId);
                               if (!originalEvent) return;
 
-                              // Calculate new start and end dates based on the difference
                               const originalStartDate = new Date(dragData.originalStartDate);
                               const originalStartDay = new Date(originalStartDate.getFullYear(), originalStartDate.getMonth(), originalStartDate.getDate());
-                              const dateDiff = (newDate - originalStartDay) / (1000 * 60 * 60 * 24); // Difference in days
+                              const dateDiff = (newDate - originalStartDay) / (1000 * 60 * 60 * 24);
 
                               const newStartDate = new Date(originalEvent.start_date || originalEvent.startDate);
                               newStartDate.setDate(newStartDate.getDate() + dateDiff);
@@ -590,7 +658,6 @@ const Calendar = () => {
                               const newEndDate = new Date(originalEvent.end_date || originalEvent.endDate);
                               newEndDate.setDate(newEndDate.getDate() + dateDiff);
 
-                              // Update the event's dates
                               await updateEventDates(originalEvent, newStartDate, newEndDate);
                             }}
                             onMouseEnter={(e) => {
@@ -608,13 +675,15 @@ const Calendar = () => {
                               popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
                             }}
                             className={`
-                              text-xs p-1 rounded truncate relative cursor-move
+                              text-xs p-1 rounded truncate relative ${event.isHoliday ? 'cursor-default' : 'cursor-move'}
                               ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
                             `}
                           >
                             <div className="flex items-center justify-between">
                               <span className="truncate flex-1">{event.title}</span>
-                              {event.status && event.status !== 'Scheduled' && (
+                              {event.isHoliday ? (
+                                <span className="ml-1 text-[0.6rem] px-1 rounded bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200">Holiday</span>
+                              ) : event.status && event.status !== 'Scheduled' && (
                                 <span className={`
                                   ml-1 text-[0.6rem] px-1 rounded
                                   ${event.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : 
@@ -705,14 +774,27 @@ const Calendar = () => {
                   const dayOffset = index - currentDate.getDay();
                   date.setDate(currentDate.getDate() + dayOffset);
                   
-                  const dayEvents = events.filter(event => {
-                    const eventDate = new Date(event.date || event.start_date);
-                    return (
-                      eventDate.getDate() === date.getDate() &&
-                      eventDate.getMonth() === date.getMonth() &&
-                      eventDate.getFullYear() === date.getFullYear()
-                    );
-                  });
+                  const dayEvents = [
+                    ...holidays
+                      .filter(h => {
+                        const hDate = new Date(h.date + 'T00:00:00');
+                        return (
+                          hDate.getDate() === date.getDate() &&
+                          hDate.getMonth() === date.getMonth() &&
+                          hDate.getFullYear() === date.getFullYear()
+                        );
+                      })
+                      .filter(h => !isDateOccupiedByEvent(h.date))
+                      .map(h => holidayToEvent(h)),
+                    ...events.filter(event => {
+                      const eventDate = new Date(event.date || event.start_date);
+                      return (
+                        eventDate.getDate() === date.getDate() &&
+                        eventDate.getMonth() === date.getMonth() &&
+                        eventDate.getFullYear() === date.getFullYear()
+                      );
+                    })
+                  ];
                   
                   const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                   
@@ -779,9 +861,9 @@ const Calendar = () => {
                             key={idx}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEventClick(event);
+                              if (!event.isHoliday) handleEventClick(event);
                             }}
-                            draggable={view === 'month' || view === 'week'} // Enable dragging only in month and week views
+                            draggable={!event.isHoliday && (view === 'month' || view === 'week')}
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', JSON.stringify({
                                 eventId: event.id,
@@ -794,26 +876,23 @@ const Calendar = () => {
                               e.currentTarget.classList.remove('dragging');
                             }}
                             onDragOver={(e) => {
-                              e.preventDefault(); // Necessary to allow dropping
+                              e.preventDefault();
                             }}
                             onDrop={async (e) => {
                               e.preventDefault();
-                              if (view !== 'month' && view !== 'week') return; // Only for month and week views
+                              if (view !== 'month' && view !== 'week') return;
 
                               const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-                              if (dragData.eventId !== event.id) return; // Only process drop on the same event
+                              if (dragData.eventId !== event.id) return;
 
-                              // Calculate new date based on the day being dropped on
                               const newDate = new Date(date);
 
-                              // Get the original event from the state to get the full event object
                               const originalEvent = events.find(ev => ev.id === dragData.eventId);
                               if (!originalEvent) return;
 
-                              // Calculate new start and end dates based on the difference
                               const originalStartDate = new Date(dragData.originalStartDate);
                               const originalStartDay = new Date(originalStartDate.getFullYear(), originalStartDate.getMonth(), originalStartDate.getDate());
-                              const dateDiff = (newDate - originalStartDay) / (1000 * 60 * 60 * 24); // Difference in days
+                              const dateDiff = (newDate - originalStartDay) / (1000 * 60 * 60 * 24);
 
                               const newStartDate = new Date(originalEvent.start_date || originalEvent.startDate);
                               newStartDate.setDate(newStartDate.getDate() + dateDiff);
@@ -821,7 +900,6 @@ const Calendar = () => {
                               const newEndDate = new Date(originalEvent.end_date || originalEvent.endDate);
                               newEndDate.setDate(newEndDate.getDate() + dateDiff);
 
-                              // Update the event's dates
                               await updateEventDates(originalEvent, newStartDate, newEndDate);
                             }}
                             onMouseEnter={(e) => {
@@ -839,12 +917,14 @@ const Calendar = () => {
                               popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
                             }}
                             className={`
-                              text-xs p-2 rounded mb-1 cursor-move
+                              text-xs p-2 rounded mb-1 ${event.isHoliday ? 'cursor-default' : 'cursor-move'}
                               ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
                             `}
                           >
                             <div className="font-medium truncate">{event.title}</div>
-                            {event.status && event.status !== 'Scheduled' && (
+                            {event.isHoliday ? (
+                              <span className="text-[0.6rem] px-1 rounded bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200">Holiday</span>
+                            ) : event.status && event.status !== 'Scheduled' && (
                               <span className={`
                                 text-[0.6rem] px-1 rounded
                                 ${event.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : 
@@ -894,19 +974,35 @@ const Calendar = () => {
               </div>
               <div className="p-4 min-h-96">
                 <div className="space-y-2 overflow-y-auto max-h-96 scrollbar-hide">
-                  {events
-                    .filter(event => {
-                      const eventDate = new Date(event.date || event.start_date);
-                      return (
-                        eventDate.getDate() === currentDate.getDate() &&
-                        eventDate.getMonth() === currentDate.getMonth() &&
-                        eventDate.getFullYear() === currentDate.getFullYear()
-                      );
-                    })
-                    .map((event, idx) => (
+                  {(() => {
+                    const dayItems = [
+                      ...holidays
+                        .filter(h => {
+                          const hDate = new Date(h.date + 'T00:00:00');
+                          return (
+                            hDate.getDate() === currentDate.getDate() &&
+                            hDate.getMonth() === currentDate.getMonth() &&
+                            hDate.getFullYear() === currentDate.getFullYear()
+                          );
+                        })
+                        .filter(h => !isDateOccupiedByEvent(h.date))
+                        .map(h => holidayToEvent(h)),
+                      ...events.filter(event => {
+                        const eventDate = new Date(event.date || event.start_date);
+                        return (
+                          eventDate.getDate() === currentDate.getDate() &&
+                          eventDate.getMonth() === currentDate.getMonth() &&
+                          eventDate.getFullYear() === currentDate.getFullYear()
+                        );
+                      })
+                    ];
+
+                    return dayItems.length > 0 ? dayItems.map((event, idx) => (
                       <div
                         key={idx}
-                        onClick={() => handleEventClick(event)}
+                        onClick={() => {
+                          if (!event.isHoliday) handleEventClick(event);
+                        }}
                         onMouseEnter={(e) => {
                           if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
                           const popupWidth = 312;
@@ -922,39 +1018,36 @@ const Calendar = () => {
                           popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
                         }}
                         className={`
-                          p-3 rounded-lg cursor-pointer
+                          p-3 rounded-lg ${event.isHoliday ? 'cursor-default' : 'cursor-pointer'}
                           ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
                         `}
                       >
                         <div className="font-medium">{event.title}</div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-sm opacity-80">{event.category}</div>
-                          {event.status && event.status !== 'Scheduled' && (
-                            <span className={`
-                              text-xs px-2 py-0.5 rounded
-                              ${event.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : 
-                                event.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' : 
-                                event.status === 'Cancelled' ? 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200' : 
-                                'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'}
-                            `}>
-                              {event.status}
-                            </span>
-                          )}
-                        </div>
+                        {event.isHoliday ? (
+                          <div className="text-xs opacity-80 mt-1">Philippine Public Holiday</div>
+                        ) : (
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm opacity-80">{event.category}</div>
+                            {event.status && event.status !== 'Scheduled' && (
+                              <span className={`
+                                text-xs px-2 py-0.5 rounded
+                                ${event.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : 
+                                  event.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' : 
+                                  event.status === 'Cancelled' ? 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200' : 
+                                  'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'}
+                              `}>
+                                {event.status}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  {events.filter(event => {
-                    const eventDate = new Date(event.date || event.start_date);
-                    return (
-                      eventDate.getDate() === currentDate.getDate() &&
-                      eventDate.getMonth() === currentDate.getMonth() &&
-                      eventDate.getFullYear() === currentDate.getFullYear()
+                    )) : (
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        No events scheduled for today
+                      </div>
                     );
-                  }).length === 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No events scheduled for today
-                    </div>
-                  )}
+                  })()}
                 </div>
               </div>
             </div>
@@ -992,51 +1085,96 @@ const Calendar = () => {
             popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
           }}
         >
-          <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
-            {calendarEventPopup.event.title || 'Event Details'}
-          </div>
-          {calendarEventPopup.event.description && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
-              {calendarEventPopup.event.description}
-            </div>
+          {calendarEventPopup.event.isHoliday ? (
+            <>
+              <div className="flex items-center gap-2 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+                <span className="material-symbols-outlined text-red-500 text-sm">celebration</span>
+                <span className="font-semibold text-sm text-gray-900 dark:text-white">
+                  {calendarEventPopup.event.title}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Philippine Public Holiday
+              </div>
+              {calendarEventPopup.event.description && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
+                  {calendarEventPopup.event.description}
+                </div>
+              )}
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Date</span>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {calendarEventPopup.event.start_date?.slice(0, 10) || 'N/A'}
+                  </span>
+                </div>
+              </div>
+              {(() => {
+                const popupDate = calendarEventPopup.event.start_date?.slice(0, 10) || calendarEventPopup.event.date;
+                return !isDateOccupiedByEvent(popupDate);
+              })() && (
+                <button
+                  className="mt-2 w-full text-xs bg-blue-600 text-white rounded py-1.5 hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSaveHolidayAsEvent(calendarEventPopup.event);
+                    setCalendarEventPopup(null);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                  Save as Event
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+                {calendarEventPopup.event.title || 'Event Details'}
+              </div>
+              {calendarEventPopup.event.description && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
+                  {calendarEventPopup.event.description}
+                </div>
+              )}
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                    calendarEventPopup.event.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                    calendarEventPopup.event.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                    calendarEventPopup.event.status === 'Cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' :
+                    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
+                    {calendarEventPopup.event.status || 'Scheduled'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+                  <span className="text-gray-700 dark:text-gray-300">{calendarEventPopup.event.category || 'N/A'}</span>
+                </div>
+                {calendarEventPopup.event.event_type && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                    <span className="text-gray-700 dark:text-gray-300 capitalize">{calendarEventPopup.event.event_type}</span>
+                  </div>
+                )}
+                {calendarEventPopup.event.location && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Location</span>
+                    <span className="text-gray-700 dark:text-gray-300 truncate">{calendarEventPopup.event.location}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Start</span>
+                  <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.start_date || calendarEventPopup.event.startDate)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">End</span>
+                  <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.end_date || calendarEventPopup.event.endDate)}</span>
+                </div>
+              </div>
+            </>
           )}
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
-                calendarEventPopup.event.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                calendarEventPopup.event.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
-                calendarEventPopup.event.status === 'Cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' :
-                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-              }`}>
-                {calendarEventPopup.event.status || 'Scheduled'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
-              <span className="text-gray-700 dark:text-gray-300">{calendarEventPopup.event.category || 'N/A'}</span>
-            </div>
-            {calendarEventPopup.event.event_type && (
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
-                <span className="text-gray-700 dark:text-gray-300 capitalize">{calendarEventPopup.event.event_type}</span>
-              </div>
-            )}
-            {calendarEventPopup.event.location && (
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Location</span>
-                <span className="text-gray-700 dark:text-gray-300 truncate">{calendarEventPopup.event.location}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Start</span>
-              <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.start_date || calendarEventPopup.event.startDate)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">End</span>
-              <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.end_date || calendarEventPopup.event.endDate)}</span>
-            </div>
-          </div>
         </div>
       )}
     </div>
