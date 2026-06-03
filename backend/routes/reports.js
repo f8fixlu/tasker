@@ -155,6 +155,9 @@ async function handleGetTaskCompletionTrend(req, res, userId, query) {
     // Parse query parameters for date range
     const startDate = query.start_date ? new Date(query.start_date) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
     const endDate = query.end_date ? new Date(query.end_date) : new Date();
+    if (query.end_date) {
+      endDate.setHours(23, 59, 59, 999);
+    }
     
     // Get daily task completion counts within the date range
     const { getAll } = require('../utils/database');
@@ -393,29 +396,19 @@ async function handleGetTaskTypeSummary(req, res, userId, query) {
 
     // For the 'combined' grouping mode, group by task type with sub type breakdowns
     if (grouping === 'combined') {
-      // Get task type and sub type breakdowns - sum the quantity field and count the records
-      let sql = `
-        SELECT
-          tt.name as type_name,
-          tst.name as sub_type_name,
-          COALESCE(SUM(t.quantity), 0) as quantity,
-          COUNT(*) as record_count
-        FROM tasks t
-        LEFT JOIN task_types tt ON t.type_id = tt.id
-        LEFT JOIN task_sub_types tst ON t.sub_type_id = tst.id
-        WHERE t.user_id = ?
-      `;
-      const params = [userId];
+      // Build common WHERE conditions shared by aggregate and detail queries
+      let whereConditions = ['t.user_id = ?'];
+      let params = [userId];
 
       // Add date range filtering
       if (startDate && endDate) {
-        sql += ` AND (t.task_date >= ? AND t.task_date <= ?)`;
+        whereConditions.push('(t.task_date >= ? AND t.task_date <= ?)');
         params.push(startDate, endDate);
       } else if (startDate) {
-        sql += ` AND t.task_date >= ?`;
+        whereConditions.push('t.task_date >= ?');
         params.push(startDate);
       } else if (endDate) {
-        sql += ` AND t.task_date <= ?`;
+        whereConditions.push('t.task_date <= ?');
         params.push(endDate);
       }
 
@@ -456,25 +449,78 @@ async function handleGetTaskTypeSummary(req, res, userId, query) {
           // If we have matching categories, filter by them
           if (categoryIds.length > 0) {
             const placeholders = categoryIds.map(() => '?').join(',');
-            sql += ` AND t.category_id IN (${placeholders})`;
+            whereConditions.push(`t.category_id IN (${placeholders})`);
             params.push(...categoryIds);
           } else {
             // Check if all available categories are explicitly set to false
             const allFalse = categoryResults.every(cat => !selectedCategoryFilters[cat.name.toLowerCase()]);
             if (allFalse) {
-              // If all selected categories are false, we want no results
-              sql += ` AND 1 = 0`; // This ensures no records match
+              whereConditions.push('1 = 0'); // This ensures no records match
             }
           }
         }
       }
 
-      sql += ` GROUP BY COALESCE(tt.name, 'N/A'), COALESCE(tst.name, 'N/A') ORDER BY tt.name, tst.name`;
-      const taskTypeSubtypeBreakdown = await getAll(sql, params);
+      const whereClause = whereConditions.join(' AND ');
+
+      // Get task type and sub type breakdowns - sum the quantity field and count the records
+      const aggregateSql = `
+        SELECT
+          tt.name as type_name,
+          tst.name as sub_type_name,
+          COALESCE(SUM(t.quantity), 0) as quantity,
+          COUNT(*) as record_count
+        FROM tasks t
+        LEFT JOIN task_types tt ON t.type_id = tt.id
+        LEFT JOIN task_sub_types tst ON t.sub_type_id = tst.id
+        WHERE ${whereClause}
+        GROUP BY COALESCE(tt.name, 'N/A'), COALESCE(tst.name, 'N/A')
+        ORDER BY tt.name, tst.name
+      `;
+      const taskTypeSubtypeBreakdown = await getAll(aggregateSql, params);
+
+      // Get individual task details for hover popup
+      const detailsSql = `
+        SELECT
+          t.id,
+          t.title,
+          t.task_date,
+          t.status,
+          COALESCE(tt.name, 'N/A') as type_name,
+          COALESCE(tst.name, 'N/A') as sub_type_name
+        FROM tasks t
+        LEFT JOIN task_types tt ON t.type_id = tt.id
+        LEFT JOIN task_sub_types tst ON t.sub_type_id = tst.id
+        WHERE ${whereClause}
+        ORDER BY t.task_date DESC
+      `;
+      const taskDetails = await getAll(detailsSql, params);
+
+      // Group task details by type|sub_type key
+      const tasksByKey = {};
+      taskDetails.forEach(task => {
+        const key = `${task.type_name}|${task.sub_type_name}`;
+        if (!tasksByKey[key]) tasksByKey[key] = [];
+        tasksByKey[key].push({
+          id: task.id,
+          title: task.title,
+          date: task.task_date,
+          status: task.status
+        });
+      });
+
+      // Attach tasks to summary items
+      const summaryWithTasks = taskTypeSubtypeBreakdown.map(item => {
+        const key = `${item.type_name || 'N/A'}|${item.sub_type_name || 'N/A'}`;
+        return {
+          ...item,
+          tasks: tasksByKey[key] || []
+        };
+      });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
-        taskTypeSummary: taskTypeSubtypeBreakdown
+        taskTypeSummary: summaryWithTasks
       }));
     } else if (grouping === 'type') {
       // Group only by task type (sum sub types)
@@ -668,29 +714,19 @@ async function handleGetEventSummary(req, res, userId, query) {
 
     const { getAll } = require('../utils/database');
 
-    // Get event category and event type breakdowns - count the records
-    let sql = `
-      SELECT
-        ec.name as category_name,
-        et.name as type_name,
-        COUNT(*) as quantity,
-        COUNT(*) as record_count
-      FROM events e
-      LEFT JOIN event_categories ec ON e.category_id = ec.id
-      LEFT JOIN event_types et ON e.event_type_id = et.id
-      WHERE e.user_id = ?
-    `;
+    // Build WHERE conditions
+    const whereConditions = ['e.user_id = ?'];
     const params = [userId];
 
     // Add date range filtering - only filter by start_date since that's what we use in the event model
     if (startDate && endDate) {
-      sql += ` AND (DATE(e.start_date, 'localtime') >= DATE(?, 'localtime') AND DATE(e.start_date, 'localtime') <= DATE(?, 'localtime'))`;
+      whereConditions.push(`(DATE(e.start_date, 'localtime') >= DATE(?, 'localtime') AND DATE(e.start_date, 'localtime') <= DATE(?, 'localtime'))`);
       params.push(startDate, endDate);
     } else if (startDate) {
-      sql += ` AND DATE(e.start_date, 'localtime') >= DATE(?, 'localtime')`;
+      whereConditions.push(`DATE(e.start_date, 'localtime') >= DATE(?, 'localtime')`);
       params.push(startDate);
     } else if (endDate) {
-      sql += ` AND DATE(e.start_date, 'localtime') <= DATE(?, 'localtime')`;
+      whereConditions.push(`DATE(e.start_date, 'localtime') <= DATE(?, 'localtime')`);
       params.push(endDate);
     }
 
@@ -731,21 +767,71 @@ async function handleGetEventSummary(req, res, userId, query) {
         // If we have matching categories, filter by them
         if (categoryIds.length > 0) {
           const placeholders = categoryIds.map(() => '?').join(',');
-          sql += ` AND e.category_id IN (${placeholders})`;
+          whereConditions.push(`e.category_id IN (${placeholders})`);
           params.push(...categoryIds);
         } else {
           // Check if all available categories are explicitly set to false
           const allFalse = categoryResults.every(cat => !selectedCategoryFilters[cat.name.toLowerCase()]);
           if (allFalse) {
             // If all selected categories are false, we want no results
-            sql += ` AND 1 = 0`; // This ensures no records match
+            whereConditions.push('1 = 0'); // This ensures no records match
           }
         }
       }
     }
 
-    sql += ` GROUP BY COALESCE(ec.name, 'N/A'), COALESCE(et.name, 'N/A') ORDER BY ec.name, et.name`;
-    const eventSummary = await getAll(sql, params);
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get event category and event type breakdowns - count the records
+    const aggregateSql = `
+      SELECT
+        ec.name as category_name,
+        et.name as type_name,
+        COUNT(*) as quantity,
+        COUNT(*) as record_count
+      FROM events e
+      LEFT JOIN event_categories ec ON e.category_id = ec.id
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      WHERE ${whereClause}
+      GROUP BY COALESCE(ec.name, 'N/A'), COALESCE(et.name, 'N/A')
+      ORDER BY ec.name, et.name
+    `;
+    const eventSummary = await getAll(aggregateSql, params);
+
+    // Get individual event details for hover popup using the same filters
+    const detailsSql = `
+      SELECT
+        e.id,
+        e.title,
+        e.description,
+        e.start_date,
+        e.end_date,
+        e.status,
+        e.color_class,
+        e.location,
+        COALESCE(ec.name, 'N/A') as category_name,
+        COALESCE(et.name, 'N/A') as type_name
+      FROM events e
+      LEFT JOIN event_categories ec ON e.category_id = ec.id
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      WHERE ${whereClause}
+      ORDER BY ec.name, et.name, e.start_date
+    `;
+    const eventDetails = await getAll(detailsSql, params);
+
+    // Attach event details to each summary row
+    const summaryMap = {};
+    eventSummary.forEach(row => {
+      const key = `${row.category_name}|${row.type_name}`;
+      summaryMap[key] = row;
+      row.events = [];
+    });
+    eventDetails.forEach(detail => {
+      const key = `${detail.category_name}|${detail.type_name}`;
+      if (summaryMap[key]) {
+        summaryMap[key].events.push(detail);
+      }
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

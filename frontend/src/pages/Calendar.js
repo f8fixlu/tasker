@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Button from '../components/common/Button';
 import NewEventModal from '../components/modals/NewEventModal';
 import ViewEventModal from '../components/modals/ViewEventModal';
@@ -36,6 +36,8 @@ const Calendar = () => {
   const [loading, setLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [newEventPrefillData, setNewEventPrefillData] = useState({});
+  const [calendarEventPopup, setCalendarEventPopup] = useState(null);
+  const popupTimeoutRef = useRef(null);
 
   const { updateTrigger: taskUpdateTrigger, triggerTaskUpdate, dropdownUpdateTrigger } = useTaskUpdate();
   const { fetchNotifications } = useNotifications();
@@ -56,6 +58,13 @@ const Calendar = () => {
         setInitialLoadComplete(true);
       }
     }
+  };
+
+  const formatDateOnly = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // Effect to load events when component mounts
@@ -584,6 +593,20 @@ const Calendar = () => {
                               // Update the event's dates
                               await updateEventDates(originalEvent, newStartDate, newEndDate);
                             }}
+                            onMouseEnter={(e) => {
+                              if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
+                              const popupWidth = 312;
+                              const estimatedHeight = 300;
+                              const gap = 4;
+                              const spaceRight = window.innerWidth - e.clientX;
+                              const spaceBelow = window.innerHeight - e.clientY;
+                              const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+                              const showAbove = spaceBelow < estimatedHeight + gap;
+                              setCalendarEventPopup({ event, x, showAbove, cursorY: e.clientY });
+                            }}
+                            onMouseLeave={() => {
+                              popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
+                            }}
                             className={`
                               text-xs p-1 rounded truncate relative cursor-move
                               ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
@@ -801,6 +824,20 @@ const Calendar = () => {
                               // Update the event's dates
                               await updateEventDates(originalEvent, newStartDate, newEndDate);
                             }}
+                            onMouseEnter={(e) => {
+                              if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
+                              const popupWidth = 312;
+                              const estimatedHeight = 300;
+                              const gap = 4;
+                              const spaceRight = window.innerWidth - e.clientX;
+                              const spaceBelow = window.innerHeight - e.clientY;
+                              const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+                              const showAbove = spaceBelow < estimatedHeight + gap;
+                              setCalendarEventPopup({ event, x, showAbove, cursorY: e.clientY });
+                            }}
+                            onMouseLeave={() => {
+                              popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
+                            }}
                             className={`
                               text-xs p-2 rounded mb-1 cursor-move
                               ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
@@ -870,6 +907,20 @@ const Calendar = () => {
                       <div
                         key={idx}
                         onClick={() => handleEventClick(event)}
+                        onMouseEnter={(e) => {
+                          if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
+                          const popupWidth = 312;
+                          const estimatedHeight = 300;
+                          const gap = 4;
+                          const spaceRight = window.innerWidth - e.clientX;
+                          const spaceBelow = window.innerHeight - e.clientY;
+                          const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+                          const showAbove = spaceBelow < estimatedHeight + gap;
+                          setCalendarEventPopup({ event, x, showAbove, cursorY: e.clientY });
+                        }}
+                        onMouseLeave={() => {
+                          popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
+                        }}
                         className={`
                           p-3 rounded-lg cursor-pointer
                           ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
@@ -929,6 +980,65 @@ const Calendar = () => {
         }}
       />
       
+      {/* Event hover popup */}
+      {calendarEventPopup && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[300px]"
+          style={{ left: calendarEventPopup.x, ...(calendarEventPopup.showAbove ? { bottom: window.innerHeight - calendarEventPopup.cursorY + 4 } : { top: calendarEventPopup.cursorY + 4 }) }}
+          onMouseEnter={() => {
+            if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
+          }}
+          onMouseLeave={() => {
+            popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
+          }}
+        >
+          <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+            {calendarEventPopup.event.title || 'Event Details'}
+          </div>
+          {calendarEventPopup.event.description && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
+              {calendarEventPopup.event.description}
+            </div>
+          )}
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                calendarEventPopup.event.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                calendarEventPopup.event.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                calendarEventPopup.event.status === 'Cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' :
+                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              }`}>
+                {calendarEventPopup.event.status || 'Scheduled'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+              <span className="text-gray-700 dark:text-gray-300">{calendarEventPopup.event.category || 'N/A'}</span>
+            </div>
+            {calendarEventPopup.event.event_type && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                <span className="text-gray-700 dark:text-gray-300 capitalize">{calendarEventPopup.event.event_type}</span>
+              </div>
+            )}
+            {calendarEventPopup.event.location && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Location</span>
+                <span className="text-gray-700 dark:text-gray-300 truncate">{calendarEventPopup.event.location}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Start</span>
+              <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.start_date || calendarEventPopup.event.startDate)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">End</span>
+              <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(calendarEventPopup.event.end_date || calendarEventPopup.event.endDate)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

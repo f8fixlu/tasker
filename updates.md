@@ -384,3 +384,61 @@
 - Signatories now appear correctly in report preview on new browsers
 - No need to save changes in Settings modal to display signatories
 - Users always see the most current signatory data from the database
+
+---
+
+## Task Completion Rate Chart End Date Bug Fix
+
+### Issue
+- Task Completion Rate chart in Performance Overview showed zero data for the end date
+- Start date data displayed correctly
+- Tasks completed on the last day of the selected date range were excluded
+
+### Root Cause
+- `handleGetTaskCompletionTrend` set the end date to midnight (start of day), e.g. `2026-06-03T00:00:00.000Z`
+- SQL condition `task_date <= ?` excluded any task completed after midnight on the end date
+- Other date-range handlers in the same file correctly extended the end date to `23:59:59.999`
+
+### Fix
+- Added `endDate.setHours(23, 59, 59, 999)` when a query end date is provided
+- SQL boundary now becomes `task_date <= '2026-06-03T23:59:59.999Z'`, including all tasks on the end date
+- Date range generation loop still works correctly since midnight start-of-day is still `<=` end-of-day
+
+### Files Modified
+- `backend/routes/reports.js`: Added end-of-day extension in `handleGetTaskCompletionTrend` (line 158-160)
+
+---
+
+## Consolidated Tasks Hover Popup
+
+### Added Task Detail Popup on Hover
+- Added hover popup to sub-type rows in the Consolidated Tasks section
+- Hovering over a sub-type (e.g., "Phone Call (3)") now shows a popup with individual task details
+- Popup displays each task's title, date, and status badge
+
+### Implementation
+- **Backend (`backend/routes/reports.js`)**:
+  - Refactored `handleGetTaskTypeSummary` to build shareable WHERE conditions
+  - Added a second query to fetch individual task details (id, title, date, status) per type/sub_type
+  - Groups task details by type_name|sub_type_name key
+  - Attaches `tasks` array to each summary item in the response
+
+- **Frontend (`frontend/src/pages/Reports.js`)**:
+  - Added `taskPopup` state and `taskPopupTimeoutRef` for hover management
+  - Updated consolidation logic to merge `tasks` arrays from backend response
+  - Added `onMouseEnter`/`onMouseLeave` handlers on sub-type rows with 250ms hide delay
+  - Popup includes viewport boundary detection (positions above if not enough room below)
+  - Shows task title (truncated), formatted date, and color-coded status badge
+  - Popup scrolls with `max-h-48` when many tasks are present
+  - Popup stays open when moving mouse from row to popup (timeout-based approach)
+
+### User Experience
+- Hover any sub-type row in a Consolidated Tasks card to see individual tasks
+- Status badges color-coded: green for Completed, blue for In Progress, yellow for Pending
+- Dates shown in compact format (e.g., "Jun 3")
+- Popup automatically repositions if near bottom of viewport
+- Smooth hide delay prevents popup flickering when moving between rows
+
+### Files Modified
+- `backend/routes/reports.js`: Refactored combined grouping query, added individual task details query, attached `tasks` to response
+- `frontend/src/pages/Reports.js`: Added popup state/ref, updated consolidation logic, added hover handlers and popup rendering

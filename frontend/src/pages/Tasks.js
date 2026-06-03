@@ -409,6 +409,9 @@ const Option2Tasks = () => {
   const { updateTrigger: taskUpdateTrigger, triggerTaskUpdate, dropdownUpdateTrigger } = useTaskUpdate();
 
   const [tasks, setTasks] = useState([]);
+  const [cellPopup, setCellPopup] = useState(null);
+  const cellPopupTimeoutRef = useRef(null);
+
   const [searchTerm, setSearchTerm] = useState('');
 
   // Initialize filters from URL parameters if window is available
@@ -738,16 +741,25 @@ const Option2Tasks = () => {
       className: 'px-1 sm:px-2 py-3 min-w-[120px] max-[768px]:min-w-[100px] max-[781px]:px-0',
       width: '40%',
       render: (v, task) => (
-        <Tooltip content={task.description || 'No description provided'} position="top">
-          <div className="flex items-center gap-2">
-            <span
-              className="cursor-default truncate max-[768px]:truncate-none max-[768px]:whitespace-normal max-[768px]:break-words"
-              title={task.title || 'N/A'}
-            >
-              {task.title || 'N/A'}
-            </span>
-          </div>
-        </Tooltip>
+        <span
+          className="cursor-pointer truncate max-[768px]:truncate-none max-[768px]:whitespace-normal max-[768px]:break-words hover:text-blue-600 dark:hover:text-blue-400"
+          onMouseEnter={(e) => {
+            if (cellPopupTimeoutRef.current) clearTimeout(cellPopupTimeoutRef.current);
+            const popupWidth = 280;
+            const estimatedHeight = 300;
+            const gap = 4;
+            const spaceRight = window.innerWidth - e.clientX;
+            const spaceBelow = window.innerHeight - e.clientY;
+            const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+            const showAbove = spaceBelow < estimatedHeight + gap;
+            setCellPopup({ task, x, showAbove, cursorY: e.clientY });
+          }}
+          onMouseLeave={() => {
+            cellPopupTimeoutRef.current = setTimeout(() => setCellPopup(null), 250);
+          }}
+        >
+          {task.title || 'N/A'}
+        </span>
       )
     },
     {
@@ -1963,6 +1975,78 @@ const Option2Tasks = () => {
 
           <div className="flex-1 overflow-auto bg-gray-800 text-white">
             {renderPreviewContent(previewAttachment)}
+          </div>
+        </div>
+      )}
+
+      {/* Task title hover popup */}
+      {cellPopup && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[300px]"
+          style={{ left: cellPopup.x, ...(cellPopup.showAbove ? { bottom: window.innerHeight - cellPopup.cursorY + 4 } : { top: cellPopup.cursorY + 4 }) }}
+          onMouseEnter={() => {
+            if (cellPopupTimeoutRef.current) clearTimeout(cellPopupTimeoutRef.current);
+          }}
+          onMouseLeave={() => {
+            cellPopupTimeoutRef.current = setTimeout(() => setCellPopup(null), 250);
+          }}
+        >
+          <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+            {cellPopup.task.title || 'Task Details'}
+          </div>
+          {cellPopup.task.description && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
+              {cellPopup.task.description}
+            </div>
+          )}
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                cellPopup.task.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                cellPopup.task.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                cellPopup.task.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                cellPopup.task.status === 'Overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              }`}>
+                {cellPopup.task.status || 'N/A'}
+              </span>
+            </div>
+            {(cellPopup.task.type_name || cellPopup.task.sub_type_name) && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                <span className="text-gray-700 dark:text-gray-300 truncate">
+                  {[cellPopup.task.type_name, cellPopup.task.sub_type_name].filter(Boolean).join(' / ')}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Priority</span>
+              <span className={`font-medium ${
+                cellPopup.task.priority === 'High' ? 'text-red-600 dark:text-red-400' :
+                cellPopup.task.priority === 'Medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                cellPopup.task.priority === 'Low' ? 'text-green-600 dark:text-green-400' :
+                'text-gray-600 dark:text-gray-400'
+              }`}>
+                {cellPopup.task.priority || 'N/A'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+              <span className="text-gray-700 dark:text-gray-300">{cellPopup.task.category_name || 'N/A'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Task Date</span>
+              <span className="text-gray-700 dark:text-gray-300">
+                {cellPopup.task.task_date ? formatDateOnly(cellPopup.task.task_date) : 'N/A'}
+              </span>
+            </div>
+            {cellPopup.task.due_date && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Due Date</span>
+                <span className="text-gray-700 dark:text-gray-300">{formatDateOnly(cellPopup.task.due_date)}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -115,6 +115,10 @@ const Reports = () => {
   const [taskTypeSummaryError, setTaskTypeSummaryError] = useState(null);
   const [taskTypeGrouping, setTaskTypeGrouping] = useState('combined'); // only 'combined' available now
 
+  // State for task hover popup
+  const [taskPopup, setTaskPopup] = useState(null);
+  const taskPopupTimeoutRef = useRef(null);
+
   // State for event summary
   const [eventSummary, setEventSummary] = useState([]);
   const [eventSummaryLoading, setEventSummaryLoading] = useState(false);
@@ -1029,6 +1033,12 @@ const Reports = () => {
   const [sidebarTaskListTotal, setSidebarTaskListTotal] = useState(0);
   const [sidebarTaskListLoadingMore, setSidebarTaskListLoadingMore] = useState(false);
   const taskListContainerRef = useRef(null);
+  const [sidebarTaskPopup, setSidebarTaskPopup] = useState(null);
+  const sidebarTaskPopupTimeoutRef = useRef(null);
+  const [sidebarEventPopup, setSidebarEventPopup] = useState(null);
+  const sidebarEventPopupTimeoutRef = useRef(null);
+  const [consolidatedEventPopup, setConsolidatedEventPopup] = useState(null);
+  const consolidatedEventPopupTimeoutRef = useRef(null);
 
   // Fetch task completion trend data
   const fetchTaskCompletionTrend = async () => {
@@ -2491,7 +2501,32 @@ const generatePDF = async () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {sidebarTaskList.map((task, index) => (
-                        <tr key={task.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                        <tr
+                          key={task.id || index}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 cursor-pointer"
+                          onMouseEnter={(e) => {
+                            if (sidebarTaskPopupTimeoutRef.current) clearTimeout(sidebarTaskPopupTimeoutRef.current);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const popupWidth = 280;
+                            const estimatedHeight = 300;
+                            const gap = 4;
+                            const spaceRight = window.innerWidth - e.clientX;
+                            const spaceBelow = window.innerHeight - e.clientY;
+                            const x = spaceRight >= popupWidth + 12
+                              ? e.clientX + 12
+                              : e.clientX - popupWidth - 12;
+                            const showAbove = spaceBelow < estimatedHeight + gap;
+                            setSidebarTaskPopup({
+                              task,
+                              x,
+                              showAbove,
+                              cursorY: e.clientY
+                            });
+                          }}
+                          onMouseLeave={() => {
+                            sidebarTaskPopupTimeoutRef.current = setTimeout(() => setSidebarTaskPopup(null), 250);
+                          }}
+                        >
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {task.task_date ? formatToLocalDateTime(task.task_date).split(',')[0] : (task.created_date ? formatToLocalDateTime(task.created_date).split(',')[0] : 'N/A')}
                           </td>
@@ -2556,7 +2591,32 @@ const generatePDF = async () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {sidebarEventList.map((event, index) => (
-                        <tr key={event.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                        <tr
+                          key={event.id || index}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 cursor-pointer"
+                          onMouseEnter={(e) => {
+                            if (sidebarEventPopupTimeoutRef.current) clearTimeout(sidebarEventPopupTimeoutRef.current);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const popupWidth = 280;
+                            const estimatedHeight = 300;
+                            const gap = 4;
+                            const spaceRight = window.innerWidth - e.clientX;
+                            const spaceBelow = window.innerHeight - e.clientY;
+                            const x = spaceRight >= popupWidth + 12
+                              ? e.clientX + 12
+                              : e.clientX - popupWidth - 12;
+                            const showAbove = spaceBelow < estimatedHeight + gap;
+                            setSidebarEventPopup({
+                              event,
+                              x,
+                              showAbove,
+                              cursorY: e.clientY
+                            });
+                          }}
+                          onMouseLeave={() => {
+                            sidebarEventPopupTimeoutRef.current = setTimeout(() => setSidebarEventPopup(null), 250);
+                          }}
+                        >
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {event.start_date ? formatToLocalDateTime(event.start_date).split(',')[0] : (event.created_at ? formatToLocalDateTime(event.created_at).split(',')[0] : 'N/A')}
                           </td>
@@ -2642,16 +2702,19 @@ const generatePDF = async () => {
                 // Convert grouped data to cards - one card per task type showing all its sub types with consolidated quantities
                 const cards = [];
                 Object.entries(groupedData).forEach(([taskType, subTypes]) => {
-                  // Consolidate quantities and record counts for the same sub type under each task type
+                  // Consolidate quantities, record counts, and task details for the same sub type under each task type
                   const consolidatedSubTypes = {};
                   let totalQuantity = 0; // Track total quantity for this task type
                   subTypes.forEach(item => {
                     const subType = item.sub_type_name || 'N/A';
                     if (!consolidatedSubTypes[subType]) {
-                      consolidatedSubTypes[subType] = { quantity: 0, record_count: 0 };
+                      consolidatedSubTypes[subType] = { quantity: 0, record_count: 0, tasks: [] };
                     }
                     consolidatedSubTypes[subType].quantity += item.quantity || 0;
                     consolidatedSubTypes[subType].record_count += item.record_count || 0;
+                    if (item.tasks && Array.isArray(item.tasks)) {
+                      consolidatedSubTypes[subType].tasks.push(...item.tasks);
+                    }
                     totalQuantity += item.quantity || 0;
                   });
 
@@ -2665,7 +2728,32 @@ const generatePDF = async () => {
                       </div>
                       <div className="space-y-1">
                         {Object.entries(consolidatedSubTypes).map(([subType, data], idx) => (
-                          <div key={idx} className="flex justify-between text-xs">
+                          <div
+                            key={idx}
+                            className="flex justify-between text-xs cursor-pointer rounded px-1 -mx-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onMouseEnter={(e) => {
+                              if (taskPopupTimeoutRef.current) clearTimeout(taskPopupTimeoutRef.current);
+                              const popupWidth = 280;
+                              const estimatedHeight = 300;
+                              const gap = 4;
+                              const spaceRight = window.innerWidth - e.clientX;
+                              const spaceBelow = window.innerHeight - e.clientY;
+                              const x = spaceRight >= popupWidth + 12
+                                ? e.clientX + 12
+                                : e.clientX - popupWidth - 12;
+                              const showAbove = spaceBelow < estimatedHeight + gap;
+                              setTaskPopup({
+                                subType,
+                                tasks: data.tasks || [],
+                                x,
+                                showAbove,
+                                cursorY: e.clientY
+                              });
+                            }}
+                            onMouseLeave={() => {
+                              taskPopupTimeoutRef.current = setTimeout(() => setTaskPopup(null), 250);
+                            }}
+                          >
                             <span className="text-gray-700 dark:text-gray-300 truncate max-w-[60%]">
                               {subType} ({data.record_count})
                             </span>
@@ -2693,6 +2781,235 @@ const generatePDF = async () => {
             </div>
           )}
         </div>
+
+        {/* Task hover popup */}
+        {taskPopup && (
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[320px]"
+            style={{ left: taskPopup.x, ...(taskPopup.showAbove ? { bottom: window.innerHeight - taskPopup.cursorY + 4 } : { top: taskPopup.cursorY + 4 }) }}
+            onMouseEnter={() => {
+              if (taskPopupTimeoutRef.current) clearTimeout(taskPopupTimeoutRef.current);
+            }}
+            onMouseLeave={() => {
+              taskPopupTimeoutRef.current = setTimeout(() => setTaskPopup(null), 250);
+            }}
+          >
+            <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+              {taskPopup.subType} ({taskPopup.tasks.length})
+            </div>
+            <div className="max-h-48 overflow-y-auto scrollbar-hide space-y-1.5">
+              {taskPopup.tasks.length > 0 ? (
+                taskPopup.tasks.map((task) => (
+                  <div key={task.id} className="text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-[14px] mt-0.5 text-gray-400">task_alt</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white truncate">{task.title}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            {task.date ? formatToLocalDateTime(task.date).split(',')[0] : 'N/A'}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                            task.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                            task.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                            'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {task.status || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
+                  No task details available
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Sidebar task hover popup */}
+        {sidebarTaskPopup && (
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[300px]"
+            style={{ left: sidebarTaskPopup.x, ...(sidebarTaskPopup.showAbove ? { bottom: window.innerHeight - sidebarTaskPopup.cursorY + 4 } : { top: sidebarTaskPopup.cursorY + 4 }) }}
+            onMouseEnter={() => {
+              if (sidebarTaskPopupTimeoutRef.current) clearTimeout(sidebarTaskPopupTimeoutRef.current);
+            }}
+            onMouseLeave={() => {
+              sidebarTaskPopupTimeoutRef.current = setTimeout(() => setSidebarTaskPopup(null), 250);
+            }}
+          >
+            <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+              {sidebarTaskPopup.task.title || 'Task Details'}
+            </div>
+            {sidebarTaskPopup.task.description && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">
+                {sidebarTaskPopup.task.description}
+              </div>
+            )}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                  sidebarTaskPopup.task.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                  sidebarTaskPopup.task.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                  sidebarTaskPopup.task.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                  sidebarTaskPopup.task.status === 'Overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                  'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}>
+                  {sidebarTaskPopup.task.status || 'N/A'}
+                </span>
+              </div>
+              {(sidebarTaskPopup.task.type_name || sidebarTaskPopup.task.sub_type_name) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                  <span className="text-gray-700 dark:text-gray-300 truncate">
+                    {[sidebarTaskPopup.task.type_name, sidebarTaskPopup.task.sub_type_name].filter(Boolean).join(' / ')}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Priority</span>
+                <span className={`font-medium ${
+                  sidebarTaskPopup.task.priority === 'High' ? 'text-red-600 dark:text-red-400' :
+                  sidebarTaskPopup.task.priority === 'Medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                  sidebarTaskPopup.task.priority === 'Low' ? 'text-green-600 dark:text-green-400' :
+                  'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {sidebarTaskPopup.task.priority || 'N/A'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+                <span className="text-gray-700 dark:text-gray-300">{sidebarTaskPopup.task.category_name || 'N/A'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Date</span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  {sidebarTaskPopup.task.task_date ? formatToLocalDateTime(sidebarTaskPopup.task.task_date).split(',')[0] : 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sidebar event hover popup */}
+        {sidebarEventPopup && (
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[300px]"
+            style={{ left: sidebarEventPopup.x, ...(sidebarEventPopup.showAbove ? { bottom: window.innerHeight - sidebarEventPopup.cursorY + 4 } : { top: sidebarEventPopup.cursorY + 4 }) }}
+            onMouseEnter={() => {
+              if (sidebarEventPopupTimeoutRef.current) clearTimeout(sidebarEventPopupTimeoutRef.current);
+            }}
+            onMouseLeave={() => {
+              sidebarEventPopupTimeoutRef.current = setTimeout(() => setSidebarEventPopup(null), 250);
+            }}
+          >
+            <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+              {sidebarEventPopup.event.title || 'Event Details'}
+            </div>
+            {sidebarEventPopup.event.description && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">
+                {sidebarEventPopup.event.description}
+              </div>
+            )}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                <span className="text-gray-700 dark:text-gray-300">{sidebarEventPopup.event.event_type || sidebarEventPopup.event.event_type_name || 'N/A'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+                <span className="text-gray-700 dark:text-gray-300">{sidebarEventPopup.event.category || sidebarEventPopup.event.category_name || 'N/A'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                  sidebarEventPopup.event.status === 'Ongoing' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                  sidebarEventPopup.event.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                  sidebarEventPopup.event.status === 'Cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                  sidebarEventPopup.event.status === 'Upcoming' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                  'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                }`}>
+                  {sidebarEventPopup.event.status || 'N/A'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Start</span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  {sidebarEventPopup.event.start_date ? formatToLocalDateTime(sidebarEventPopup.event.start_date) : 'N/A'}
+                </span>
+              </div>
+              {sidebarEventPopup.event.end_date && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">End</span>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {formatToLocalDateTime(sidebarEventPopup.event.end_date)}
+                  </span>
+                </div>
+              )}
+              {sidebarEventPopup.event.location && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Location</span>
+                  <span className="text-gray-700 dark:text-gray-300">{sidebarEventPopup.event.location}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Consolidated event hover popup */}
+        {consolidatedEventPopup && (
+          <div
+            className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[320px]"
+            style={{ left: consolidatedEventPopup.x, ...(consolidatedEventPopup.showAbove ? { bottom: window.innerHeight - consolidatedEventPopup.cursorY + 4 } : { top: consolidatedEventPopup.cursorY + 4 }) }}
+            onMouseEnter={() => {
+              if (consolidatedEventPopupTimeoutRef.current) clearTimeout(consolidatedEventPopupTimeoutRef.current);
+            }}
+            onMouseLeave={() => {
+              consolidatedEventPopupTimeoutRef.current = setTimeout(() => setConsolidatedEventPopup(null), 250);
+            }}
+          >
+            <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+              {consolidatedEventPopup.eventType} ({consolidatedEventPopup.events.length})
+            </div>
+            <div className="max-h-48 overflow-y-auto scrollbar-hide space-y-1.5">
+              {consolidatedEventPopup.events.length > 0 ? (
+                consolidatedEventPopup.events.map((event) => (
+                  <div key={event.id} className="text-xs text-gray-700 dark:text-gray-300">
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-[14px] mt-0.5 text-gray-400">event</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white truncate">{event.title}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            {event.start_date ? formatToLocalDateTime(event.start_date).split(',')[0] : 'N/A'}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                            event.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                            event.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                            event.status === 'Cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' :
+                            'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                          }`}>
+                            {event.status || 'Scheduled'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
+                  No event details available
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Consolidated Events Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
@@ -2755,10 +3072,13 @@ const generatePDF = async () => {
                   eventTypes.forEach(item => {
                     const eventType = item.type_name || 'N/A';
                     if (!consolidatedEventTypes[eventType]) {
-                      consolidatedEventTypes[eventType] = { quantity: 0, record_count: 0 };
+                      consolidatedEventTypes[eventType] = { quantity: 0, record_count: 0, events: [] };
                     }
                     consolidatedEventTypes[eventType].quantity += item.quantity || 0;
                     consolidatedEventTypes[eventType].record_count += item.record_count || 0;
+                    if (item.events && item.events.length > 0) {
+                      consolidatedEventTypes[eventType].events.push(...item.events);
+                    }
                     totalQuantity += item.quantity || 0;
                   });
 
@@ -2772,7 +3092,32 @@ const generatePDF = async () => {
                       </div>
                       <div className="space-y-1">
                         {Object.entries(consolidatedEventTypes).map(([eventType, data], idx) => (
-                          <div key={idx} className="flex justify-between text-xs">
+                          <div
+                            key={idx}
+                            className="flex justify-between text-xs cursor-pointer rounded px-1 -mx-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onMouseEnter={(e) => {
+                              if (consolidatedEventPopupTimeoutRef.current) clearTimeout(consolidatedEventPopupTimeoutRef.current);
+                              const popupWidth = 280;
+                              const estimatedHeight = 300;
+                              const gap = 4;
+                              const spaceRight = window.innerWidth - e.clientX;
+                              const spaceBelow = window.innerHeight - e.clientY;
+                              const x = spaceRight >= popupWidth + 12
+                                ? e.clientX + 12
+                                : e.clientX - popupWidth - 12;
+                              const showAbove = spaceBelow < estimatedHeight + gap;
+                              setConsolidatedEventPopup({
+                                eventType,
+                                events: data.events || [],
+                                quantity: data.quantity,
+                                x,
+                                showAbove,
+                                cursorY: e.clientY
+                              });
+                            }}
+                            onMouseLeave={() => {
+                              consolidatedEventPopupTimeoutRef.current = setTimeout(() => setConsolidatedEventPopup(null), 250);
+                            }}>
                             <span className="text-gray-700 dark:text-gray-300 truncate max-w-[60%]">
                               {eventType}
                             </span>

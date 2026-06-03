@@ -54,6 +54,8 @@ const Dashboard = () => {
     eventsThisMonth: 0
   });
   const [recentTasks, setRecentTasks] = useState([]);
+  const [dashboardTaskPopup, setDashboardTaskPopup] = useState(null);
+  const dashboardTaskPopupTimeoutRef = useRef(null);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
   const [loading, setLoading] = useState(false); // Changed to false since we're using progressive loading
@@ -340,9 +342,25 @@ const Dashboard = () => {
     return recentTasks.map((task) => (
       <tr key={task.id} className="border-b border-border-light dark:border-border-dark hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
         <td className="py-3 px-3 sm:px-4 text-text-light dark:text-text-dark">
-          <Tooltip content={task.description || 'No description provided'} position="top">
-            <span className="cursor-default">{truncateText(task.taskName, 30)}</span>
-          </Tooltip>
+          <span
+            className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+            onMouseEnter={(e) => {
+              if (dashboardTaskPopupTimeoutRef.current) clearTimeout(dashboardTaskPopupTimeoutRef.current);
+              const popupWidth = 280;
+              const estimatedHeight = 300;
+              const gap = 4;
+              const spaceRight = window.innerWidth - e.clientX;
+              const spaceBelow = window.innerHeight - e.clientY;
+              const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+              const showAbove = spaceBelow < estimatedHeight + gap;
+              setDashboardTaskPopup({ task, x, showAbove, cursorY: e.clientY });
+            }}
+            onMouseLeave={() => {
+              dashboardTaskPopupTimeoutRef.current = setTimeout(() => setDashboardTaskPopup(null), 250);
+            }}
+          >
+            {truncateText(task.taskName, 30)}
+          </span>
         </td>
         <td className="py-3 px-3 sm:px-4 text-text-light dark:text-text-dark">{task.category || 'N/A'}</td>
         <td className="py-3 px-3 sm:px-4">
@@ -1087,6 +1105,71 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Dashboard recent tasks hover popup */}
+      {dashboardTaskPopup && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 min-w-[240px] max-w-[300px]"
+          style={{ left: dashboardTaskPopup.x, ...(dashboardTaskPopup.showAbove ? { bottom: window.innerHeight - dashboardTaskPopup.cursorY + 4 } : { top: dashboardTaskPopup.cursorY + 4 }) }}
+          onMouseEnter={() => {
+            if (dashboardTaskPopupTimeoutRef.current) clearTimeout(dashboardTaskPopupTimeoutRef.current);
+          }}
+          onMouseLeave={() => {
+            dashboardTaskPopupTimeoutRef.current = setTimeout(() => setDashboardTaskPopup(null), 250);
+          }}
+        >
+          <div className="font-semibold text-sm text-gray-900 dark:text-white mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
+            {dashboardTaskPopup.task.title || 'Task Details'}
+          </div>
+          {dashboardTaskPopup.task.description && dashboardTaskPopup.task.description !== 'No description provided' && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-3">
+              {dashboardTaskPopup.task.description}
+            </div>
+          )}
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Status</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                dashboardTaskPopup.task.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                dashboardTaskPopup.task.status === 'In Progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                dashboardTaskPopup.task.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                dashboardTaskPopup.task.status === 'Overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              }`}>
+                {dashboardTaskPopup.task.status || 'N/A'}
+              </span>
+            </div>
+            {(dashboardTaskPopup.task.type_name || dashboardTaskPopup.task.sub_type_name) && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Type</span>
+                <span className="text-gray-700 dark:text-gray-300 truncate">
+                  {[dashboardTaskPopup.task.type_name, dashboardTaskPopup.task.sub_type_name].filter(Boolean).join(' / ')}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Priority</span>
+              <span className={`font-medium ${
+                dashboardTaskPopup.task.priority === 'High' ? 'text-red-600 dark:text-red-400' :
+                dashboardTaskPopup.task.priority === 'Medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                dashboardTaskPopup.task.priority === 'Low' ? 'text-green-600 dark:text-green-400' :
+                'text-gray-600 dark:text-gray-400'
+              }`}>
+                {dashboardTaskPopup.task.priority || 'N/A'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Category</span>
+              <span className="text-gray-700 dark:text-gray-300">{dashboardTaskPopup.task.category_name || 'N/A'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 dark:text-gray-400 w-16 shrink-0">Due Date</span>
+              <span className="text-gray-700 dark:text-gray-300">
+                {dashboardTaskPopup.task.due_date ? formatToLocalDateTime(dashboardTaskPopup.task.due_date).split(',')[0] : 'N/A'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
