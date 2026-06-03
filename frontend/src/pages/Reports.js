@@ -15,26 +15,15 @@ import { GlobalWorkerOptions } from 'pdfjs-dist';
 // Initialize pdfjs worker
 GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Import pdfmake dynamically - prefer CDN version if available
+// Import pdfmake dynamically
 let pdfMake = null;
-let isCdnVersion = false;
 const loadPdfMake = async () => {
   if (!pdfMake) {
-    // Check if CDN version is available (window.pdfMake)
-    if (window.pdfMake && window.pdfMake.vfs) {
-      pdfMake = window.pdfMake;
-      isCdnVersion = true;
-    } else {
-      // Fallback to npm package
-      const [module, fonts] = await Promise.all([
-        import('pdfmake/build/pdfmake'),
-        import('pdfmake/build/vfs_fonts')
-      ]);
-      
-      pdfMake = module.default;
-      pdfMake.vfs = fonts.default || fonts;
-      isCdnVersion = false;
-    }
+    const module = await import('pdfmake/build/pdfmake');
+    const fonts = await import('pdfmake/build/vfs_fonts');
+
+    pdfMake = module.default;
+    pdfMake.addVirtualFileSystem(fonts.default || fonts);
   }
   return pdfMake;
 };
@@ -2038,29 +2027,16 @@ const generatePDF = async () => {
       const pdf = pdfMakeInstance.createPdf(docDefinition);
 
       return new Promise((resolve, reject) => {
-        if (isCdnVersion) {
-          // CDN version (0.2.x) uses callback API
-          pdf.getDataUrl((dataUrl) => {
-            try {
-              const blob = dataURLToBlob(dataUrl);
-              resolve(blob);
-            } catch (blobErr) {
-              reject(new Error('Failed to convert dataUrl to blob: ' + blobErr.message));
-            }
-          });
-        } else {
-          // npm version (0.3.x) uses promise API
-          pdf.getDataUrl().then((dataUrl) => {
-            try {
-              const blob = dataURLToBlob(dataUrl);
-              resolve(blob);
-            } catch (blobErr) {
-              reject(new Error('Failed to convert dataUrl to blob: ' + blobErr.message));
-            }
-          }).catch(err => {
-            reject(new Error('getDataUrl failed: ' + err.message));
-          });
-        }
+        pdf.getDataUrl().then((dataUrl) => {
+          try {
+            const blob = dataURLToBlob(dataUrl);
+            resolve(blob);
+          } catch (blobErr) {
+            reject(new Error('Failed to convert dataUrl to blob: ' + blobErr.message));
+          }
+        }).catch(err => {
+          reject(new Error('getDataUrl failed: ' + err.message));
+        });
       });
     } catch (error) {
       console.error('Error generating PDF preview:', error);
@@ -2227,8 +2203,9 @@ const generatePDF = async () => {
   // Function to download the PDF
   const downloadPdf = async () => {
     try {
-      const docDefinition = createReportDefinition();
-      pdfMake.createPdf(docDefinition).download('accomplishment_report.pdf');
+      const pdfMakeInstance = await loadPdfMake();
+      const docDefinition = await createReportDefinition();
+      pdfMakeInstance.createPdf(docDefinition).download('accomplishment_report.pdf');
     } catch (error) {
       console.error('Error downloading PDF:', error);
       alert('Failed to download PDF: ' + error.message);

@@ -1,5 +1,31 @@
 # Tasker Application Updates
 
+## PDF Preview Font Loading Fix
+
+### Fixed Intermittent "roboto-regular.ttf not found" Error
+- Fixed race condition and API mismatch in pdfmake font loading that caused PDF preview to fail intermittently
+- Error occurred when CDN scripts loaded slowly and the npm fallback path was used
+- Root cause 1: CDN loads pdfmake v0.2.7 but npm package is v0.3.7 — two different APIs
+- Root cause 2: npm fallback used `pdfMake.vfs = ...` (v0.2.x API) but v0.3.7 reads fonts from `virtualfs.storage`, not `vfs`
+- Root cause 3: `Promise.all` loaded module and fonts in parallel, causing a race condition where font auto-registration failed
+
+### Changes Made
+- **Removed CDN scripts** from `index.html` (pdfmake 0.2.7 CDN scripts removed)
+- **Fixed `loadPdfMake()`** in `Reports.js`:
+  - Sequential loading: fonts module now loads after pdfmake module is ready
+  - Uses `pdfMake.addVirtualFileSystem(vfs)` (correct v0.3.x API) instead of `pdfMake.vfs = ...`
+  - Removed `isCdnVersion` flag and CDN check logic
+- **Simplified `generatePDFBlob()`**: Always uses promise API (no more CDN callback branch)
+- **Fixed `downloadPdf()`**: Now calls `loadPdfMake()` to ensure pdfmake is initialized
+
+### Files Modified
+- `frontend/public/index.html`: Removed pdfmake 0.2.7 CDN `<script>` tags (lines 48-49)
+- `frontend/src/pages/Reports.js`: Rewrote `loadPdfMake()` function, simplified `generatePDFBlob()`, fixed `downloadPdf()` to await initialization
+
+---
+
+# Tasker Application Updates
+
 ## Google Calendar API - Philippine Holidays Integration
 
 ### Added Philippine Holiday Auto-Population

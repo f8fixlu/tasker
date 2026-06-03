@@ -135,8 +135,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
   const [securityLoading, setSecurityLoading] = useState(false);
 
   // Database management state
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
-  const [autoSavePath, setAutoSavePath] = useState('');
 
   useEffect(() => {
     if (authUser) {
@@ -158,24 +156,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
         console.error('Error loading notification preferences:', error);
       }
     }
-
-    // Load auto-save settings from localStorage
-    const savedAutoSaveEnabled = localStorage.getItem('autoSaveDatabaseEnabled');
-    if (savedAutoSaveEnabled !== null) {
-      setAutoSaveEnabled(savedAutoSaveEnabled === 'true');
-    }
-
-    const savedAutoSavePath = localStorage.getItem('autoSaveDatabasePath');
-    if (savedAutoSavePath) {
-      setAutoSavePath(savedAutoSavePath);
-    }
   }, [authUser]);
-
-  // Save auto-save settings to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem('autoSaveDatabaseEnabled', autoSaveEnabled.toString());
-    localStorage.setItem('autoSaveDatabasePath', autoSavePath);
-  }, [autoSaveEnabled, autoSavePath]);
 
   // Load signatory data when modal opens and signatories tab is active
   useEffect(() => {
@@ -1040,21 +1021,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
     }
   };
 
-  const toggleAutoSave = () => {
-    setAutoSaveEnabled(!autoSaveEnabled);
-  };
-
-  const selectAutoSavePath = async () => {
-    // For web applications, we can't actually select a folder path due to security restrictions
-    // Instead, we'll prompt the user to input the path manually or provide a simulated experience
-    // In a real implementation with Node.js/Electron, we could use native file dialogs
-
-    const path = window.prompt('Enter the folder path where you want to save database backups:', autoSavePath || 'C:\\Users\\YourName\\Documents\\tasker-backup\\');
-    if (path !== null) {
-      setAutoSavePath(path);
-    }
-  };
-
   // Reset bug report state when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -1571,57 +1537,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   Supports SQLite database files (.db, .sqlite, .sqlite3) and ZIP files (.zip) for full data import.
                 </p>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-[#111418] dark:text-white mb-3">Auto-save Database</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Enable automatic saving of your database to a specified location.
-                </p>
-
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={autoSaveEnabled}
-                        onChange={toggleAutoSave}
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                      <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {autoSaveEnabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </label>
-                  </div>
-
-                  {autoSaveEnabled && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Save Path
-                        </label>
-                        <input
-                          type="text"
-                          value={autoSavePath}
-                          onChange={(e) => setAutoSavePath(e.target.value)}
-                          placeholder="C:\Users\YourName\Documents\tasker-backup\"
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          variant="outline"
-                          type="button"
-                          onClick={selectAutoSavePath}
-                          className="w-full"
-                        >
-                          Browse
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </div>
