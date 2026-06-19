@@ -503,3 +503,28 @@
 ### Files Modified
 - `backend/routes/reports.js`: Refactored combined grouping query, added individual task details query, attached `tasks` to response
 - `frontend/src/pages/Reports.js`: Added popup state/ref, updated consolidation logic, added hover handlers and popup rendering
+
+---
+
+## Calendar & Tasks UI Refinements
+
+### Date Picker Width Adjustment
+- Increased date input width from `w-32` (128px) to `w-40` (160px) on Tasks page to allow date text to fit beside the calendar icon
+- Applied same width increase (`w-36` to `w-40`) to date pickers on Reports page for consistency
+
+### Calendar Header Restructuring
+- Moved Day/Week/Month view toggle buttons to the persistent top bar so they remain visible when switching between views
+- Removed duplicate navigation buttons (chevron_left, Today, chevron_right) from the month view card header — navigation is now handled entirely from the top bar
+- Changed New Event button from outline to primary variant for consistent styling with Add Task button
+
+### Tasks Page Toolbar Consolidation
+- Moved bulk Delete and Archive actions from standalone title bar buttons into a `more_vert` dropdown next to Add Task
+- `more_vert` button has no border/background, with hover highlight and height matching Add Task button
+- Dropdown disabled when no tasks are selected
+- Added "Delete Task" option to the row-level `more_vert` ActionsDropdown (before Archive Task) with red styling
+- Both Delete and Archive actions use the same confirmation modal flow
+
+### Files Modified
+- `frontend/src/pages/Calendar.js`: Moved view toggle to top bar, removed duplicate month header navigation, changed New Event to primary variant
+- `frontend/src/pages/Tasks.js`: Adjusted date picker width, reorganized toolbar buttons, simplified Delete/Archive button labels, added Delete Task to row ActionsDropdown, moved bulk actions to title bar more_vert dropdown
+- `frontend/src/pages/Reports.js`: Adjusted date picker width to match Tasks page

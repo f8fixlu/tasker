@@ -2358,7 +2358,7 @@ const generatePDF = async () => {
           </Button>
                     <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
             <input
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium px-4 py-1.5 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium px-4 py-1.5 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 w-40 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               type="date"
               value={dateRange.startDate}
               onChange={(e) => {
@@ -2380,7 +2380,7 @@ const generatePDF = async () => {
             />
             <span className="px-2 text-gray-500 dark:text-gray-400">-</span>
             <input
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium px-4 py-1.5 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 w-36 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium px-4 py-1.5 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 w-40 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               type="date"
               value={dateRange.endDate}
               min={dateRange.startDate} // Ensure end date can't be earlier than start date

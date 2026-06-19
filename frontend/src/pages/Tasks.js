@@ -344,6 +344,7 @@ const ActionsDropdown = ({
   onAttachmentClick,
   onViewClick,
   onEditClick,
+  onDeleteClick,
   onArchiveClick,
   isOpen,
   onClose,
@@ -379,6 +380,18 @@ const ActionsDropdown = ({
       >
         <span className="material-symbols-outlined text-base">edit</span>
         <span>Edit Task</span>
+      </button>
+
+      <button
+        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteClick(task.id);
+          onClose();
+        }}
+      >
+        <span className="material-symbols-outlined text-base">delete</span>
+        <span>Delete Task</span>
       </button>
 
       <button
@@ -577,6 +590,7 @@ const Option2Tasks = () => {
   const [showSearchOptionsDropdown, setShowSearchOptionsDropdown] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showColumnVisibilityDropdown, setShowColumnVisibilityDropdown] = useState(false);
+  const [showTitleActionsDropdown, setShowTitleActionsDropdown] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
@@ -599,13 +613,15 @@ const Option2Tasks = () => {
   const actionsDropdownRef = useRef(null);
   const columnTogglebuttonRef = useRef(null);
   const columnVisibilityDropdownRef = useRef(null);
+  const titleActionsDropdownRef = useRef(null);
 
-  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef, actionsDropdownRef, columnVisibilityDropdownRef], () => {
+  useOutsideClick([filterDropdownRef, sortDropdownRef, searchOptionsDropdownRef, actionsDropdownRef, columnVisibilityDropdownRef, titleActionsDropdownRef], () => {
     setShowFilterDropdown(false);
     setShowSortDropdown(false);
     setShowSearchOptionsDropdown(false);
     setShowActionsDropdown(false);
     setShowColumnVisibilityDropdown(false);
+    setShowTitleActionsDropdown(false);
     setActiveTaskId(null);
   });
 
@@ -885,6 +901,11 @@ const Option2Tasks = () => {
                     openViewTaskModal(transformedTask);
                   }}
                   onEditClick={openEditTaskModal}
+                  onDeleteClick={(taskId) => {
+                    setTaskToDelete(taskId);
+                    setActionType('delete');
+                    setIsModalOpen(true);
+                  }}
                   onArchiveClick={(taskId) => {
                     setTaskToDelete(taskId);
                     setActionType('archive');
@@ -1498,10 +1519,57 @@ const Option2Tasks = () => {
     <div className="layout-content-container flex flex-col w-full gap-8">
       <div className="flex justify-between items-center">
         <h1 className="text-[#111418] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em]">Tasks</h1>
-        <Button onClick={openNewTaskModal} className="flex items-center gap-2 h-[34px]">
-          <span className="material-symbols-outlined">add</span>
-          Add Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openNewTaskModal} className="flex items-center gap-2 h-[34px]">
+            <span className="material-symbols-outlined">add</span>
+            Add Task
+          </Button>
+
+          <div className="relative flex-shrink-0">
+            <button
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors h-[34px] flex items-center"
+              onClick={() => setShowTitleActionsDropdown(s => !s)}
+              disabled={selectedTasks.length === 0}
+              title="Actions"
+            >
+              <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+            </button>
+            {showTitleActionsDropdown && selectedTasks.length > 0 && (
+              <div
+                ref={titleActionsDropdownRef}
+                className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700 py-1"
+                style={{ position: 'absolute' }}
+              >
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-red-600 dark:text-red-400"
+                  onClick={() => {
+                    setActionType('delete');
+                    setIsModalOpen(true);
+                    setShowTitleActionsDropdown(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-base">delete</span>
+                  <span>Delete {selectedTasks.length > 0 ? `(${selectedTasks.length})` : ''}</span>
+                </button>
+
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+                  onClick={() => {
+                    setActionType('archive');
+                    setIsModalOpen(true);
+                    setShowTitleActionsDropdown(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-base">archive</span>
+                  <span>Archive{selectedTasks.length > 0 ? ` (${selectedTasks.filter(taskId => {
+                    const task = tasks.find(t => t.id === taskId);
+                    return task && task.status !== 'Archived';
+                  }).length})` : ''}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -1579,7 +1647,7 @@ const Option2Tasks = () => {
                 value={filters.date_from}
                 onChange={(e) => handleFilterChange('date_from', e.target.value)}
                 max={getTodayDate()}
-                className="w-32 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
+                className="w-40 rounded-l-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               />
               <span className="px-2 text-gray-500 dark:text-gray-400 max-[1231px]:hidden">-</span>
               <input
@@ -1587,7 +1655,7 @@ const Option2Tasks = () => {
                 value={filters.date_to}
                 onChange={(e) => handleFilterChange('date_to', e.target.value)}
                 max={getTodayDate()}
-                className="w-32 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
+                className="w-40 rounded-r-lg border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white text-sm font-medium px-4 py-1.5 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:text-white dark:[&::-webkit-calendar-picker-indicator]:text-white"
               />
             </div>
 
@@ -1646,51 +1714,6 @@ const Option2Tasks = () => {
                 </div>
               )}
             </div>
-
-            <Button
-              variant="primary"
-              size="md"
-              className="bg-red-500 hover:bg-red-600 h-[34px] whitespace-nowrap flex-shrink-0"
-              onClick={() => {
-                if (selectedTasks.length > 0) {
-                  setActionType('delete');
-                  setIsModalOpen(true);
-                }
-              }}
-              disabled={selectedTasks.length === 0}
-              title="Delete"
-            >
-              <span className="material-symbols-outlined text-sm">delete</span>
-              <span className="text-sm font-medium max-[1231px]:hidden">
-                Delete{selectedTasks.length > 0 ? ` (${selectedTasks.length})` : ''}
-              </span>
-            </Button>
-
-            <Button
-              variant="primary"
-              size="md"
-              className="bg-gray-500 hover:bg-gray-600 h-[34px] whitespace-nowrap flex-shrink-0"
-              onClick={() => {
-                if (selectedTasks.length > 0) {
-                  setActionType('archive');
-                  setIsModalOpen(true);
-                }
-              }}
-              disabled={selectedTasks.length === 0 || selectedTasks.every(taskId => {
-                const task = tasks.find(t => t.id === taskId);
-                return task && task.status === 'Archived';
-              })}
-              title="Archive"
-            >
-              <span className="material-symbols-outlined text-sm">archive</span>
-              <span className="text-sm font-medium max-[1231px]:hidden">
-                Archive{selectedTasks.length > 0 ?
-                  ` (${selectedTasks.filter(taskId => {
-                    const task = tasks.find(t => t.id === taskId);
-                    return task && task.status !== 'Archived';
-                  }).length})`.replace(' (0)', '') : ''}
-              </span>
-            </Button>
           </div>
         </div>
       </div>

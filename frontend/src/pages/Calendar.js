@@ -28,6 +28,8 @@ const scrollbarHideStyle = `
 `;
 
 const Calendar = () => {
+  const { triggerTaskUpdate } = useTaskUpdate();
+  const { fetchNotifications } = useNotifications();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'day', 'week', or 'month'
   const [isNewEventModalOpen, setIsNewEventModalOpen] = useState(false);
@@ -325,7 +327,7 @@ const Calendar = () => {
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </Button>
-                <span className="text-lg font-semibold text-[#111418] dark:text-white">
+                <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </span>
                 <Button
@@ -355,7 +357,7 @@ const Calendar = () => {
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </Button>
-                <span className="text-lg font-semibold text-[#111418] dark:text-white">
+                <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   Week of {currentDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
                 </span>
                 <Button
@@ -385,7 +387,7 @@ const Calendar = () => {
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </Button>
-                <span className="text-lg font-semibold text-[#111418] dark:text-white">
+                <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   {currentDate.toLocaleString('default', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
                 <Button
@@ -404,6 +406,14 @@ const Calendar = () => {
             ) : null}
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="px-3 py-1.5 h-[34px]"
+              onClick={() => setCurrentDate(new Date())}
+            >
+              Today
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -430,7 +440,7 @@ const Calendar = () => {
             </Button>
           </div>
           <Button
-            variant="outline"
+            variant="primary"
             className="flex items-center gap-2 h-[34px]"
             onClick={handleNewEventClick}
           >
@@ -486,36 +496,6 @@ const Calendar = () => {
                 <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
                   {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                    onClick={() => {
-                      const newDate = new Date(currentDate);
-                      newDate.setMonth(newDate.getMonth() - 1);
-                      setCurrentDate(newDate);
-                    }}
-                  >
-                    <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_left</span>
-                  </button>
-                  <button
-                    className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-200"
-                    onClick={() => {
-                      setCurrentDate(new Date());
-                    }}
-                  >
-                    Today
-                  </button>
-                  <button
-                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                    onClick={() => {
-                      const newDate = new Date(currentDate);
-                      newDate.setMonth(newDate.getMonth() + 1);
-                      setCurrentDate(newDate);
-                    }}
-                  >
-                    <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_right</span>
-                  </button>
-                </div>
               </div>
               
               <div className="grid grid-cols-7">
@@ -972,8 +952,185 @@ const Calendar = () => {
                   {currentDate.toLocaleString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
-              <div className="p-4 min-h-96">
-                <div className="space-y-2 overflow-y-auto max-h-96 scrollbar-hide">
+              <div className="flex">
+                <div className="flex-shrink-0 w-16 border-r border-gray-200 dark:border-gray-700">
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+                    const ampm = i < 12 ? 'AM' : 'PM';
+                    return (
+                      <div key={i} className="h-16 border-b border-gray-100 dark:border-gray-700 flex items-start justify-center pt-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{hour}{ampm}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex-1 min-h-96">
+                  <div className="relative">
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`h-16 border-b border-gray-100 dark:border-gray-700 transition-colors ${
+                          (() => {
+                            const slotDate = new Date(currentDate);
+                            slotDate.setHours(i, 0, 0, 0);
+                            return slotDate < new Date()
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer';
+                          })()
+                        }`}
+                        onClick={() => {
+                          const slotDate = new Date(currentDate);
+                          slotDate.setHours(i, 0, 0, 0);
+                          if (slotDate < new Date()) return;
+                          const dateStr = currentDate.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                          const startTime = `${String(i).padStart(2, '0')}:00`;
+                          const endTime = `${String(i + 1).padStart(2, '0')}:00`;
+                          setNewEventPrefillData({ startDate: dateStr, endDate: dateStr, startTime, endTime });
+                          setIsNewEventModalOpen(true);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          const slotDate = new Date(currentDate);
+                          slotDate.setHours(i, 0, 0, 0);
+                          if (slotDate >= new Date()) {
+                            e.currentTarget.classList.add('bg-blue-100', 'dark:bg-blue-900/40');
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          e.currentTarget.classList.remove('bg-blue-100', 'dark:bg-blue-900/40');
+                        }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.remove('bg-blue-100', 'dark:bg-blue-900/40');
+                          const slotDate = new Date(currentDate);
+                          slotDate.setHours(i, 0, 0, 0);
+                          if (slotDate < new Date()) return;
+
+                          const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+                          const originalEvent = events.find(ev => ev.id === dragData.eventId);
+                          if (!originalEvent) return;
+
+                          const originalStart = new Date(originalEvent.start_date || originalEvent.startDate);
+                          const originalEnd = new Date(originalEvent.end_date || originalEvent.endDate);
+                          const durationMs = originalEnd - originalStart;
+
+                          const newStartDate = new Date(currentDate);
+                          newStartDate.setHours(i, 0, 0, 0);
+
+                          const newEndDate = new Date(newStartDate.getTime() + durationMs);
+
+                          const updateData = {
+                            ...originalEvent,
+                            start_date: newStartDate.toISOString(),
+                            end_date: newEndDate.toISOString()
+                          };
+                          delete updateData.startDate;
+                          delete updateData.endDate;
+
+                          await eventService.updateEvent(originalEvent.id, updateData);
+                          await fetchEvents();
+                          triggerTaskUpdate();
+                          setTimeout(() => fetchNotifications(), 100);
+                        }}
+                      ></div>
+                    ))}
+                    {(() => {
+                      const dayItems = [
+                        ...holidays
+                          .filter(h => {
+                            const hDate = new Date(h.date + 'T00:00:00');
+                            return (
+                              hDate.getDate() === currentDate.getDate() &&
+                              hDate.getMonth() === currentDate.getMonth() &&
+                              hDate.getFullYear() === currentDate.getFullYear()
+                            );
+                          })
+                          .filter(h => !isDateOccupiedByEvent(h.date))
+                          .map(h => holidayToEvent(h)),
+                        ...events.filter(event => {
+                          const eventDate = new Date(event.date || event.start_date);
+                          return (
+                            eventDate.getDate() === currentDate.getDate() &&
+                            eventDate.getMonth() === currentDate.getMonth() &&
+                            eventDate.getFullYear() === currentDate.getFullYear()
+                          );
+                        })
+                      ];
+
+                      return dayItems.length > 0 ? dayItems.map((event, idx) => {
+                        const eventDate = new Date(event.start_date || event.date);
+                        const hour = eventDate.getHours();
+                        const minutes = eventDate.getMinutes();
+                        const topOffset = hour * 64 + (minutes / 60) * 64;
+
+                        let eventHeight = null;
+                        if (event.end_date && !event.isHoliday) {
+                          const endDate = new Date(event.end_date);
+                          const endHour = endDate.getHours();
+                          const endMinutes = endDate.getMinutes();
+                          const durationMinutes = (endHour * 60 + endMinutes) - (hour * 60 + minutes);
+                          eventHeight = Math.max((durationMinutes / 60) * 64, 24);
+                        }
+
+                        const eventStartDate = new Date(event.start_date || event.date);
+                        const isPastEvent = eventStartDate < new Date();
+
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              if (!event.isHoliday) handleEventClick(event);
+                            }}
+                            onMouseEnter={(e) => {
+                              if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
+                              const popupWidth = 312;
+                              const estimatedHeight = 300;
+                              const gap = 4;
+                              const spaceRight = window.innerWidth - e.clientX;
+                              const spaceBelow = window.innerHeight - e.clientY;
+                              const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
+                              const showAbove = spaceBelow < estimatedHeight + gap;
+                              setCalendarEventPopup({ event, x, showAbove, cursorY: e.clientY });
+                            }}
+                            onMouseLeave={() => {
+                              popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
+                            }}
+                            draggable={!event.isHoliday && !isPastEvent}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', JSON.stringify({
+                                eventId: event.id,
+                                originalStartDate: event.start_date || event.startDate,
+                                originalEndDate: event.end_date || event.endDate
+                              }));
+                              e.currentTarget.classList.add('opacity-50');
+                            }}
+                            onDragEnd={(e) => {
+                              e.currentTarget.classList.remove('opacity-50');
+                            }}
+                            className={`
+                              absolute left-1 right-1 p-2 rounded text-xs overflow-hidden cursor-pointer
+                              ${event.isHoliday ? 'cursor-default' : 'cursor-pointer'}
+                              ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
+                            `}
+                            style={{ top: `${topOffset}px`, height: eventHeight ? `${eventHeight}px` : undefined, minHeight: '24px' }}
+                          >
+                            <div className="font-medium truncate">{event.title}</div>
+                            {event.isHoliday ? (
+                              <div className="opacity-80 truncate">Holiday</div>
+                            ) : (
+                              <>
+                                <div className="opacity-80 truncate">{event.category}</div>
+                                <div className="opacity-60 truncate">
+                                  {event.start_date ? new Date(event.start_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : ''}
+                                  {event.end_date ? ` - ${new Date(event.end_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      }) : null;
+                    })()}
+                  </div>
                   {(() => {
                     const dayItems = [
                       ...holidays
@@ -997,54 +1154,11 @@ const Calendar = () => {
                       })
                     ];
 
-                    return dayItems.length > 0 ? dayItems.map((event, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          if (!event.isHoliday) handleEventClick(event);
-                        }}
-                        onMouseEnter={(e) => {
-                          if (popupTimeoutRef.current) clearTimeout(popupTimeoutRef.current);
-                          const popupWidth = 312;
-                          const estimatedHeight = 300;
-                          const gap = 4;
-                          const spaceRight = window.innerWidth - e.clientX;
-                          const spaceBelow = window.innerHeight - e.clientY;
-                          const x = spaceRight >= popupWidth + 12 ? e.clientX + 12 : e.clientX - popupWidth - 12;
-                          const showAbove = spaceBelow < estimatedHeight + gap;
-                          setCalendarEventPopup({ event, x, showAbove, cursorY: e.clientY });
-                        }}
-                        onMouseLeave={() => {
-                          popupTimeoutRef.current = setTimeout(() => setCalendarEventPopup(null), 250);
-                        }}
-                        className={`
-                          p-3 rounded-lg ${event.isHoliday ? 'cursor-default' : 'cursor-pointer'}
-                          ${event.color_class || 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'}
-                        `}
-                      >
-                        <div className="font-medium">{event.title}</div>
-                        {event.isHoliday ? (
-                          <div className="text-xs opacity-80 mt-1">Philippine Public Holiday</div>
-                        ) : (
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm opacity-80">{event.category}</div>
-                            {event.status && event.status !== 'Scheduled' && (
-                              <span className={`
-                                text-xs px-2 py-0.5 rounded
-                                ${event.status === 'Completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' : 
-                                  event.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200' : 
-                                  event.status === 'Cancelled' ? 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200' : 
-                                  'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'}
-                              `}>
-                                {event.status}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )) : (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        No events scheduled for today
+                    return dayItems.length === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          No events scheduled for today
+                        </div>
                       </div>
                     );
                   })()}
