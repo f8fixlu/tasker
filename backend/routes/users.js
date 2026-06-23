@@ -151,7 +151,7 @@ async function handleUpdateUser(req, res, userId) {
 // Handle updating user profile
 async function handleUpdateProfile(req, res, userId) {
   try {
-    const { full_name, profile_image_url, signatories } = req.body;
+    const { full_name, profile_image_url, signatories, header_image, footer_image, show_default_header, report_title, header_on_all_pages } = req.body;
 
     // If profile_image_url is provided and it's a relative path, convert it to full URL
     let processed_profile_image_url = profile_image_url;  // Initialize the variable
@@ -176,6 +176,11 @@ async function handleUpdateProfile(req, res, userId) {
       full_name: full_name || undefined,
       profile_image_url: processed_profile_image_url || undefined,
       signatories: signatories || undefined,
+      header_image: header_image !== undefined ? header_image : undefined,
+      footer_image: footer_image !== undefined ? footer_image : undefined,
+      show_default_header: show_default_header !== undefined ? show_default_header : undefined,
+      report_title: report_title !== undefined ? report_title : undefined,
+      header_on_all_pages: header_on_all_pages !== undefined ? header_on_all_pages : undefined,
       email: undefined // Don't allow email changes through this endpoint
     };
 

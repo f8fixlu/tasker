@@ -90,6 +90,11 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
     }
   ]);
   const [loadingSignatories, setLoadingSignatories] = useState(true);
+  const [headerImage, setHeaderImage] = useState(null);
+  const [footerImage, setFooterImage] = useState(null);
+  const [showDefaultHeader, setShowDefaultHeader] = useState(true);
+  const [headerOnAllPages, setHeaderOnAllPages] = useState(true);
+  const [reportTitle, setReportTitle] = useState('ACCOMPLISHMENT REPORT');
   const [profileData, setProfileData] = useState({
     fullName: authUser?.name || authUser?.full_name || '',
     email: authUser?.email || '',
@@ -270,6 +275,57 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
       }
 
       setSignatoryData(signatoryArray);
+
+      // Load header image from API
+      if (userData?.header_image) {
+        setHeaderImage(userData.header_image);
+      } else {
+        // Fallback to localStorage
+        const savedHeaderImage = localStorage.getItem(`headerImage_${authUser?.id}`);
+        if (savedHeaderImage) {
+          setHeaderImage(savedHeaderImage);
+        }
+      }
+
+      // Load footer image from API
+      if (userData?.footer_image) {
+        setFooterImage(userData.footer_image);
+      } else {
+        const savedFooterImage = localStorage.getItem(`footerImage_${authUser?.id}`);
+        if (savedFooterImage) {
+          setFooterImage(savedFooterImage);
+        }
+      }
+
+      // Load show default header setting
+      if (userData?.show_default_header !== undefined) {
+        setShowDefaultHeader(!!userData.show_default_header);
+      } else {
+        const saved = localStorage.getItem(`showDefaultHeader_${authUser?.id}`);
+        if (saved !== null) {
+          setShowDefaultHeader(saved === 'true');
+        }
+      }
+
+      // Load header on all pages setting
+      if (userData?.header_on_all_pages !== undefined) {
+        setHeaderOnAllPages(!!userData.header_on_all_pages);
+      } else {
+        const saved = localStorage.getItem(`headerOnAllPages_${authUser?.id}`);
+        if (saved !== null) {
+          setHeaderOnAllPages(saved === 'true');
+        }
+      }
+
+      // Load report title
+      if (userData?.report_title) {
+        setReportTitle(userData.report_title);
+      } else {
+        const saved = localStorage.getItem(`reportTitle_${authUser?.id}`);
+        if (saved) {
+          setReportTitle(saved);
+        }
+      }
     } catch (error) {
       console.error('Error loading signatory data:', error);
       // Fallback to local storage if API fails
@@ -298,6 +354,56 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
             title: 'Prepared By'
           }
         ]);
+      }
+
+      // Try loading header image from localStorage as fallback
+      try {
+        const savedHeaderImage = localStorage.getItem(`headerImage_${authUser?.id}`);
+        if (savedHeaderImage) {
+          setHeaderImage(savedHeaderImage);
+        }
+      } catch (e) {
+        // Ignore
+      }
+
+      // Try loading footer image from localStorage as fallback
+      try {
+        const savedFooterImage = localStorage.getItem(`footerImage_${authUser?.id}`);
+        if (savedFooterImage) {
+          setFooterImage(savedFooterImage);
+        }
+      } catch (e) {
+        // Ignore
+      }
+
+      // Try loading show default header setting from localStorage as fallback
+      try {
+        const saved = localStorage.getItem(`showDefaultHeader_${authUser?.id}`);
+        if (saved !== null) {
+          setShowDefaultHeader(saved === 'true');
+        }
+      } catch (e) {
+        // Ignore
+      }
+
+      // Try loading header on all pages setting from localStorage as fallback
+      try {
+        const saved = localStorage.getItem(`headerOnAllPages_${authUser?.id}`);
+        if (saved !== null) {
+          setHeaderOnAllPages(saved === 'true');
+        }
+      } catch (e) {
+        // Ignore
+      }
+
+      // Try loading report title from localStorage as fallback
+      try {
+        const saved = localStorage.getItem(`reportTitle_${authUser?.id}`);
+        if (saved) {
+          setReportTitle(saved);
+        }
+      } catch (e) {
+        // Ignore
       }
     } finally {
       setLoadingSignatories(false);
@@ -339,7 +445,12 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
         },
         body: JSON.stringify({
           signatories: signatoryData,  // Save array format for SettingsModal
-          ...signatoryObject           // Also save object format for Reports.js compatibility
+          ...signatoryObject,          // Also save object format for Reports.js compatibility
+          header_image: headerImage,   // Save header image
+          footer_image: footerImage,   // Save footer image
+          show_default_header: showDefaultHeader,
+          header_on_all_pages: headerOnAllPages,
+          report_title: reportTitle
         })
       });
 
@@ -350,8 +461,21 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
 
       // Also save to local storage for cross-browser compatibility
       localStorage.setItem(`signatories_${authUser?.id}`, JSON.stringify(signatoryData));
+      if (headerImage) {
+        localStorage.setItem(`headerImage_${authUser?.id}`, headerImage);
+      } else {
+        localStorage.removeItem(`headerImage_${authUser?.id}`);
+      }
+      if (footerImage) {
+        localStorage.setItem(`footerImage_${authUser?.id}`, footerImage);
+      } else {
+        localStorage.removeItem(`footerImage_${authUser?.id}`);
+      }
+      localStorage.setItem(`showDefaultHeader_${authUser?.id}`, showDefaultHeader);
+      localStorage.setItem(`headerOnAllPages_${authUser?.id}`, headerOnAllPages);
+      localStorage.setItem(`reportTitle_${authUser?.id}`, reportTitle);
 
-      setSuccessMessage('Signatory data saved successfully!');
+      setSuccessMessage('Settings saved successfully!');
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error saving signatory data:', error);
@@ -1086,7 +1210,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
             }`}
             onClick={() => setActiveTab('signatories')}
           >
-            Signatories
+            Reports
           </button>
         )}
         {!(propsUser?.role === 'admin') && (
@@ -1352,6 +1476,20 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
         {/* Signatories Tab */}
         {activeTab === 'signatories' && !(propsUser?.role === 'admin') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 signatory-tab-content" style={{ contain: 'layout' }}>
+            {/* Report Title Section */}
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4">Report Title</h3>
+              <Input
+                label="Report Title"
+                id="reportTitle"
+                name="reportTitle"
+                type="text"
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value)}
+                placeholder="ACCOMPLISHMENT REPORT"
+              />
+            </div>
+
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-[#111418] dark:text-white">Report Signatories</h2>
               <Button
@@ -1448,6 +1586,186 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                       return elements;
                     }
                   })()}
+                </div>
+
+                {/* Report Header Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                  <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4">Report Header</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Upload a JPG image to replace the default header in the PDF report. Recommended width: 800px.
+                  </p>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      {headerImage ? (
+                        <div className="relative">
+                          <img
+                            src={headerImage}
+                            alt="Report header preview"
+                            className="h-24 w-auto rounded border border-gray-300 dark:border-gray-600 object-contain"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setHeaderImage(null)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            title="Remove header image"
+                          >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="h-24 w-48 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm">
+                          No image selected
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-[#111418] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <span className="material-symbols-outlined text-base">upload</span>
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,image/jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              if (!file.type.match('image/jpeg')) {
+                                alert('Please select a JPG image file.');
+                                return;
+                              }
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('File size exceeds 5MB limit.');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                setHeaderImage(event.target.result);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {headerImage && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          When set, replaces the default header (logos and agency name).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Report Footer Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                  <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4">Report Footer</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Upload a JPG image to display at the bottom of each page in the PDF report. Recommended width: 800px.
+                  </p>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      {footerImage ? (
+                        <div className="relative">
+                          <img
+                            src={footerImage}
+                            alt="Report footer preview"
+                            className="h-24 w-auto rounded border border-gray-300 dark:border-gray-600 object-contain"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setFooterImage(null)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            title="Remove footer image"
+                          >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="h-24 w-48 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm">
+                          No image selected
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-[#111418] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <span className="material-symbols-outlined text-base">upload</span>
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,image/jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              if (!file.type.match('image/jpeg')) {
+                                alert('Please select a JPG image file.');
+                                return;
+                              }
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('File size exceeds 5MB limit.');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                setFooterImage(event.target.result);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {footerImage && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Displays at the bottom of each page in the PDF report.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Show Default Header Toggle */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#111418] dark:text-white">Show Default Header</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Display the agency logo and name header when no custom header is uploaded.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={showDefaultHeader}
+                        onChange={(e) => setShowDefaultHeader(e.target.checked)}
+                        disabled={!!headerImage}
+                      />
+                      <div className={`w-11 h-6 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${headerImage ? 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed' : 'bg-gray-200 dark:bg-gray-700 peer-checked:bg-primary peer-checked:after:translate-x-full'}`}></div>
+                    </label>
+                  </div>
+                  {headerImage && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Disabled because a custom header image is uploaded.
+                    </p>
+                  )}
+                </div>
+
+                {/* Show Header on All Pages Toggle */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#111418] dark:text-white">Show Header on All Pages</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Display the header on every page of the report instead of only the first page.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={headerOnAllPages}
+                        onChange={(e) => setHeaderOnAllPages(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all bg-gray-200 dark:bg-gray-700 peer-checked:bg-primary peer-checked:after:translate-x-full"></div>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-6">

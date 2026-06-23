@@ -5,35 +5,43 @@ import App from './App';
 
 // Handle ResizeObserver loop errors gracefully with more aggressive suppression
 const resizeObserverLoopErrRe = /ResizeObserver loop limit exceeded|ResizeObserver loop completed with undelivered notifications/;
+
+// Suppress via error event listener
 if (window.addEventListener) {
   window.addEventListener('error', function (e) {
     if (resizeObserverLoopErrRe.test(e.message)) {
-      // More aggressive error suppression
       e.stopImmediatePropagation();
       e.preventDefault();
       e.stopPropagation();
-      // Completely suppress these errors to prevent them from being reported
-      return false; // Return false to indicate the error was handled
+      return false;
     }
   }, true);
 }
 
-// Also handle unhandledrejection for promise-based errors
+// Suppress via unhandledrejection
 window.addEventListener('unhandledrejection', function (e) {
   if (resizeObserverLoopErrRe.test(e.reason?.message || e.reason)) {
-    // More aggressive error suppression
     e.preventDefault();
-    // Completely suppress these errors to prevent them from being reported
-    return false; // Return false to indicate the error was handled
+    return false;
   }
 });
 
-// Add a cleanup function to handle ResizeObserver when elements are removed
-window.addEventListener('beforeunload', function() {
-  if (window.__resizeObserverErrors) {
-    delete window.__resizeObserverErrors;
+// Suppress via console.error patching (catches React dev-mode reporting)
+const origConsoleError = console.error;
+console.error = function (...args) {
+  const msg = args.map(a => String(a)).join(' ');
+  if (resizeObserverLoopErrRe.test(msg)) {
+    return;
   }
-});
+  return origConsoleError.apply(this, args);
+};
+
+// Suppress via window.onerror fallback
+window.onerror = function (msg) {
+  if (resizeObserverLoopErrRe.test(msg)) {
+    return true;
+  }
+};
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

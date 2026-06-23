@@ -78,6 +78,11 @@ const Reports = () => {
   const categoryFiltersDropdownRef = useRef(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [signatoryData, setSignatoryData] = useState([]);
+  const [headerImage, setHeaderImage] = useState(null);
+  const [footerImage, setFooterImage] = useState(null);
+  const [showDefaultHeader, setShowDefaultHeader] = useState(true);
+  const [headerOnAllPages, setHeaderOnAllPages] = useState(true);
+  const [reportTitleText, setReportTitleText] = useState('ACCOMPLISHMENT REPORT');
   const [printSections, setPrintSections] = useState({
     reportStats: false,
     taskList: true,  // Default to true
@@ -324,6 +329,57 @@ const Reports = () => {
           if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
             setSignatoryData(newData);
           }
+
+          // Load header image from API
+          if (userData.user?.header_image) {
+            setHeaderImage(userData.user.header_image);
+          } else {
+            const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
+            if (savedHeaderImage) {
+              setHeaderImage(savedHeaderImage);
+            }
+          }
+
+          // Load footer image from API
+          if (userData.user?.footer_image) {
+            setFooterImage(userData.user.footer_image);
+          } else {
+            const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
+            if (savedFooterImage) {
+              setFooterImage(savedFooterImage);
+            }
+          }
+
+          // Load show default header setting
+          if (userData.user?.show_default_header !== undefined) {
+            setShowDefaultHeader(!!userData.user.show_default_header);
+          } else {
+            const saved = localStorage.getItem(`showDefaultHeader_${user?.id}`);
+            if (saved !== null) {
+              setShowDefaultHeader(saved === 'true');
+            }
+          }
+
+          // Load header on all pages setting
+          if (userData.user?.header_on_all_pages !== undefined) {
+            setHeaderOnAllPages(!!userData.user.header_on_all_pages);
+          } else {
+            const saved = localStorage.getItem(`headerOnAllPages_${user?.id}`);
+            if (saved !== null) {
+              setHeaderOnAllPages(saved === 'true');
+            }
+          }
+
+          // Load report title
+          if (userData.user?.report_title) {
+            setReportTitleText(userData.user.report_title);
+          } else {
+            const saved = localStorage.getItem(`reportTitleText_${user?.id}`);
+            if (saved) {
+              setReportTitleText(saved);
+            }
+          }
+
           return; // Exit early since we got data from API
         } else {
           console.log('No signatories in API response, trying localStorage');
@@ -462,43 +518,57 @@ const Reports = () => {
   // Function to create multiple pages based on content length
   const renderReportPages = () => {
     // Define content that should go on every page (header and footer)
-    const renderPageHeader = () => (
-      <header className="page-header p-6 border-b border-gray-200" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
-        <div className="flex items-center justify-center space-x-1">
-          <img
-            src="/logo/logoleft.png"
-            alt="Left Logo"
-            className="h-16 w-16 flex-shrink-0 rounded"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              const span = document.createElement('span');
-              span.className = 'text-xs text-gray-500';
-              span.textContent = 'Logo';
-              e.target.parentNode.appendChild(span);
-            }}
-          />
-          <div className="text-center px-1">
-            <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-            <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-            <p className="font-bold" style={{ fontSize: '10pt' }}>COMMISSION ON HIGHER EDUCATION</p>
-            <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-            <p style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
+    const renderPageHeader = (pageNum) => {
+      if (!headerOnAllPages && pageNum > 0) return null;
+
+      if (headerImage) {
+        return (
+          <header className="page-header p-6 border-b border-gray-200 flex justify-center" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
+            <img src={headerImage} alt="Header" className="max-w-full h-auto" style={{ maxHeight: '100px' }} />
+          </header>
+        );
+      }
+
+      if (!showDefaultHeader) return null;
+
+      return (
+        <header className="page-header p-6 border-b border-gray-200" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
+          <div className="flex items-center justify-center space-x-1">
+            <img
+              src="/logo/logoleft.png"
+              alt="Left Logo"
+              className="h-16 w-16 flex-shrink-0 rounded"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                const span = document.createElement('span');
+                span.className = 'text-xs text-gray-500';
+                span.textContent = 'Logo';
+                e.target.parentNode.appendChild(span);
+              }}
+            />
+            <div className="text-center px-1">
+              <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
+              <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
+              <p className="font-bold" style={{ fontSize: '10pt' }}>COMMISSION ON HIGHER EDUCATION</p>
+              <p style={{ fontSize: '10pt' }}>Regional Office I</p>
+              <p style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
+            </div>
+            <img
+              src="/logo/logoright.png"
+              alt="Right Logo"
+              className="h-16 w-16 flex-shrink-0 rounded"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                const span = document.createElement('span');
+                span.className = 'text-xs text-gray-500';
+                span.textContent = 'Logo';
+                e.target.parentNode.appendChild(span);
+              }}
+            />
           </div>
-          <img
-            src="/logo/logoright.png"
-            alt="Right Logo"
-            className="h-16 w-16 flex-shrink-0 rounded"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              const span = document.createElement('span');
-              span.className = 'text-xs text-gray-500';
-              span.textContent = 'Logo';
-              e.target.parentNode.appendChild(span);
-            }}
-          />
-        </div>
-      </header>
-    );
+        </header>
+      );
+    };
 
     const renderPageFooter = (pageNumber, totalPages) => (
       <div className="page-footer p-4 text-right" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
@@ -608,7 +678,7 @@ const Reports = () => {
     // Add report title and date to the first page
     const reportTitle = (
       <div key="report-title" className="mb-12" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
-        <h1 className="text-center font-bold text-lg tracking-wider">ACCOMPLISHMENT REPORT</h1>
+        <h1 className="text-center font-bold text-lg tracking-wider">{reportTitleText}</h1>
         <p className="text-center mt-2">For the period of {formatPrintDateRange(dateRange.startDate, dateRange.endDate)}</p>
       </div>
     );
@@ -659,7 +729,7 @@ const Reports = () => {
 
       pages.push(
         <div key="page-1" className={`page paper-${pageSize.toLowerCase()} bg-white shadow-lg print:shadow-none mb-8`} style={{fontFamily: "'Bookman Old Style', serif", fontSize: '12pt'}}>
-          {renderPageHeader()}
+          {renderPageHeader(0)}
 
           {/* Page Content */}
           <div className="page-content p-6">
@@ -692,7 +762,7 @@ const Reports = () => {
 
       pages.push(
         <div key="page-1" className={`page paper-${pageSize.toLowerCase()} bg-white shadow-lg print:shadow-none mb-8`} style={{fontFamily: "'Bookman Old Style', serif", fontSize: '12pt'}}>
-          {renderPageHeader()}
+          {renderPageHeader(0)}
 
           {/* Page Content */}
           <div className="page-content p-6">
@@ -724,7 +794,7 @@ const Reports = () => {
 
       pages.push(
         <div key="page-1" className={`page paper-${pageSize.toLowerCase()} bg-white shadow-lg print:shadow-none mb-8`} style={{fontFamily: "'Bookman Old Style', serif", fontSize: '12pt'}}>
-          {renderPageHeader()}
+          {renderPageHeader(0)}
 
           {/* Page Content */}
           <div className="page-content p-6">
@@ -810,19 +880,20 @@ const Reports = () => {
 
         pages.push(
           <div key={`page-${pageNum + 1}`} className={`page paper-${pageSize.toLowerCase()} bg-white shadow-lg print:shadow-none mb-8`} style={{fontFamily: "'Bookman Old Style', serif", fontSize: '12pt', width: pageSize.toLowerCase() === 'folio' ? '8.5in' : pageSize.toLowerCase() === 'letter' ? '8.5in' : '8.27in', height: pageSize.toLowerCase() === 'folio' ? '13in' : pageSize.toLowerCase() === 'letter' ? '11in' : '11.69in', display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
-            {renderPageHeader()}
+            {renderPageHeader(pageNum)}
 
             {/* Page Content */}
-            <div className="page-content p-4 flex-grow" style={{ maxHeight: pageSize.toLowerCase() === 'folio' ? '12in' : pageSize.toLowerCase() === 'letter' ? '10in' : '10.69in', overflow: 'hidden' }}>
-              <main className="mt-4 flex-grow" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="page-content p-6 pb-10 flex-grow" style={{ maxHeight: pageSize.toLowerCase() === 'folio' ? '12in' : pageSize.toLowerCase() === 'letter' ? '10in' : '10.69in', overflow: 'hidden' }}>
+              <main className="mt-6 flex-grow" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="space-y-4 flex-grow" style={{ overflow: 'hidden' }}>
-                  {/* Report title and static content (stats and charts) only on first page */}
-                  {pageNum === 0 && (
-                    <>
-                      {reportTitle}
-                      {staticContent}
-                    </>
-                  )}
+                  {/* Report title only on first page */}
+                  {pageNum === 0 && reportTitle}
+
+                  {/* Maintain same spacing on subsequent pages */}
+                  {pageNum > 0 && <div className="mb-12" style={{ height: '60px' }} />}
+
+                  {/* Static content (stats and charts) only on first page */}
+                  {pageNum === 0 && staticContent}
 
                   {/* Combined task/event list content is distributed across pages */}
                   {printSections.taskList && (
@@ -849,7 +920,7 @@ const Reports = () => {
                         }
 
                         return (
-                          <div key={`combined-${pageNum}-${groupIdx}`} className="mb-6">
+                          <div key={`combined-${pageNum}-${groupIdx}`} className="mb-10">
                             <h2 className="font-bold" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>Tasks/Activities Undertaken ({group.date}):</h2>
                             <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
                               {combinedItems.map((item, itemIdx) => (
@@ -1736,67 +1807,87 @@ const Reports = () => {
         // Ignore logo loading errors
       }
 
-      // Header section
-      content.push({
-        columns: [
-          {
-            width: 64,
-            stack: [
-              leftLogoImage ? {
-                image: leftLogoImage,
-                width: 64,
-                height: 64,
-                alignment: 'center',
-                margin: [0, 5, 0, 0]
-              } : {
-                text: '[LOGO]',
-                fontSize: 10,
-                alignment: 'center',
-                bold: true,
-                margin: [0, 10, 0, 0]
-              }
-            ],
-            margin: [0, 0, 2, 0]
-          },
-          {
-            width: '*',
-            alignment: 'center',
-            stack: [
-              { text: 'Republic of the Philippines', fontSize: 10, margin: [0, 0, 0, 1] },
-              { text: 'OFFICE OF THE PRESIDENT', fontSize: 10, margin: [0, 0, 0, 1] },
-              { text: 'COMMISSION ON HIGHER EDUCATION', fontSize: 10, bold: true, margin: [0, 0, 0, 1] },
-              { text: 'Regional Office I', fontSize: 10, margin: [0, 0, 0, 1] },
-              { text: 'San Fernando City, La Union', fontSize: 10, margin: [0, 0, 0, 8] }
-            ],
-            margin: [2, 0, 2, 15]
-          },
-          {
-            width: 64,
-            stack: [
-              rightLogoImage ? {
-                image: rightLogoImage,
-                width: 64,
-                height: 64,
-                alignment: 'center',
-                margin: [0, 5, 0, 0]
-              } : {
-                text: '[LOGO]',
-                fontSize: 10,
-                alignment: 'center',
-                bold: true,
-                margin: [0, 10, 0, 0]
-              }
-            ],
-            margin: [2, 0, 0, 0]
-          }
-        ]
-      });
+      // Build header content (custom or default)
+      let headerContent = null;
+      if (headerImage) {
+        headerContent = {
+          image: headerImage,
+          width: 450,
+          alignment: 'center',
+          margin: [0, 0, 0, 15]
+        };
+      } else if (showDefaultHeader) {
+        headerContent = {
+          margin: [72, 0, 72, 0],
+          columns: [
+            {
+              width: 64,
+              stack: [
+                leftLogoImage ? {
+                  image: leftLogoImage,
+                  width: 64,
+                  height: 64,
+                  alignment: 'center',
+                  margin: [0, 5, 0, 0]
+                } : {
+                  text: '[LOGO]',
+                  fontSize: 12,
+                  alignment: 'center',
+                  bold: true,
+                  margin: [0, 10, 0, 0]
+                }
+              ],
+              margin: [0, 0, 2, 0]
+            },
+            {
+              width: '*',
+              alignment: 'center',
+              stack: [
+                { text: 'Republic of the Philippines', fontSize: 12, margin: [0, 0, 0, 1] },
+                { text: 'OFFICE OF THE PRESIDENT', fontSize: 12, margin: [0, 0, 0, 1] },
+                { text: 'COMMISSION ON HIGHER EDUCATION', fontSize: 12, bold: true, margin: [0, 0, 0, 1] },
+                { text: 'Regional Office I', fontSize: 12, margin: [0, 0, 0, 1] },
+                { text: 'San Fernando City, La Union', fontSize: 12, margin: [0, 0, 0, 8] }
+              ],
+              margin: [2, 0, 2, 15]
+            },
+            {
+              width: 64,
+              stack: [
+                rightLogoImage ? {
+                  image: rightLogoImage,
+                  width: 64,
+                  height: 64,
+                  alignment: 'center',
+                  margin: [0, 5, 0, 0]
+                } : {
+                  text: '[LOGO]',
+                  fontSize: 12,
+                  alignment: 'center',
+                  bold: true,
+                  margin: [0, 10, 0, 0]
+                }
+              ],
+              margin: [2, 0, 0, 0]
+            }
+          ]
+        };
+      }
+
+      // If header on all pages, use pdfmake header function; otherwise add to first page content only
+      if (headerOnAllPages && headerContent) {
+        // Add 0.5in top margin to the header
+        const existingMargin = headerContent.margin || [0, 0, 0, 0];
+        headerContent.margin = [existingMargin[0], 36, existingMargin[2], existingMargin[3]];
+      } else if (headerContent) {
+        content.push(headerContent);
+      }
 
       // Add the rest of the document content by duplicating the logic from the original function
       // Report title and date
       content.push(
         {
-          text: 'ACCOMPLISHMENT REPORT',
+          text: reportTitleText,
           fontSize: 12,
           bold: true,
           alignment: 'center',
@@ -1911,7 +2002,7 @@ const Reports = () => {
                 {
                   width: '50%',
                   stack: [
-                    { text: leftSig.title || `Signatory ${i + 1}`, margin: [0, 0, 0, 15] },
+                    { text: leftSig.title || `Signatory ${i + 1}`, fontSize: 12, margin: [0, 0, 0, 15] },
                     ...(leftSig.name ? [{ text: leftSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
                     ...(leftSig.position ? [{ text: leftSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
                   ]
@@ -1919,7 +2010,7 @@ const Reports = () => {
                 {
                   width: '50%',
                   stack: [
-                    { text: rightSig.title || `Signatory ${i + 2}`, margin: [0, 0, 0, 15] },
+                    { text: rightSig.title || `Signatory ${i + 2}`, fontSize: 12, margin: [0, 0, 0, 15] },
                     ...(rightSig.name ? [{ text: rightSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
                     ...(rightSig.position ? [{ text: rightSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
                   ]
@@ -1934,7 +2025,7 @@ const Reports = () => {
                 {
                   width: '50%',
                   stack: [
-                    { text: leftSig.title || `Signatory ${i + 1}`, margin: [0, 0, 0, 15] },
+                    { text: leftSig.title || `Signatory ${i + 1}`, fontSize: 12, margin: [0, 0, 0, 15] },
                     ...(leftSig.name ? [{ text: leftSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
                     ...(leftSig.position ? [{ text: leftSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
                   ]
@@ -1956,10 +2047,26 @@ const Reports = () => {
         content = content.concat(signatureSection);
       }
 
+      // Footer image at the bottom of the document
+      if (footerImage) {
+        content.push({
+          image: footerImage,
+          width: 450,
+          alignment: 'center',
+          margin: [0, 40, 0, 0]
+        });
+      }
+
+      // Adjust top margin to accommodate header on all pages
+      let topMargin = 36; // default 0.5in
+      if (headerOnAllPages && headerContent) {
+        topMargin = 130; // space for header + content
+      }
+
       const docDefinition = {
         pageSize: pageSize.toLowerCase() === 'folio' ? { width: 612, height: 936 } : // 8.5in x 13in in points (72 points per inch)
                    pageSize.toLowerCase() === 'letter' ? 'LETTER' : 'A4',
-        pageMargins: [60, 36, 60, 36], // 0.5 inches top and bottom (36 points), 0.83 inches left and right (60 points)
+        pageMargins: [60, topMargin, 60, 36], // dynamic top margin, 0.83 inches left and right (60 points), 0.5 inches bottom (36 points)
         content: content,
         fonts: {
           Roboto: {
@@ -1969,6 +2076,7 @@ const Reports = () => {
             bolditalics: 'Roboto-MediumItalic.ttf'
           }
         },
+        ...(headerOnAllPages && headerContent ? { header: () => headerContent } : {}),
         footer: (currentPage, pageCount) => {
           return {
             columns: [
@@ -1982,7 +2090,7 @@ const Reports = () => {
               {
                 text: `Page ${currentPage} of ${pageCount}`,
                 alignment: 'right',
-                fontSize: 10,
+                fontSize: 12,
                 margin: [0, 0, 60, 10]
               }
             ]
@@ -2067,7 +2175,7 @@ const generatePDF = async () => {
   const showPdfPreview = async () => {
     setIsPreviewLoading(true);
     try {
-      // Fetch fresh signatory data from API first, then localStorage when opening preview
+      // Fetch fresh signatory data and header image from API first, then localStorage when opening preview
       if (user) {
         try {
           const userData = await api.get('/users/profile');
@@ -2132,6 +2240,56 @@ const generatePDF = async () => {
               }
             }
           }
+
+          // Load header image from API
+          if (userData.user?.header_image) {
+            setHeaderImage(userData.user.header_image);
+          } else {
+            const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
+            if (savedHeaderImage) {
+              setHeaderImage(savedHeaderImage);
+            }
+          }
+
+          // Load footer image from API
+          if (userData.user?.footer_image) {
+            setFooterImage(userData.user.footer_image);
+          } else {
+            const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
+            if (savedFooterImage) {
+              setFooterImage(savedFooterImage);
+            }
+          }
+
+          // Load show default header setting
+          if (userData.user?.show_default_header !== undefined) {
+            setShowDefaultHeader(!!userData.user.show_default_header);
+          } else {
+            const saved = localStorage.getItem(`showDefaultHeader_${user?.id}`);
+            if (saved !== null) {
+              setShowDefaultHeader(saved === 'true');
+            }
+          }
+
+          // Load header on all pages setting
+          if (userData.user?.header_on_all_pages !== undefined) {
+            setHeaderOnAllPages(!!userData.user.header_on_all_pages);
+          } else {
+            const saved = localStorage.getItem(`headerOnAllPages_${user?.id}`);
+            if (saved !== null) {
+              setHeaderOnAllPages(saved === 'true');
+            }
+          }
+
+          // Load report title
+          if (userData.user?.report_title) {
+            setReportTitleText(userData.user.report_title);
+          } else {
+            const saved = localStorage.getItem(`reportTitleText_${user?.id}`);
+            if (saved) {
+              setReportTitleText(saved);
+            }
+          }
         } catch (apiError) {
           const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
           if (savedSignatories) {
@@ -2143,6 +2301,30 @@ const generatePDF = async () => {
             } catch (parseError) {
               // Ignore parse errors
             }
+          }
+
+          // Try loading header image from localStorage as fallback
+          const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
+          if (savedHeaderImage) {
+            setHeaderImage(savedHeaderImage);
+          }
+
+          // Try loading footer image from localStorage as fallback
+          const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
+          if (savedFooterImage) {
+            setFooterImage(savedFooterImage);
+          }
+
+          // Try loading show default header from localStorage as fallback
+          const savedDefaultHeader = localStorage.getItem(`showDefaultHeader_${user?.id}`);
+          if (savedDefaultHeader !== null) {
+            setShowDefaultHeader(savedDefaultHeader === 'true');
+          }
+
+          // Try loading header on all pages from localStorage as fallback
+          const savedHeaderOnAllPages = localStorage.getItem(`headerOnAllPages_${user?.id}`);
+          if (savedHeaderOnAllPages !== null) {
+            setHeaderOnAllPages(savedHeaderOnAllPages === 'true');
           }
         }
       }
@@ -2174,7 +2356,7 @@ const generatePDF = async () => {
       };
       regeneratePreview();
     }
-  }, [pageSize, signatoryData, showPdfPreviewModal]);
+  }, [pageSize, signatoryData, headerImage, footerImage, showDefaultHeader, headerOnAllPages, reportTitleText, showPdfPreviewModal]);
 
   // Function to handle PDF printing from preview
   const handlePrintFromPreview = () => {

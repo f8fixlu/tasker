@@ -12,6 +12,11 @@ const PrintReport = () => {
   
   // This is mock data for the report - in real implementation, this would come from API
   const [signatoryData, setSignatoryData] = useState([]);
+  const [headerImage, setHeaderImage] = useState(null);
+  const [footerImage, setFooterImage] = useState(null);
+  const [showDefaultHeader, setShowDefaultHeader] = useState(true);
+  const [headerOnAllPages, setHeaderOnAllPages] = useState(true);
+  const [reportTitleText, setReportTitleText] = useState('ACCOMPLISHMENT REPORT');
 
   // Helper function to determine if signature section has all fields populated (dynamic signatory system)
   const hasAllSignatureFields = () => {
@@ -147,10 +152,89 @@ const PrintReport = () => {
             console.log('No signatory data found in localStorage');
           }
         }
+
+        // Load header image from API (outside signatories if/else)
+        if (userData.user?.header_image) {
+          setHeaderImage(userData.user.header_image);
+        } else {
+          const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
+          if (savedHeaderImage) {
+            setHeaderImage(savedHeaderImage);
+          }
+        }
+
+        // Load footer image from API
+        if (userData.user?.footer_image) {
+          setFooterImage(userData.user.footer_image);
+        } else {
+          const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
+          if (savedFooterImage) {
+            setFooterImage(savedFooterImage);
+          }
+        }
+
+        // Load show default header setting
+        if (userData.user?.show_default_header !== undefined) {
+          setShowDefaultHeader(!!userData.user.show_default_header);
+        } else {
+          const saved = localStorage.getItem(`showDefaultHeader_${user?.id}`);
+          if (saved !== null) {
+            setShowDefaultHeader(saved === 'true');
+          }
+        }
+
+        // Load header on all pages setting
+        if (userData.user?.header_on_all_pages !== undefined) {
+          setHeaderOnAllPages(!!userData.user.header_on_all_pages);
+        } else {
+          const saved = localStorage.getItem(`headerOnAllPages_${user?.id}`);
+          if (saved !== null) {
+            setHeaderOnAllPages(saved === 'true');
+          }
+        }
+
+        // Load report title
+        if (userData.user?.report_title) {
+          setReportTitleText(userData.user.report_title);
+        } else {
+          const saved = localStorage.getItem(`reportTitleText_${user?.id}`);
+          if (saved) {
+            setReportTitleText(saved);
+          }
+        }
       } catch (error) {
         console.error('Error loading signatory data:', error);
         // Set default empty array if there's an error
         setSignatoryData([]);
+        // Try loading header image from localStorage as fallback
+        const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
+        if (savedHeaderImage) {
+          setHeaderImage(savedHeaderImage);
+        }
+
+        // Try loading footer image from localStorage as fallback
+        const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
+        if (savedFooterImage) {
+          setFooterImage(savedFooterImage);
+        }
+
+        // Try loading show default header from localStorage as fallback
+        const savedDefaultHeader = localStorage.getItem(`showDefaultHeader_${user?.id}`);
+        if (savedDefaultHeader !== null) {
+          setShowDefaultHeader(savedDefaultHeader === 'true');
+        }
+
+        // Try loading header on all pages from localStorage as fallback
+        const savedHeaderOnAllPages = localStorage.getItem(`headerOnAllPages_${user?.id}`);
+        if (savedHeaderOnAllPages !== null) {
+          setHeaderOnAllPages(savedHeaderOnAllPages === 'true');
+        }
+
+        // Try loading report title from localStorage as fallback
+        const savedReportTitle = localStorage.getItem(`reportTitleText_${user?.id}`);
+        if (savedReportTitle) {
+          setReportTitleText(savedReportTitle);
+        }
       }
     } else {
       console.log('No user available to load signatory data');
@@ -182,6 +266,18 @@ const PrintReport = () => {
             console.error('Error parsing localStorage signatory data:', e);
           }
         }
+        // Try loading header image from localStorage as fallback
+        const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id || 'unknown'}`);
+        if (savedHeaderImage) {
+          setHeaderImage(savedHeaderImage);
+        }
+
+        // Try loading footer image from localStorage as fallback
+        const savedFooterImage = localStorage.getItem(`footerImage_${user?.id || 'unknown'}`);
+        if (savedFooterImage) {
+          setFooterImage(savedFooterImage);
+        }
+
         setLoading(false); // Make sure loading is stopped even if user is not available
       }
     };
@@ -190,7 +286,7 @@ const PrintReport = () => {
   }, [user]);
 
   const mockReportData = {
-    title: "ACCOMPLISHMENT REPORT",
+    title: reportTitleText,
     period: "For the period of August 1-31, 2025",
     tasksByDate: [
       {
@@ -257,6 +353,16 @@ const PrintReport = () => {
       }));
     }
   }, [signatoryData]);
+
+  // When report title changes, update the report data
+  useEffect(() => {
+    if (reportData) {
+      setReportData(prevData => ({
+        ...prevData,
+        title: reportTitleText
+      }));
+    }
+  }, [reportTitleText]);
 
   const fetchReportData = async () => {
     try {
@@ -401,41 +507,53 @@ const PrintReport = () => {
                 id={`page-${page.id}`}
               >
                 {/* Page Header */}
-                <header className="page-header">
-                  <div className="flex items-center justify-center space-x-0.5">
-                    <img
-                      src="/logo/logoleft.png"
-                      alt="Left Logo"
-                      className="h-16 w-16 flex-shrink-0 rounded"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        const span = document.createElement('span');
-                        span.className = 'text-xs text-gray-500';
-                        span.textContent = 'Logo';
-                        e.target.parentNode.appendChild(span);
-                      }}
-                    />
-                    <div className="text-center px-1">
-                      <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-                      <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-                      <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
-                      <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-                      <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
-                    </div>
-                    <img
-                      src="/logo/logoright.png"
-                      alt="Right Logo"
-                      className="h-16 w-16 flex-shrink-0 rounded"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        const span = document.createElement('span');
-                        span.className = 'text-xs text-gray-500';
-                        span.textContent = 'Logo';
-                        e.target.parentNode.appendChild(span);
-                      }}
-                    />
-                  </div>
-                </header>
+                {(headerOnAllPages || index === 0) && (
+                  <header className="page-header">
+                    {headerImage ? (
+                      <div className="flex justify-center mb-2">
+                        <img
+                          src={headerImage}
+                          alt="Report Header"
+                          className="max-h-16 w-auto object-contain"
+                        />
+                      </div>
+                    ) : showDefaultHeader ? (
+                      <div className="flex items-center justify-center space-x-0.5">
+                        <img
+                          src="/logo/logoleft.png"
+                          alt="Left Logo"
+                          className="h-16 w-16 flex-shrink-0 rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const span = document.createElement('span');
+                            span.className = 'text-xs text-gray-500';
+                            span.textContent = 'Logo';
+                            e.target.parentNode.appendChild(span);
+                          }}
+                        />
+                        <div className="text-center px-1">
+                          <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
+                          <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
+                          <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
+                          <p style={{ fontSize: '10pt' }}>Regional Office I</p>
+                          <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
+                        </div>
+                        <img
+                          src="/logo/logoright.png"
+                          alt="Right Logo"
+                          className="h-16 w-16 flex-shrink-0 rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const span = document.createElement('span');
+                            span.className = 'text-xs text-gray-500';
+                            span.textContent = 'Logo';
+                            e.target.parentNode.appendChild(span);
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </header>
+                )}
 
                 {/* Page Content */}
                 <div className="page-content">
@@ -519,6 +637,15 @@ const PrintReport = () => {
 
                 {/* Page Footer */}
                 <div className="page-footer" style={{ fontSize: '12pt' }}>Page {page.id} of {pages.length}</div>
+                {footerImage && (
+                  <div className="flex justify-center mt-4">
+                    <img
+                      src={footerImage}
+                      alt="Report Footer"
+                      className="max-h-16 w-auto object-contain"
+                    />
+                  </div>
+                )}
               </div>
             );
           } else {
@@ -530,41 +657,53 @@ const PrintReport = () => {
                 id={`page-${page.id}`}
               >
                 {/* Page Header */}
-                <header className="page-header">
-                  <div className="flex items-center justify-center space-x-0.5">
-                    <img
-                      src="/logo/logoleft.png"
-                      alt="Left Logo"
-                      className="h-16 w-16 flex-shrink-0 rounded"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        const span = document.createElement('span');
-                        span.className = 'text-xs text-gray-500';
-                        span.textContent = 'Logo';
-                        e.target.parentNode.appendChild(span);
-                      }}
-                    />
-                    <div className="text-center px-1">
-                      <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-                      <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-                      <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
-                      <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-                      <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
-                    </div>
-                    <img
-                      src="/logo/logoright.png"
-                      alt="Right Logo"
-                      className="h-16 w-16 flex-shrink-0 rounded"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        const span = document.createElement('span');
-                        span.className = 'text-xs text-gray-500';
-                        span.textContent = 'Logo';
-                        e.target.parentNode.appendChild(span);
-                      }}
-                    />
-                  </div>
-                </header>
+                {(headerOnAllPages || index === 0) && (
+                  <header className="page-header">
+                    {headerImage ? (
+                      <div className="flex justify-center mb-2">
+                        <img
+                          src={headerImage}
+                          alt="Report Header"
+                          className="max-h-16 w-auto object-contain"
+                        />
+                      </div>
+                    ) : showDefaultHeader ? (
+                      <div className="flex items-center justify-center space-x-0.5">
+                        <img
+                          src="/logo/logoleft.png"
+                          alt="Left Logo"
+                          className="h-16 w-16 flex-shrink-0 rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const span = document.createElement('span');
+                            span.className = 'text-xs text-gray-500';
+                            span.textContent = 'Logo';
+                            e.target.parentNode.appendChild(span);
+                          }}
+                        />
+                        <div className="text-center px-1">
+                          <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
+                          <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
+                          <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
+                          <p style={{ fontSize: '10pt' }}>Regional Office I</p>
+                          <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
+                        </div>
+                        <img
+                          src="/logo/logoright.png"
+                          alt="Right Logo"
+                          className="h-16 w-16 flex-shrink-0 rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const span = document.createElement('span');
+                            span.className = 'text-xs text-gray-500';
+                            span.textContent = 'Logo';
+                            e.target.parentNode.appendChild(span);
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </header>
+                )}
 
                 {/* Page Content */}
                 <div className="page-content">
@@ -593,6 +732,15 @@ const PrintReport = () => {
 
                 {/* Page Footer */}
                 <div className="page-footer" style={{ fontSize: '12pt' }}>Page {page.id} of {pages.length}</div>
+                {footerImage && (
+                  <div className="flex justify-center mt-4">
+                    <img
+                      src={footerImage}
+                      alt="Report Footer"
+                      className="max-h-16 w-auto object-contain"
+                    />
+                  </div>
+                )}
               </div>
             );
           }

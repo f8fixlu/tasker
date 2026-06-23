@@ -524,7 +524,20 @@
 - Added "Delete Task" option to the row-level `more_vert` ActionsDropdown (before Archive Task) with red styling
 - Both Delete and Archive actions use the same confirmation modal flow
 
+### Day View Time Grid & Drag-and-Drop
+- Redesigned day view from a simple event list to a full time-based grid layout
+- Left column shows 24-hour time labels (12AM–11PM) with `h-16` per slot
+- Events are absolutely positioned based on their start time and span the correct duration (e.g., 5PM–10PM fills 5 slots)
+- Each event card displays title, category, and time range (e.g., "9:00 AM - 10:00 AM")
+- Clicking an empty hour slot opens the New Event modal pre-filled with that date and time
+- Past time slots are dimmed and non-clickable to prevent creating events in the past
+- Events are draggable to reschedule: dropping on a different hour preserves duration and updates start/end times
+- Drag-and-drop only works for future events (past events and holidays are excluded)
+
+### Bug Fixes
+- Fixed `triggerTaskUpdate` and `fetchNotifications` not being destructured from their hooks in Calendar component, causing "is not defined" errors when updating event dates
+
 ### Files Modified
-- `frontend/src/pages/Calendar.js`: Moved view toggle to top bar, removed duplicate month header navigation, changed New Event to primary variant
+- `frontend/src/pages/Calendar.js`: Redesigned day view with time grid, draggable events, hourly drop targets, past-slot protection, new event prefills with time, fixed missing hook destructuring
 - `frontend/src/pages/Tasks.js`: Adjusted date picker width, reorganized toolbar buttons, simplified Delete/Archive button labels, added Delete Task to row ActionsDropdown, moved bulk actions to title bar more_vert dropdown
 - `frontend/src/pages/Reports.js`: Adjusted date picker width to match Tasks page

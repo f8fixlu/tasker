@@ -26,7 +26,7 @@ async function createUser(userData) {
 
 // Get user by ID
 async function getUserById(id) {
-  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at, signatories FROM users WHERE id = ?';
+  const sql = 'SELECT id, full_name, email, password_hash, profile_image_url, welcome_shown, role, status, created_at, updated_at, signatories, header_image, footer_image, show_default_header, report_title, header_on_all_pages FROM users WHERE id = ?';
   const params = [id];
 
   try {
@@ -89,6 +89,26 @@ async function updateUser(id, userData) {
       : JSON.stringify(userData.signatories);
     fields.push('signatories = ?');
     params.push(signatoriesJson);
+  }
+  if (userData.header_image !== undefined) {
+    fields.push('header_image = ?');
+    params.push(userData.header_image);
+  }
+  if (userData.footer_image !== undefined) {
+    fields.push('footer_image = ?');
+    params.push(userData.footer_image);
+  }
+  if (userData.show_default_header !== undefined) {
+    fields.push('show_default_header = ?');
+    params.push(userData.show_default_header ? 1 : 0);
+  }
+  if (userData.report_title !== undefined) {
+    fields.push('report_title = ?');
+    params.push(userData.report_title);
+  }
+  if (userData.header_on_all_pages !== undefined) {
+    fields.push('header_on_all_pages = ?');
+    params.push(userData.header_on_all_pages ? 1 : 0);
   }
 
   // Add updated_at timestamp

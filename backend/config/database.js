@@ -376,6 +376,51 @@ function createOtherTablesAndColumns(callback) {
     }
   });
 
+  // Add header_image column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN header_image TEXT`, (err) => {
+    if (err) {
+      console.log('Note: header_image column may already exist or table is not ready yet');
+    } else {
+      console.log('header_image column added to users table successfully');
+    }
+  });
+
+  // Add footer_image column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN footer_image TEXT`, (err) => {
+    if (err) {
+      console.log('Note: footer_image column may already exist or table is not ready yet');
+    } else {
+      console.log('footer_image column added to users table successfully');
+    }
+  });
+
+  // Add show_default_header column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN show_default_header INTEGER DEFAULT 1`, (err) => {
+    if (err) {
+      console.log('Note: show_default_header column may already exist or table is not ready yet');
+    } else {
+      console.log('show_default_header column added to users table successfully');
+    }
+  });
+
+  // Add report_title column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN report_title TEXT DEFAULT 'ACCOMPLISHMENT REPORT'`, (err) => {
+    if (err) {
+      console.log('Note: report_title column may already exist or table is not ready yet');
+    } else {
+      console.log('report_title column added to users table successfully');
+    }
+  });
+
+  // Add header_on_all_pages column if it doesn't exist (for existing databases)
+  db.run(`ALTER TABLE users ADD COLUMN header_on_all_pages INTEGER DEFAULT 1`, (err) => {
+    if (err) {
+      console.log('Note: header_on_all_pages column may already exist or table is not ready yet');
+    } else {
+      console.log('header_on_all_pages column added to users table successfully');
+    }
+  });
+
   console.log('Database initialized successfully');
 
   if (callback) callback(null);
