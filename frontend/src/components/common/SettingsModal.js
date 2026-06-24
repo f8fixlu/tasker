@@ -1592,63 +1592,87 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
                   <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4">Report Header</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Upload a JPG image to replace the default header in the PDF report. Recommended width: 800px.
+                    Upload a JPG or PNG image to replace the default header in the PDF report. Recommended width: 800px. PNG supports transparent backgrounds.
                   </p>
-                  <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
                       {headerImage ? (
                         <div className="relative">
                           <img
                             src={headerImage}
                             alt="Report header preview"
-                            className="h-24 w-auto rounded border border-gray-300 dark:border-gray-600 object-contain"
+                            className="h-20 w-[28rem] rounded border border-gray-300 dark:border-gray-600 object-contain cursor-pointer"
+                            onClick={() => document.getElementById('header-file-input').click()}
                           />
                           <button
                             type="button"
                             onClick={() => setHeaderImage(null)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                             title="Remove header image"
                           >
                             <span className="material-symbols-outlined text-sm">close</span>
                           </button>
+                          <input
+                            id="header-file-input"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+                                  alert('Please select a JPG or PNG image file.');
+                                  return;
+                                }
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('File size exceeds 5MB limit.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setHeaderImage(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          {headerImage && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              When set, replaces the default header (logos and agency name).
+                            </p>
+                          )}
                         </div>
                       ) : (
-                        <div className="h-24 w-48 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm">
+                        <div
+                          className="h-20 w-[28rem] flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm cursor-pointer"
+                          onClick={() => document.getElementById('header-file-input').click()}
+                        >
                           No image selected
+                          <input
+                            id="header-file-input"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+                                  alert('Please select a JPG or PNG image file.');
+                                  return;
+                                }
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('File size exceeds 5MB limit.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setHeaderImage(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-[#111418] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <span className="material-symbols-outlined text-base">upload</span>
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,image/jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              if (!file.type.match('image/jpeg')) {
-                                alert('Please select a JPG image file.');
-                                return;
-                              }
-                              if (file.size > 5 * 1024 * 1024) {
-                                alert('File size exceeds 5MB limit.');
-                                return;
-                              }
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setHeaderImage(event.target.result);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
-                      {headerImage && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          When set, replaces the default header (logos and agency name).
-                        </p>
                       )}
                     </div>
                   </div>
@@ -1658,7 +1682,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
                   <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4">Report Footer</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Upload a JPG image to display at the bottom of each page in the PDF report. Recommended width: 800px.
+                    Upload a JPG or PNG image to display at the bottom of each page in the PDF report. Recommended width: 800px. PNG supports transparent backgrounds.
                   </p>
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
@@ -1667,54 +1691,78 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                           <img
                             src={footerImage}
                             alt="Report footer preview"
-                            className="h-24 w-auto rounded border border-gray-300 dark:border-gray-600 object-contain"
+                            className="h-20 w-[28rem] rounded border border-gray-300 dark:border-gray-600 object-contain cursor-pointer"
+                            onClick={() => document.getElementById('footer-file-input').click()}
                           />
                           <button
                             type="button"
                             onClick={() => setFooterImage(null)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                             title="Remove footer image"
                           >
                             <span className="material-symbols-outlined text-sm">close</span>
                           </button>
+                          <input
+                            id="footer-file-input"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+                                  alert('Please select a JPG or PNG image file.');
+                                  return;
+                                }
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('File size exceeds 5MB limit.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setFooterImage(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          {footerImage && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Displays at the bottom of each page in the PDF report.
+                            </p>
+                          )}
                         </div>
                       ) : (
-                        <div className="h-24 w-48 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm">
+                        <div
+                          className="h-20 w-[28rem] flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-400 text-sm cursor-pointer"
+                          onClick={() => document.getElementById('footer-file-input').click()}
+                        >
                           No image selected
+                          <input
+                            id="footer-file-input"
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                if (!file.type.match('image/jpeg') && !file.type.match('image/png')) {
+                                  alert('Please select a JPG or PNG image file.');
+                                  return;
+                                }
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('File size exceeds 5MB limit.');
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setFooterImage(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-[#111418] dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <span className="material-symbols-outlined text-base">upload</span>
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,image/jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              if (!file.type.match('image/jpeg')) {
-                                alert('Please select a JPG image file.');
-                                return;
-                              }
-                              if (file.size > 5 * 1024 * 1024) {
-                                alert('File size exceeds 5MB limit.');
-                                return;
-                              }
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setFooterImage(event.target.result);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
-                      {footerImage && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Displays at the bottom of each page in the PDF report.
-                        </p>
                       )}
                     </div>
                   </div>
