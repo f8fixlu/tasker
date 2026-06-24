@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
+import MarginSettingsModal from '../components/common/MarginSettingsModal';
 import { reportsService } from '../services/reportsService';
 import { categoryService } from '../services/categoryService';
 import { eventCategoryService } from '../services/eventCategoryService';
@@ -220,6 +221,35 @@ const Reports = () => {
 
   const [pageSize, setPageSize] = useState('A4'); // Default to A4
   const [zoomLevel, setZoomLevel] = useState(100); // Default zoom level 100%
+  const [showMarginModal, setShowMarginModal] = useState(false);
+  const [pdfMargins, setPdfMargins] = useState({
+    page: [60, 36, 60, 36],
+    customHeader: [0, 0, 0, 15],
+    defaultHeader: [72, 0, 72, 0],
+    defaultHeaderLeftCol: [0, 0, 2, 0],
+    defaultHeaderCenterCol: [2, 0, 2, 15],
+    defaultHeaderRightCol: [2, 0, 0, 0],
+    leftLogo: [0, 5, 0, 0],
+    rightLogo: [0, 5, 0, 0],
+    leftLogoPlaceholder: [0, 10, 0, 0],
+    rightLogoPlaceholder: [0, 10, 0, 0],
+    agencyLine: [0, 0, 0, 1],
+    agencyLastLine: [0, 0, 0, 8],
+    reportTitle: [0, 0, 0, 5],
+    dateRange: [0, 0, 0, 30],
+    taskSection: [0, 0, 0, 10],
+    dateHeader: [0, 0, 0, 5],
+    firstEventLine: [20, 0, 0, 15],
+    eachActivity: [0, 10, 0, 20],
+    signatoryTitle: [0, 0, 0, 15],
+    signatoryName: [0, 10, 0, 0],
+    signatoryPosition: [0, 5, 0, 0],
+    signatoryWrapper: [0, 0, 0, 30],
+    spacer: [0, 40, 0, 0],
+    footerLeft: [60, 0, 0, 10],
+    footerRight: [0, 0, 60, 10],
+    footerImage: [0, 40, 0, 0],
+  });
 
   // Helper function to format category filters for API
   const formatCategoryFiltersForAPI = () => {
@@ -1770,7 +1800,9 @@ const Reports = () => {
   };
 
   // Function to create PDFMake document definition for the report
-  const createReportDefinition = async () => {
+  const createReportDefinition = async (customHeaderImage, customFooterImage) => {
+    const activeHeaderImage = customHeaderImage !== undefined ? customHeaderImage : headerImage;
+    const activeFooterImage = customFooterImage !== undefined ? customFooterImage : footerImage;
     return new Promise(async (resolve) => {
       let content = [];
 
@@ -1809,66 +1841,60 @@ const Reports = () => {
 
       // Build header content (custom or default)
       let headerContent = null;
-      if (headerImage) {
+      if (activeHeaderImage) {
+        const hMargin = headerOnAllPages
+          ? [pdfMargins.customHeader[0], 36, pdfMargins.customHeader[2], pdfMargins.customHeader[3]]
+          : pdfMargins.customHeader;
         headerContent = {
-          image: headerImage,
+          image: activeHeaderImage,
           width: 450,
           alignment: 'center',
-          margin: [0, 0, 0, 15]
+          margin: hMargin
         };
       } else if (showDefaultHeader) {
+        const hMargin = headerOnAllPages
+          ? [pdfMargins.defaultHeader[0], 36, pdfMargins.defaultHeader[2], pdfMargins.defaultHeader[3]]
+          : pdfMargins.defaultHeader;
         headerContent = {
-          margin: [72, 0, 72, 0],
+          margin: hMargin,
           columns: [
             {
               width: 64,
               stack: [
-                leftLogoImage ? {
+                  leftLogoImage ? {
                   image: leftLogoImage,
-                  width: 64,
-                  height: 64,
-                  alignment: 'center',
-                  margin: [0, 5, 0, 0]
+                  style: 'leftLogoImg'
                 } : {
                   text: '[LOGO]',
-                  fontSize: 12,
-                  alignment: 'center',
-                  bold: true,
-                  margin: [0, 10, 0, 0]
+                  style: 'leftLogoPlaceholder'
                 }
               ],
-              margin: [0, 0, 2, 0]
+              style: 'defaultHeaderLeftCol'
             },
             {
               width: '*',
               alignment: 'center',
               stack: [
-                { text: 'Republic of the Philippines', fontSize: 12, margin: [0, 0, 0, 1] },
-                { text: 'OFFICE OF THE PRESIDENT', fontSize: 12, margin: [0, 0, 0, 1] },
-                { text: 'COMMISSION ON HIGHER EDUCATION', fontSize: 12, bold: true, margin: [0, 0, 0, 1] },
-                { text: 'Regional Office I', fontSize: 12, margin: [0, 0, 0, 1] },
-                { text: 'San Fernando City, La Union', fontSize: 12, margin: [0, 0, 0, 8] }
+                { text: 'Republic of the Philippines', style: 'agencyLine' },
+                { text: 'OFFICE OF THE PRESIDENT', style: 'agencyLine' },
+                { text: 'COMMISSION ON HIGHER EDUCATION', bold: true, style: 'agencyLine' },
+                { text: 'Regional Office I', style: 'agencyLine' },
+                { text: 'San Fernando City, La Union', style: 'agencyLastLine' }
               ],
-              margin: [2, 0, 2, 15]
+              style: 'defaultHeaderCenterCol'
             },
             {
               width: 64,
               stack: [
                 rightLogoImage ? {
                   image: rightLogoImage,
-                  width: 64,
-                  height: 64,
-                  alignment: 'center',
-                  margin: [0, 5, 0, 0]
+                  style: 'rightLogoImg'
                 } : {
                   text: '[LOGO]',
-                  fontSize: 12,
-                  alignment: 'center',
-                  bold: true,
-                  margin: [0, 10, 0, 0]
+                  style: 'rightLogoPlaceholder'
                 }
               ],
-              margin: [2, 0, 0, 0]
+              style: 'defaultHeaderRightCol'
             }
           ]
         };
@@ -1876,29 +1902,15 @@ const Reports = () => {
 
       // If header on all pages, use pdfmake header function; otherwise add to first page content only
       if (headerOnAllPages && headerContent) {
-        // Add 0.5in top margin to the header
-        const existingMargin = headerContent.margin || [0, 0, 0, 0];
-        headerContent.margin = [existingMargin[0], 36, existingMargin[2], existingMargin[3]];
+        // Already computed margin with 36pt top above
       } else if (headerContent) {
         content.push(headerContent);
       }
 
-      // Add the rest of the document content by duplicating the logic from the original function
       // Report title and date
       content.push(
-        {
-          text: reportTitleText,
-          fontSize: 12,
-          bold: true,
-          alignment: 'center',
-          margin: [0, 0, 0, 5]
-        },
-        {
-          text: `For the period of ${formatPrintDateRange(dateRange.startDate, dateRange.endDate)}`,
-          fontSize: 12,
-          alignment: 'center',
-          margin: [0, 0, 0, 30]
-        }
+        { text: reportTitleText, style: 'reportTitle' },
+        { text: `For the period of ${formatPrintDateRange(dateRange.startDate, dateRange.endDate)}`, style: 'dateRange' }
       );
 
 
@@ -1945,35 +1957,22 @@ const Reports = () => {
             content.push(
               {
                 text: `Tasks/Activities Undertaken (${date}):`,
-                bold: true,
-                fontSize: 12,
-                margin: [0, 0, 0, 10]
+                style: 'taskSectionTitle'
               },
               {
                 ul: combinedItems.map(item => ({
                   text: item,
-                  fontSize: 12,
-                  margin: [0, 0, 0, 5]
+                  style: 'taskItem'
                 })),
-                margin: [20, 0, 0, 15]
+                style: 'taskList'
               }
             );
           }
         });
       } else if (printSections.taskList) {
         content.push(
-          {
-            text: 'TASKS/ACTIVITIES UNDERTAKEN',
-            bold: true,
-            fontSize: 12,
-            margin: [0, 0, 0, 10]
-          },
-          {
-            text: 'No tasks found for the selected date range',
-            color: '#6b7280',
-            alignment: 'center',
-            margin: [0, 10, 0, 20]
-          }
+          { text: 'TASKS/ACTIVITIES UNDERTAKEN', style: 'taskSectionTitle' },
+          { text: 'No tasks found for the selected date range', style: 'noTasksText' }
         );
       }
 
@@ -1996,38 +1995,36 @@ const Reports = () => {
           const rightSig = signatoryArray[i + 1];
 
           if (rightSig) {
-            // Two signatories in this row
             signatureSection.push({
               columns: [
                 {
                   width: '50%',
                   stack: [
-                    { text: leftSig.title || `Signatory ${i + 1}`, fontSize: 12, margin: [0, 0, 0, 15] },
-                    ...(leftSig.name ? [{ text: leftSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
-                    ...(leftSig.position ? [{ text: leftSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
+                    { text: leftSig.title || `Signatory ${i + 1}`, style: 'signatoryTitle' },
+                    ...(leftSig.name ? [{ text: leftSig.name, style: 'signatoryName' }] : []),
+                    ...(leftSig.position ? [{ text: leftSig.position, style: 'signatoryPosition' }] : [])
                   ]
                 },
                 {
                   width: '50%',
                   stack: [
-                    { text: rightSig.title || `Signatory ${i + 2}`, fontSize: 12, margin: [0, 0, 0, 15] },
-                    ...(rightSig.name ? [{ text: rightSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
-                    ...(rightSig.position ? [{ text: rightSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
+                    { text: rightSig.title || `Signatory ${i + 2}`, style: 'signatoryTitle' },
+                    ...(rightSig.name ? [{ text: rightSig.name, style: 'signatoryName' }] : []),
+                    ...(rightSig.position ? [{ text: rightSig.position, style: 'signatoryPosition' }] : [])
                   ]
                 }
               ],
-              margin: [0, 0, 0, 30]
+              style: 'signatoryWrapper'
             });
           } else {
-            // Single signatory in this row
             signatureSection.push({
               columns: [
                 {
                   width: '50%',
                   stack: [
-                    { text: leftSig.title || `Signatory ${i + 1}`, fontSize: 12, margin: [0, 0, 0, 15] },
-                    ...(leftSig.name ? [{ text: leftSig.name, fontSize: 12, bold: true, margin: [0, 10, 0, 0] }] : []),
-                    ...(leftSig.position ? [{ text: leftSig.position, fontSize: 12, margin: [0, 5, 0, 0] }] : [])
+                    { text: leftSig.title || `Signatory ${i + 1}`, style: 'signatoryTitle' },
+                    ...(leftSig.name ? [{ text: leftSig.name, style: 'signatoryName' }] : []),
+                    ...(leftSig.position ? [{ text: leftSig.position, style: 'signatoryPosition' }] : [])
                   ]
                 },
                 {
@@ -2035,25 +2032,23 @@ const Reports = () => {
                   stack: [] // Empty space to maintain layout
                 }
               ],
-              margin: [0, 0, 0, 30]
+              style: 'signatoryWrapper'
             });
           }
         }
       }
 
       if (signatureSection.length > 0) {
-        // Add spacer before signature section
-        content.push({ text: ' ', margin: [0, 40, 0, 0] }); // Spacer
+        content.push({ text: ' ', style: 'spacer' });
         content = content.concat(signatureSection);
       }
 
-      // Footer image at the bottom of the document
-      if (footerImage) {
+      if (activeFooterImage) {
         content.push({
-          image: footerImage,
+          image: activeFooterImage,
           width: 450,
           alignment: 'center',
-          margin: [0, 40, 0, 0]
+          style: 'footerImage'
         });
       }
 
@@ -2063,10 +2058,40 @@ const Reports = () => {
         topMargin = 130; // space for header + content
       }
 
+      const pageMarginLeft = pdfMargins.page[0];
+      const pageMarginRight = pdfMargins.page[2];
+      const pageMarginBottom = pdfMargins.page[3];
+
+      const marginStyles = {
+        reportTitle: { margin: pdfMargins.reportTitle, fontSize: 12, bold: true, alignment: 'center' },
+        dateRange: { margin: pdfMargins.dateRange, fontSize: 12, alignment: 'center' },
+        taskSectionTitle: { margin: pdfMargins.taskSection, bold: true, fontSize: 12 },
+        taskItem: { margin: pdfMargins.dateHeader, fontSize: 12 },
+        taskList: { margin: pdfMargins.firstEventLine },
+        noTasksText: { margin: pdfMargins.eachActivity, color: '#6b7280', alignment: 'center' },
+        signatoryTitle: { margin: pdfMargins.signatoryTitle, fontSize: 12 },
+        signatoryName: { margin: pdfMargins.signatoryName, fontSize: 12, bold: true },
+        signatoryPosition: { margin: pdfMargins.signatoryPosition, fontSize: 12 },
+        signatoryWrapper: { margin: pdfMargins.signatoryWrapper },
+        spacer: { margin: pdfMargins.spacer },
+        footerImage: { margin: pdfMargins.footerImage },
+        footerLeft: { margin: pdfMargins.footerLeft, fontSize: 9, italics: true, color: '#6b7280' },
+        footerRight: { margin: pdfMargins.footerRight, alignment: 'right', fontSize: 12 },
+        agencyLine: { margin: pdfMargins.agencyLine, fontSize: 12 },
+        agencyLastLine: { margin: pdfMargins.agencyLastLine, fontSize: 12 },
+        leftLogoImg: { margin: pdfMargins.leftLogo, width: 64, height: 64, alignment: 'center' },
+        rightLogoImg: { margin: pdfMargins.rightLogo, width: 64, height: 64, alignment: 'center' },
+        leftLogoPlaceholder: { margin: pdfMargins.leftLogoPlaceholder, fontSize: 12, alignment: 'center', bold: true },
+        rightLogoPlaceholder: { margin: pdfMargins.rightLogoPlaceholder, fontSize: 12, alignment: 'center', bold: true },
+        defaultHeaderLeftCol: { margin: pdfMargins.defaultHeaderLeftCol },
+        defaultHeaderCenterCol: { margin: pdfMargins.defaultHeaderCenterCol },
+        defaultHeaderRightCol: { margin: pdfMargins.defaultHeaderRightCol },
+      };
+
       const docDefinition = {
         pageSize: pageSize.toLowerCase() === 'folio' ? { width: 612, height: 936 } : // 8.5in x 13in in points (72 points per inch)
                    pageSize.toLowerCase() === 'letter' ? 'LETTER' : 'A4',
-        pageMargins: [60, topMargin, 60, 36], // dynamic top margin, 0.83 inches left and right (60 points), 0.5 inches bottom (36 points)
+        pageMargins: [pageMarginLeft, topMargin, pageMarginRight, pageMarginBottom],
         content: content,
         fonts: {
           Roboto: {
@@ -2080,19 +2105,8 @@ const Reports = () => {
         footer: (currentPage, pageCount) => {
           return {
             columns: [
-              {
-                text: 'This report is system generated',
-                fontSize: 9,
-                italics: true,
-                color: '#6b7280',
-                margin: [60, 0, 0, 10]
-              },
-              {
-                text: `Page ${currentPage} of ${pageCount}`,
-                alignment: 'right',
-                fontSize: 12,
-                margin: [0, 0, 60, 10]
-              }
+              { text: 'This report is system generated', style: 'footerLeft' },
+              { text: `Page ${currentPage} of ${pageCount}`, style: 'footerRight' }
             ]
           };
         },
@@ -2101,6 +2115,7 @@ const Reports = () => {
           fontSize: 12
         },
         styles: {
+          ...marginStyles,
           statBox: {
             fillColor: '#f3f4f6',
             padding: 15,
@@ -2127,10 +2142,10 @@ const generatePDF = async () => {
   };
 
   // Function to generate PDF blob for preview
-  const generatePDFBlob = async () => {
+  const generatePDFBlob = async (customHeaderImage, customFooterImage) => {
     try {
       const pdfMakeInstance = await loadPdfMake();
-      const docDefinition = await createReportDefinition();
+      const docDefinition = await createReportDefinition(customHeaderImage, customFooterImage);
 
       const pdf = pdfMakeInstance.createPdf(docDefinition);
 
@@ -2176,6 +2191,10 @@ const generatePDF = async () => {
     setIsPreviewLoading(true);
     try {
       // Fetch fresh signatory data and header image from API first, then localStorage when opening preview
+      // Use local variables to avoid React async state closure issues
+      let freshHeaderImage = headerImage;
+      let freshFooterImage = footerImage;
+
       if (user) {
         try {
           const userData = await api.get('/users/profile');
@@ -2241,23 +2260,27 @@ const generatePDF = async () => {
             }
           }
 
-          // Load header image from API
+          // Load header image from API (use local variable to avoid closure issue)
           if (userData.user?.header_image) {
-            setHeaderImage(userData.user.header_image);
+            freshHeaderImage = userData.user.header_image;
+            setHeaderImage(freshHeaderImage);
           } else {
             const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
             if (savedHeaderImage) {
-              setHeaderImage(savedHeaderImage);
+              freshHeaderImage = savedHeaderImage;
+              setHeaderImage(freshHeaderImage);
             }
           }
 
-          // Load footer image from API
+          // Load footer image from API (use local variable to avoid closure issue)
           if (userData.user?.footer_image) {
-            setFooterImage(userData.user.footer_image);
+            freshFooterImage = userData.user.footer_image;
+            setFooterImage(freshFooterImage);
           } else {
             const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
             if (savedFooterImage) {
-              setFooterImage(savedFooterImage);
+              freshFooterImage = savedFooterImage;
+              setFooterImage(freshFooterImage);
             }
           }
 
@@ -2306,13 +2329,15 @@ const generatePDF = async () => {
           // Try loading header image from localStorage as fallback
           const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
           if (savedHeaderImage) {
-            setHeaderImage(savedHeaderImage);
+            freshHeaderImage = savedHeaderImage;
+            setHeaderImage(freshHeaderImage);
           }
 
           // Try loading footer image from localStorage as fallback
           const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
           if (savedFooterImage) {
-            setFooterImage(savedFooterImage);
+            freshFooterImage = savedFooterImage;
+            setFooterImage(freshFooterImage);
           }
 
           // Try loading show default header from localStorage as fallback
@@ -2329,7 +2354,8 @@ const generatePDF = async () => {
         }
       }
 
-      const blob = await generatePDFBlob();
+      // Pass local variables directly to avoid React async state closure issue
+      const blob = await generatePDFBlob(freshHeaderImage, freshFooterImage);
       const url = URL.createObjectURL(blob);
       setPdfPreviewUrl(url);
       setShowPdfPreviewModal(true);
@@ -2356,7 +2382,7 @@ const generatePDF = async () => {
       };
       regeneratePreview();
     }
-  }, [pageSize, signatoryData, headerImage, footerImage, showDefaultHeader, headerOnAllPages, reportTitleText, showPdfPreviewModal]);
+  }, [pageSize, signatoryData, headerImage, footerImage, showDefaultHeader, headerOnAllPages, reportTitleText, showPdfPreviewModal, pdfMargins]);
 
   // Function to handle PDF printing from preview
   const handlePrintFromPreview = () => {
@@ -3326,8 +3352,8 @@ const generatePDF = async () => {
 
       {/* PDF Preview Modal */}
       <div className={`fixed inset-0 z-[1001] bg-gray-100 dark:bg-gray-800 flex flex-col ${showPdfPreviewModal ? 'block' : 'hidden'}`}>
-        {/* Modal Header */}
-        <div className="w-full max-w-7xl flex justify-between items-center px-4 py-4 sticky top-0 z-50 bg-white dark:bg-gray-800">
+        {/* Floating Controls */}
+        <div className="absolute bottom-4 left-[10rem] right-[10rem] flex justify-between items-center px-4 py-3 z-50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg shadow-lg">
           <div className="flex items-center gap-2 text-sm">
             <label htmlFor="pdf-page-size-select" className="text-gray-700 dark:text-gray-300">Page Size:</label>
             <select
@@ -3335,12 +3361,21 @@ const generatePDF = async () => {
               value={pageSize}
               onChange={(e) => setPageSize(e.target.value)}
               className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              onClick={(e) => e.stopPropagation()} // Prevent click from affecting modal
+              onClick={(e) => e.stopPropagation()}
             >
               <option value="A4">A4</option>
               <option value="Letter">Letter</option>
               <option value="Folio">Folio</option>
             </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMarginModal(true)}
+              className="ml-2"
+            >
+              <span className="material-symbols-outlined text-sm mr-1">margin</span>
+              Set Margin
+            </Button>
           </div>
           <div className="flex items-center gap-4">
             <Button
@@ -3370,6 +3405,19 @@ const generatePDF = async () => {
         <div className="flex-grow overflow-hidden bg-gray-100 dark:bg-gray-800">
           {pdfPreviewUrl ? (
             <iframe
+              ref={(el) => {
+                if (el) {
+                  el.addEventListener('load', () => {
+                    try {
+                      const style = el.contentDocument?.createElement('style');
+                      if (style) {
+                        style.textContent = '#title { display: none !important; }';
+                        el.contentDocument?.head?.appendChild(style);
+                      }
+                    } catch (e) { /* cross-origin */ }
+                  }, { once: true });
+                }
+              }}
               src={pdfPreviewUrl}
               width="100%"
               height="100%"
@@ -3383,6 +3431,17 @@ const generatePDF = async () => {
           )}
         </div>
       </div>
+
+      <MarginSettingsModal
+        isOpen={showMarginModal}
+        onClose={() => setShowMarginModal(false)}
+        margins={pdfMargins}
+        onMarginsChange={setPdfMargins}
+        overlay={false}
+        transparent={true}
+        zIndex="z-[1002]"
+        draggable={true}
+      />
     </div>
   );
 };

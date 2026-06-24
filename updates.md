@@ -541,3 +541,32 @@
 - `frontend/src/pages/Calendar.js`: Redesigned day view with time grid, draggable events, hourly drop targets, past-slot protection, new event prefills with time, fixed missing hook destructuring
 - `frontend/src/pages/Tasks.js`: Adjusted date picker width, reorganized toolbar buttons, simplified Delete/Archive button labels, added Delete Task to row ActionsDropdown, moved bulk actions to title bar more_vert dropdown
 - `frontend/src/pages/Reports.js`: Adjusted date picker width to match Tasks page
+
+---
+
+## PDF Margin Settings Modal — Overlay & Draggable
+
+### Floating, Transparent, Draggable Margin Modal
+- Margin Settings modal now opens as a floating overlay on top of the PDF preview
+- Semi-transparent background (`bg-white/80 backdrop-blur-sm`) so the PDF is visible underneath
+- No dark backdrop overlay — interacts directly with the PDF preview below
+- Modal is **draggable** by the title bar (`cursor-grab` / `cursor-grabbing`)
+- Drag updates position in real-time via `transform: translate()`, disables text selection during drag
+- Position resets to center when modal is closed and reopened
+
+### Modal Component Extensions (`Modal.js`)
+- Added `overlay` prop (default `true`) — hides the dark backdrop overlay when `false`
+- Added `transparent` prop (default `false`) — applies semi-transparent background with backdrop blur
+- Added `zIndex` prop (default `'z-50'`) — allows overriding the z-index stack
+- Added `draggable` prop (default `false`) — enables mouse-drag repositioning from the header
+- Original DOM structure preserved exactly (`sm:block`, hidden `<span>` helper, `transform transition-all`, `sm:align-middle`, `items-center`) — new features added as minimal wrappers without altering base classes
+- Background classes (`bg-white dark:bg-gray-800`) unchanged for non-transparent modals — all existing modals retain identical appearance
+
+### Iframe CSS Injection Reverted
+- Reverted the complex iframe CSS injection back to the original simple approach
+- Only `#title { display: none !important; }` is injected (hides UUID in PDF viewer)
+
+### Files Modified
+- `frontend/src/components/common/Modal.js`: Added overlay, transparent, zIndex, draggable props; mousemove/mouseup document listeners for drag; restored original DOM structure exactly
+- `frontend/src/components/common/MarginSettingsModal.js`: Passes through new Modal props (overlay, transparent, zIndex, draggable)
+- `frontend/src/pages/Reports.js`: Enabled overlay={false}, transparent={true}, zIndex="z-[1002]", draggable={true} on margin modal
