@@ -225,16 +225,7 @@ const Reports = () => {
   const [pdfMargins, setPdfMargins] = useState({
     page: [60, 36, 60, 36],
     customHeader: [0, 0, 0, 15],
-    defaultHeader: [72, 0, 72, 0],
-    defaultHeaderLeftCol: [0, 0, 2, 0],
-    defaultHeaderCenterCol: [2, 0, 2, 15],
-    defaultHeaderRightCol: [2, 0, 0, 0],
-    leftLogo: [0, 5, 0, 0],
-    rightLogo: [0, 5, 0, 0],
-    leftLogoPlaceholder: [0, 10, 0, 0],
-    rightLogoPlaceholder: [0, 10, 0, 0],
-    agencyLine: [0, 0, 0, 1],
-    agencyLastLine: [0, 0, 0, 8],
+    defaultHeader: [0, 0, 0, 0],
     reportTitle: [0, 0, 0, 5],
     dateRange: [0, 0, 0, 30],
     taskSection: [0, 0, 0, 10],
@@ -562,40 +553,13 @@ const Reports = () => {
       if (!showDefaultHeader) return null;
 
       return (
-        <header className="page-header p-6 border-b border-gray-200" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
-          <div className="flex items-center justify-center space-x-1">
-            <img
-              src="/logo/logoleft.png"
-              alt="Left Logo"
-              className="h-16 w-16 flex-shrink-0 rounded"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const span = document.createElement('span');
-                span.className = 'text-xs text-gray-500';
-                span.textContent = 'Logo';
-                e.target.parentNode.appendChild(span);
-              }}
-            />
-            <div className="text-center px-1">
-              <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-              <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-              <p className="font-bold" style={{ fontSize: '10pt' }}>COMMISSION ON HIGHER EDUCATION</p>
-              <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-              <p style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
-            </div>
-            <img
-              src="/logo/logoright.png"
-              alt="Right Logo"
-              className="h-16 w-16 flex-shrink-0 rounded"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const span = document.createElement('span');
-                span.className = 'text-xs text-gray-500';
-                span.textContent = 'Logo';
-                e.target.parentNode.appendChild(span);
-              }}
-            />
-          </div>
+        <header className="page-header p-6 border-b border-gray-200 flex justify-center" style={{ fontFamily: "'Bookman Old Style', serif", fontSize: '12pt' }}>
+          <img
+            src="/header/ched_header.png"
+            alt="CHED Header"
+            className="max-w-full h-auto"
+            style={{ maxHeight: '100px' }}
+          />
         </header>
       );
     };
@@ -1806,37 +1770,20 @@ const Reports = () => {
     return new Promise(async (resolve) => {
       let content = [];
 
-      let leftLogoImage = null;
-      let rightLogoImage = null;
-
+      let chedHeaderImage = null;
       try {
-        const leftLogoResponse = await fetch('/logo/logoleft.png');
-        if (leftLogoResponse.ok) {
-          const leftLogoBlob = await leftLogoResponse.blob();
-          leftLogoImage = await new Promise((resolve, reject) => {
+        const response = await fetch('/header/ched_header.png');
+        if (response.ok) {
+          const blob = await response.blob();
+          chedHeaderImage = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
-            reader.readAsDataURL(leftLogoBlob);
+            reader.readAsDataURL(blob);
           });
         }
       } catch (error) {
-        // Ignore logo loading errors
-      }
-
-      try {
-        const rightLogoResponse = await fetch('/logo/logoright.png');
-        if (rightLogoResponse.ok) {
-          const rightLogoBlob = await rightLogoResponse.blob();
-          rightLogoImage = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(rightLogoBlob);
-          });
-        }
-      } catch (error) {
-        // Ignore logo loading errors
+        // Ignore header image loading errors
       }
 
       // Build header content (custom or default)
@@ -1851,52 +1798,15 @@ const Reports = () => {
           alignment: 'center',
           margin: hMargin
         };
-      } else if (showDefaultHeader) {
+      } else if (showDefaultHeader && chedHeaderImage) {
         const hMargin = headerOnAllPages
-          ? [pdfMargins.defaultHeader[0], 36, pdfMargins.defaultHeader[2], pdfMargins.defaultHeader[3]]
-          : pdfMargins.defaultHeader;
+          ? [pdfMargins.customHeader[0], 36, pdfMargins.customHeader[2], pdfMargins.customHeader[3]]
+          : pdfMargins.customHeader;
         headerContent = {
-          margin: hMargin,
-          columns: [
-            {
-              width: 64,
-              stack: [
-                  leftLogoImage ? {
-                  image: leftLogoImage,
-                  style: 'leftLogoImg'
-                } : {
-                  text: '[LOGO]',
-                  style: 'leftLogoPlaceholder'
-                }
-              ],
-              style: 'defaultHeaderLeftCol'
-            },
-            {
-              width: '*',
-              alignment: 'center',
-              stack: [
-                { text: 'Republic of the Philippines', style: 'agencyLine' },
-                { text: 'OFFICE OF THE PRESIDENT', style: 'agencyLine' },
-                { text: 'COMMISSION ON HIGHER EDUCATION', bold: true, style: 'agencyLine' },
-                { text: 'Regional Office I', style: 'agencyLine' },
-                { text: 'San Fernando City, La Union', style: 'agencyLastLine' }
-              ],
-              style: 'defaultHeaderCenterCol'
-            },
-            {
-              width: 64,
-              stack: [
-                rightLogoImage ? {
-                  image: rightLogoImage,
-                  style: 'rightLogoImg'
-                } : {
-                  text: '[LOGO]',
-                  style: 'rightLogoPlaceholder'
-                }
-              ],
-              style: 'defaultHeaderRightCol'
-            }
-          ]
+          image: chedHeaderImage,
+          width: 468,
+          alignment: 'center',
+          margin: hMargin
         };
       }
 
@@ -2077,15 +1987,6 @@ const Reports = () => {
         footerImage: { margin: pdfMargins.footerImage },
         footerLeft: { margin: pdfMargins.footerLeft, fontSize: 9, italics: true, color: '#6b7280' },
         footerRight: { margin: pdfMargins.footerRight, alignment: 'right', fontSize: 12 },
-        agencyLine: { margin: pdfMargins.agencyLine, fontSize: 12 },
-        agencyLastLine: { margin: pdfMargins.agencyLastLine, fontSize: 12 },
-        leftLogoImg: { margin: pdfMargins.leftLogo, width: 64, height: 64, alignment: 'center' },
-        rightLogoImg: { margin: pdfMargins.rightLogo, width: 64, height: 64, alignment: 'center' },
-        leftLogoPlaceholder: { margin: pdfMargins.leftLogoPlaceholder, fontSize: 12, alignment: 'center', bold: true },
-        rightLogoPlaceholder: { margin: pdfMargins.rightLogoPlaceholder, fontSize: 12, alignment: 'center', bold: true },
-        defaultHeaderLeftCol: { margin: pdfMargins.defaultHeaderLeftCol },
-        defaultHeaderCenterCol: { margin: pdfMargins.defaultHeaderCenterCol },
-        defaultHeaderRightCol: { margin: pdfMargins.defaultHeaderRightCol },
       };
 
       const docDefinition = {

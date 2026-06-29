@@ -518,37 +518,11 @@ const PrintReport = () => {
                         />
                       </div>
                     ) : showDefaultHeader ? (
-                      <div className="flex items-center justify-center space-x-0.5">
+                      <div className="flex justify-center">
                         <img
-                          src="/logo/logoleft.png"
-                          alt="Left Logo"
-                          className="h-16 w-16 flex-shrink-0 rounded"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            const span = document.createElement('span');
-                            span.className = 'text-xs text-gray-500';
-                            span.textContent = 'Logo';
-                            e.target.parentNode.appendChild(span);
-                          }}
-                        />
-                        <div className="text-center px-1">
-                          <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-                          <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-                          <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
-                          <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-                          <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
-                        </div>
-                        <img
-                          src="/logo/logoright.png"
-                          alt="Right Logo"
-                          className="h-16 w-16 flex-shrink-0 rounded"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            const span = document.createElement('span');
-                            span.className = 'text-xs text-gray-500';
-                            span.textContent = 'Logo';
-                            e.target.parentNode.appendChild(span);
-                          }}
+                          src="/header/ched_header.png"
+                          alt="CHED Header"
+                          className="max-h-16 w-auto object-contain"
                         />
                       </div>
                     ) : null}
@@ -668,37 +642,11 @@ const PrintReport = () => {
                         />
                       </div>
                     ) : showDefaultHeader ? (
-                      <div className="flex items-center justify-center space-x-0.5">
+                      <div className="flex justify-center">
                         <img
-                          src="/logo/logoleft.png"
-                          alt="Left Logo"
-                          className="h-16 w-16 flex-shrink-0 rounded"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            const span = document.createElement('span');
-                            span.className = 'text-xs text-gray-500';
-                            span.textContent = 'Logo';
-                            e.target.parentNode.appendChild(span);
-                          }}
-                        />
-                        <div className="text-center px-1">
-                          <p style={{ fontSize: '10pt' }}>Republic of the Philippines</p>
-                          <p style={{ fontSize: '10pt' }}>OFFICE OF THE PRESIDENT</p>
-                          <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>COMMISSION ON HIGHER EDUCATION</p>
-                          <p style={{ fontSize: '10pt' }}>Regional Office I</p>
-                          <p className="mb-4" style={{ fontSize: '10pt' }}>San Fernando City, La Union</p>
-                        </div>
-                        <img
-                          src="/logo/logoright.png"
-                          alt="Right Logo"
-                          className="h-16 w-16 flex-shrink-0 rounded"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            const span = document.createElement('span');
-                            span.className = 'text-xs text-gray-500';
-                            span.textContent = 'Logo';
-                            e.target.parentNode.appendChild(span);
-                          }}
+                          src="/header/ched_header.png"
+                          alt="CHED Header"
+                          className="max-h-16 w-auto object-contain"
                         />
                       </div>
                     ) : null}

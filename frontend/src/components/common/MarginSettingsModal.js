@@ -19,21 +19,6 @@ const sections = [
     ],
   },
   {
-    title: 'Default Header Internals',
-    key: 'headerInternals',
-    fields: [
-      { key: 'defaultHeaderLeftCol', label: 'Left Logo Column' },
-      { key: 'defaultHeaderCenterCol', label: 'Center Text Column' },
-      { key: 'defaultHeaderRightCol', label: 'Right Logo Column' },
-      { key: 'leftLogo', label: 'Left Logo Image' },
-      { key: 'rightLogo', label: 'Right Logo Image' },
-      { key: 'leftLogoPlaceholder', label: 'Left Logo Placeholder' },
-      { key: 'rightLogoPlaceholder', label: 'Right Logo Placeholder' },
-      { key: 'agencyLine', label: 'Agency Text Line' },
-      { key: 'agencyLastLine', label: 'Agency Last Line' },
-    ],
-  },
-  {
     title: 'Content',
     key: 'content',
     fields: [
