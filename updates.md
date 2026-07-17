@@ -583,3 +583,34 @@
 - `frontend/src/components/common/Modal.js`: Added overlay, transparent, zIndex, draggable props; mousemove/mouseup document listeners for drag; restored original DOM structure exactly
 - `frontend/src/components/common/MarginSettingsModal.js`: Passes through new Modal props (overlay, transparent, zIndex, draggable)
 - `frontend/src/pages/Reports.js`: Enabled overlay={false}, transparent={true}, zIndex="z-[1002]", draggable={true} on margin modal
+
+---
+
+## Default Header Replaced with CHED Header Image
+
+### Removed Legacy Default Header
+- Removed the three-column default header layout (left logo, center text, right logo) from all PDF and print preview outputs
+- Removed the "Republic of the Philippines / OFFICE OF THE PRESIDENT / CHED / Regional Office I / San Fernando City, La Union" text
+- Replaced with `ched_header.png` — a single designed header banner image
+
+### Changes Made
+- **pdfmake `createReportDefinition()`** in `Reports.js`:
+  - Removed left/right logo fetching (`logoleft.png`, `logoright.png`)
+  - Added `ched_header.png` fetch as base64 data URL
+  - Default header now renders as a single centered image (`width: 468`) using the same margin as custom headers
+- **HTML print preview (`renderPageHeader`)** in `Reports.js`:
+  - Replaced logo+text flex layout with single `<img src="/header/ched_header.png">`
+- **`PrintReport.js`**:
+  - Both page header blocks updated to render `<img src="/header/ched_header.png">`
+- **Deleted unused margin state** (10 entries) and 11 unused pdfmake style definitions
+
+### Margin Settings Cleanup
+- Removed "Default Header Internals" section from `MarginSettingsModal.js` (old margins for logos, columns, and agency text no longer exist)
+
+### File Added
+- `frontend/public/header/ched_header.png` — new default header banner image (copied from `header/ched_header.png`)
+
+### Files Modified
+- `frontend/src/pages/Reports.js`: Replaced default header in pdfmake and HTML preview, cleaned up margins/styles
+- `frontend/src/pages/PrintReport.js`: Replaced default header in both page header blocks
+- `frontend/src/components/common/MarginSettingsModal.js`: Removed "Default Header Internals" section
