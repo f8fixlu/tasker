@@ -17,81 +17,240 @@ Tasker is a comprehensive task management application built with React for the f
 - **Real-time Notifications**: Stay updated with system notifications
 - **Dark/Light Mode**: Choose between different theme options
 - **Status Tracking**: Track task and user status changes with timestamps
+- **Inactivity Detection**: Automatic detection and handling of user inactivity
+- **Session Management**: Refresh token rotation with secure session handling
+- **Image Optimization**: Automatic image compression and optimization for uploads
+- **File Security**: Secure file storage with type validation and sanitization
+- **Holiday Management**: Track and manage holidays with calendar integration
+- **Print Reports**: Generate and print formatted reports with PDF export
 
 ## Tech Stack
 
 ### Frontend
 - React 18
-- React Router for navigation
-- Tailwind CSS for styling
-- Chart.js for data visualization
+- React Router v6 for navigation
+- Tailwind CSS 3 for styling
+- Chart.js 4 via react-chartjs-2 for data visualization
 - Axios for API communication
+- pdfmake for PDF report generation
+- Helmet for security headers
+- Express-rate-limit for rate limiting
+- Prop-types for runtime type checking
 
 ### Backend
-- Node.js with Express.js
-- SQLite database
+- Node.js with native `http` module and Express.js
+- SQLite database with `sqlite3` package
 - JSON Web Tokens (JWT) for authentication
-- BCrypt for password hashing
+- Node.js built-in `crypto` for password hashing
+- Custom validation and sanitization middleware
+- Session management with refresh token rotation
+- Multipart file upload handling (no external libraries)
 
 ## Project Structure
 
 ```
 tasker/
-├── backend/                 # Node.js server
-│   ├── config/              # Configuration files
-│   ├── controllers/         # Request handlers (currently empty - API logic in routes)
-│   ├── database/            # Database setup and initialization
-│   ├── middleware/          # Authentication and validation
-│   ├── models/              # Data models (User.js, Task.js, Event.js, etc.)
-│   ├── public/              # Public static files
-│   ├── routes/              # API route definitions (auth.js, tasks.js, events.js, etc.)
-│   ├── scripts/             # Database scripts
-│   ├── services/            # Service layer functions
-│   ├── temp/                # Temporary files
-│   ├── tests/               # Test files
-│   ├── uploads/             # File uploads directory
-│   ├── utils/               # Utility functions
-│   ├── .envbak              # Environment variables template
-│   └── server.js            # Main server file
-├── frontend/                # React application
-│   ├── public/              # Static assets
-│   ├── src/                 # Source code
-│   │   ├── components/      # Reusable UI components
-│   │   │   ├── admin/       # Admin panel components
-│   │   │   ├── charts/      # Chart components for reports
-│   │   │   ├── common/      # Common UI components (Button, Input, etc.)
-│   │   │   ├── dashboard/   # Dashboard-specific components
-│   │   │   ├── layout/      # Layout components
-│   │   │   └── modals/      # Modal components (NewTaskModal, etc.)
-│   │   ├── context/         # React context providers
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── pages/           # Page components (Login, Dashboard, etc.)
-│   │   ├── services/        # API service functions
-│   │   ├── styles/          # Custom styles
-│   │   └── utils/           # Utility functions
-│   ├── .env.production      # Production environment variables
-│   ├── build-production.js  # Production build script
-│   ├── config-overrides.js  # Build configuration overrides
-│   ├── optimize-css.js      # CSS optimization script
-│   ├── server.js            # Production server for serving build
-│   └── tailwind.config.js   # Tailwind CSS configuration
-├── backup/                  # Backup utilities and configurations
-├── logo/                    # Logo and branding assets
-├── start-tasker.sh          # Startup script for the application
-├── tasker-*.service         # Systemd service files for deployment
-├── DEPLOY.md                # Deployment instructions
-├── BUILD-GUIDE.md           # Build process documentation
-├── SERVICE_SETUP.md         # Service setup documentation
-├── ISSUES.md                # Known issues and solutions
-├── package.json             # Root package.json for overall project
-└── README.md                # This file
+├── .gitignore
+├── .prettierrc
+├── LICENSE
+├── README.md
+├── package.json                 # Root scripts (dev, start, test, install:all)
+│
+├── backend/                     # Node.js API server
+│   ├── server.js                # Main entry point - HTTP server + routing
+│   ├── package.json
+│   ├── .envbak                  # Environment variables template
+│   ├── .eslintrc
+│   ├── .prettierrc
+│   │
+│   ├── config/
+│   │   ├── auth.js              # JWT/auth configuration
+│   │   ├── cors.js              # CORS configuration
+│   │   └── database.js          # SQLite database setup & initialization
+│   │
+│   ├── database/
+│   │   └── indexes.sql          # Database indexes
+│   │
+│   ├── middleware/
+│   │   ├── auth.js              # JWT authentication & request logger
+│   │   ├── error.js             # Centralized error handling
+│   │   ├── sanitize.js          # Input sanitization
+│   │   └── validation.js        # Request validation
+│   │
+│   ├── models/                  # Data access layer (SQL queries per model)
+│   │   ├── Attachment.js
+│   │   ├── Category.js
+│   │   ├── Event.js
+│   │   ├── EventCategory.js
+│   │   ├── EventType.js
+│   │   ├── Notification.js
+│   │   ├── Session.js
+│   │   ├── SubType.js
+│   │   ├── Task.js
+│   │   ├── TaskType.js
+│   │   └── User.js
+│   │
+│   ├── routes/                  # API route handlers
+│   │   ├── admin.js
+│   │   ├── attachments.js
+│   │   ├── auth.js
+│   │   ├── backups.js
+│   │   ├── categories.js
+│   │   ├── dashboard.js
+│   │   ├── database.js
+│   │   ├── eventCategories.js
+│   │   ├── eventTypes.js
+│   │   ├── events.js
+│   │   ├── holidays.js
+│   │   ├── notifications.js
+│   │   ├── reports.js
+│   │   ├── statusTracking.js
+│   │   ├── subTypes.js
+│   │   ├── tasks.js
+│   │   ├── taskTypes.js
+│   │   └── users.js
+│   │
+│   ├── services/
+│   │   ├── inactivityDetectionService.js
+│   │   └── statusCleanupService.js
+│   │
+│   ├── utils/
+│   │   ├── auth.js              # JWT generation & validation
+│   │   ├── database.js          # Database helper utilities
+│   │   ├── email.js             # Email sending (password reset)
+│   │   ├── fileValidation.js    # File type/size validation
+│   │   ├── imageOptimizer.js    # Image compression & resizing
+│   │   ├── jwtManagement.js     # JWT lifecycle management
+│   │   ├── multipartParser.js   # Custom multipart form parser
+│   │   ├── notificationJobs.js  # Scheduled notification tasks
+│   │   ├── secureFileStorage.js # Secure file write & delete
+│   │   ├── sessionManagement.js # Session cleanup & refresh
+│   │   └── statusTracker.js     # Status change tracking
+│   │
+│   └── tests/
+│       ├── integration/
+│       └── unit/
+│
+├── frontend/                    # React SPA
+│   ├── server.js                # Production Express server for serving build
+│   ├── build-production.js      # Production build script
+│   ├── config-overrides.js      # Webpack overrides (react-app-rewired)
+│   ├── optimize-css.js          # Post-build CSS optimization
+│   ├── tailwind.config.js       # Tailwind CSS configuration
+│   ├── postcss.config.js
+│   └── src/
+│       ├── App.js               # Root component with routing
+│       ├── index.js             # Entry point
+│       ├── setupTests.js
+│       │
+│       ├── components/
+│       │   ├── admin/           # Admin panel UI
+│       │   ├── common/          # Shared UI (ForgotPasswordModal, SessionExpiryWarning)
+│       │   ├── layout/          # Layout wrapper
+│       │   └── modals/          # Modal dialogs (task/event/category CRUD)
+│       │
+│       ├── context/             # React context providers
+│       │   ├── AppContext.js
+│       │   ├── AuthContext.js
+│       │   ├── ModalContext.js
+│       │   ├── NotificationUpdateContext.js
+│       │   ├── TaskUpdateContext.js
+│       │   └── ThemeContext.js
+│       │
+│       ├── hooks/               # Custom React hooks
+│       │   ├── useCalendar.js
+│       │   ├── useDebounce.js
+│       │   ├── useEvents.js
+│       │   ├── useFormValidation.js
+│       │   ├── useModal.js
+│       │   ├── useNotifications.js
+│       │   ├── useSanitization.js
+│       │   └── useTasks.js
+│       │
+│       ├── pages/               # Route-level page components
+│       │   ├── admin/
+│       │   ├── Calendar.js
+│       │   ├── Dashboard.js
+│       │   ├── Login.js
+│       │   ├── NotFound.js
+│       │   ├── PrintReport.js
+│       │   ├── Register.js
+│       │   ├── Reports.js
+│       │   ├── ResetPassword.js
+│       │   └── Tasks.js
+│       │
+│       ├── services/            # API client modules
+│       │   ├── api.js           # Axios instance with interceptors
+│       │   ├── attachmentService.js
+│       │   ├── authService.js
+│       │   ├── categoryService.js
+│       │   ├── eventCategoryService.js
+│       │   ├── eventService.js
+│       │   ├── eventTypeService.js
+│       │   ├── heartbeatService.js
+│       │   ├── holidayService.js
+│       │   ├── notificationService.js
+│       │   ├── reportsService.js
+│       │   ├── subTypeService.js
+│       │   ├── taskService.js
+│       │   ├── taskTypeService.js
+│       │   └── userService.js
+│       │
+│       ├── styles/
+│       │   └── index.css        # Tailwind base + custom styles
+│       │
+│       └── utils/
+│           ├── cache.js
+│           ├── date.js
+│           ├── dateOptimized.js
+│           ├── sanitization.js
+│           └── validation.js
+│
+├── scripts/
+│   ├── tasker_backup.sh         # Database backup script
+│   └── tasker_db_watch.sh       # Database watch/monitor script
+│
+├── header/                      # HTTP header templates
+├── logo/                        # Application logos
+├── status/                      # Status monitoring files
+├── nginx.md                     # Nginx configuration guide
+├── cloudflared.md               # Cloudflare Tunnel setup
+├── DEPLOY.md                    # Deployment instructions
+├── BUILD-GUIDE.md               # Build process guide
+├── SERVICE_SETUP.md             # Systemd service setup
+├── BACKUP_DEPLOYMENT.md         # Backup deployment guide
+├── BACKUP_STRATEGY.md           # Backup strategy documentation
+├── ISSUES.md                    # Known issues and workarounds
+├── updates.md                   # Changelog / update notes
+├── todos.md                     # Development todo list
+├── tasker.md                    # Detailed project architecture document
+├── responsive.md                # Responsive design notes
+├── audit.md                     # Security/performance audit notes
+│
+├── tasker-app.service           # Systemd unit files
+├── tasker-backend-api.service
+├── tasker-backend.service
+├── tasker-frontend.service
+├── tasker-backup.service
+├── tasker-db-watch.service
+│
+├── tasker_backup.sh             # Standalone backup script
+├── tasker_db_watch.sh           # Standalone DB watch script
+├── tasker_backup_status.json    # Backup status tracking
+├── tasker_exclude.txt           # Backup exclusion patterns
+├── tasker_performance_test.jmx  # JMeter performance test plan
+├── jmeter-config.properties     # JMeter configuration
+├── run-jmeter-tests.ps1        # JMeter runner (PowerShell)
+├── run-jmeter-tests.sh          # JMeter runner (Unix)
+│
+└── tasker_logo.png
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
+- Node.js (v18 or higher recommended)
+- npm
 
 ### Quick Setup (Recommended)
 1. Clone the repository
@@ -137,71 +296,103 @@ tasker/
 - `POST /api/auth/refresh` - Token refresh
 - `GET /api/auth/profile` - Get user profile
 - `PUT /api/auth/profile` - Update user profile
+- `POST /api/auth/forgot-password` - Request password reset
+- `POST /api/auth/reset-password` - Reset password with token
 
 ### Tasks
-- `GET /api/tasks` - Get all tasks
+- `GET /api/tasks` - Get all tasks (supports filtering, pagination)
 - `POST /api/tasks` - Create a new task
 - `GET /api/tasks/:id` - Get a specific task
 - `PUT /api/tasks/:id` - Update a task
 - `DELETE /api/tasks/:id` - Delete a task
+- `PUT /api/tasks/:id/status` - Update task status
 
 ### Events
-- `GET /api/events` - Get all events
+- `GET /api/events` - Get all events (supports date filtering)
 - `POST /api/events` - Create a new event
 - `GET /api/events/:id` - Get a specific event
 - `PUT /api/events/:id` - Update an event
 - `DELETE /api/events/:id` - Delete an event
 
 ### Categories
-- `GET /api/tasks/categories` - Get all task categories
-- `POST /api/tasks/categories` - Create a new category
-- `PUT /api/tasks/categories/:id` - Update a category
-- `DELETE /api/tasks/categories/:id` - Delete a category
+- `GET /api/categories` - Get all task categories
+- `POST /api/categories` - Create a new category
+- `PUT /api/categories/:id` - Update a category
+- `DELETE /api/categories/:id` - Delete a category
 
 ### Task Types
-- `GET /api/tasks/types` - Get all task types
-- `POST /api/tasks/types` - Create a new task type
-- `PUT /api/tasks/types/:id` - Update a task type
-- `DELETE /api/tasks/types/:id` - Delete a task type
+- `GET /api/task-types` - Get all task types
+- `POST /api/task-types` - Create a new task type
+- `PUT /api/task-types/:id` - Update a task type
+- `DELETE /api/task-types/:id` - Delete a task type
 
 ### Sub Types
-- `GET /api/tasks/subtypes` - Get all sub types
-- `POST /api/tasks/subtypes` - Create a new sub type
-- `PUT /api/tasks/subtypes/:id` - Update a sub type
-- `DELETE /api/tasks/subtypes/:id` - Delete a sub type
+- `GET /api/sub-types` - Get all sub types
+- `POST /api/sub-types` - Create a new sub type
+- `PUT /api/sub-types/:id` - Update a sub type
+- `DELETE /api/sub-types/:id` - Delete a sub type
 
 ### Event Categories
-- `GET /api/events/categories` - Get all event categories
-- `POST /api/events/categories` - Create a new event category
-- `PUT /api/events/categories/:id` - Update an event category
-- `DELETE /api/events/categories/:id` - Delete an event category
+- `GET /api/event-categories` - Get all event categories
+- `POST /api/event-categories` - Create a new event category
+- `PUT /api/event-categories/:id` - Update an event category
+- `DELETE /api/event-categories/:id` - Delete an event category
 
 ### Event Types
-- `GET /api/events/types` - Get all event types
-- `POST /api/events/types` - Create a new event type
-- `PUT /api/events/types/:id` - Update an event type
-- `DELETE /api/events/types/:id` - Delete an event type
+- `GET /api/event-types` - Get all event types
+- `POST /api/event-types` - Create a new event type
+- `PUT /api/event-types/:id` - Update an event type
+- `DELETE /api/event-types/:id` - Delete an event type
 
 ### Attachments
-- `GET /api/attachments` - Get all attachments
-- `POST /api/attachments` - Create/upload a new attachment
-- `GET /api/attachments/:id` - Get a specific attachment
+- `GET /api/attachments` - Get all attachments for a task/event
+- `POST /api/attachments` - Upload a new attachment (multipart)
+- `GET /api/attachments/:id` - Download a specific attachment
 - `DELETE /api/attachments/:id` - Delete an attachment
 
 ### Users
-- `GET /api/users` - Get all users
+- `GET /api/users` - Get all users (admin)
 - `GET /api/users/:id` - Get a specific user
 - `PUT /api/users/:id` - Update a user
 - `DELETE /api/users/:id` - Delete a user
 
+### Notifications
+- `GET /api/notifications` - Get user notifications
+- `PUT /api/notifications/:id/read` - Mark notification as read
+- `PUT /api/notifications/read-all` - Mark all as read
+
+### Dashboard
+- `GET /api/dashboard/stats` - Get dashboard statistics
+- `GET /api/dashboard/recent` - Get recent activity
+
+### Reports
+- `GET /api/reports/tasks` - Generate task report
+- `GET /api/reports/events` - Generate event report
+
 ### Admin
 - `GET /api/admin/stats` - Get system statistics
-- `POST /api/admin/backup` - Create a backup
+- `GET /api/admin/users` - Get all users
+- `POST /api/admin/backup` - Create a database backup
+- `GET /api/admin/backups` - List available backups
 - `GET /api/admin/logs` - Get system logs
+
+### Backups
+- `POST /api/backups` - Trigger manual backup
+- `GET /api/backups` - List all backups
+- `POST /api/backups/restore/:id` - Restore from backup
 
 ### Status Tracking
 - `GET /api/status-tracking` - Get status tracking information
-- `POST /api/status-tracking` - Create status tracking entry
+- `POST /api/status-tracking` - Create a status tracking entry
+
+### Holidays
+- `GET /api/holidays` - Get holidays
+- `POST /api/holidays` - Create a holiday entry
+- `DELETE /api/holidays/:id` - Delete a holiday
+
+### Database
+- `GET /api/database/status` - Get database status
+- `POST /api/database/backup` - Trigger database backup
 
 ## Environment Variables
 
@@ -211,6 +402,13 @@ tasker/
 - `PORT` - Port for the backend server (default: 5000)
 - `DB_NAME` - Name of the SQLite database file
 - `FRONTEND_URL` - URL of the frontend application
+- `SMTP_HOST` - SMTP server for email (password reset)
+- `SMTP_PORT` - SMTP port
+- `SMTP_USER` - SMTP username
+- `SMTP_PASS` - SMTP password
+- `UPLOAD_DIR` - Upload directory path
+- `MAX_FILE_SIZE` - Maximum upload file size in bytes
+- `NODE_ENV` - Environment (development/production)
 
 ### Frontend (.env)
 - `REACT_APP_API_URL` - Base URL for the backend API
@@ -219,17 +417,18 @@ tasker/
 
 The application uses SQLite with the following main tables:
 - `users` - Stores user account information
-- `tasks` - Stores task information
-- `events` - Stores event information
-- `categories` - Stores task categories
-- `task_types` - Stores task types
-- `sub_types` - Stores sub types for tasks
+- `tasks` - Stores task information with status, priority, and due dates
+- `events` - Stores event information with start/end dates
+- `task_categories` - Stores task categories with color coding
+- `task_types` - Stores task types linked to categories
+- `task_sub_types` - Stores sub types linked to task types
 - `event_categories` - Stores event categories
 - `event_types` - Stores event types
 - `attachments` - Stores file attachment metadata
-- `sessions` - Stores active user sessions
-- `notifications` - Stores user notifications
-- `status_tracking` - Stores status changes for tasks and users
+- `sessions` - Stores active user sessions (JWT refresh tokens)
+- `notifications` - Stores user notifications with read status
+- `status_tracking` - Stores status changes with timestamps
+- `holidays` - Stores holiday entries
 
 ## Contributing
 
@@ -242,14 +441,3 @@ The application uses SQLite with the following main tables:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Built with React and Create React App
-- SQLite for database management
-- Tailwind CSS for styling
-- Chart.js for data visualization
-- React Router for navigation
-- JSON Web Tokens (JWT) for authentication
-- Various open-source libraries and components
-- Concurrently for running multiple processes during development
