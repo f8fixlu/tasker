@@ -250,7 +250,7 @@ async function getEventsByUserId(user_id, options = {}) {
     // The dates are stored in the database in 'YYYY-MM-DD HH:MM:SS' format
     // Using SQLite datetime functions to handle timezone conversion consistently
     // Compare based on the date part after timezone conversion (as it appears to the user)
-    sql += ` AND (DATE(e.start_date, 'localtime') >= DATE(?, 'localtime') AND DATE(e.start_date, 'localtime') <= DATE(?, 'localtime'))`;
+    sql += ` AND (e.start_date >= datetime(?, 'localtime') AND e.start_date <= datetime(?, 'localtime', '+1 day'))`;
     params.push(options.start_date, options.end_date);
   }
 
@@ -355,7 +355,7 @@ async function getEventsForCalendar(user_id, start_date, end_date, options = {})
     LEFT JOIN event_categories ec ON e.category_id = ec.id
     LEFT JOIN event_types et ON e.event_type_id = et.id
     WHERE e.user_id = ?
-      AND (DATE(e.start_date, 'localtime') >= DATE(?, 'localtime') AND DATE(e.start_date, 'localtime') <= DATE(?, 'localtime'))
+      AND (e.start_date >= datetime(?, 'localtime') AND e.start_date <= datetime(?, 'localtime', '+1 day'))
     ORDER BY e.start_date DESC
   `;
 
@@ -527,18 +527,16 @@ async function updateEvent(id, eventData) {
 
 // Delete event
 async function deleteEvent(id) {
-  // First, get any attachments associated with this event to delete the files
+  // Batch delete attachments for this event
   const { getAttachmentsByEventId, deleteAttachment } = require('./Attachment');
   
   try {
     const attachments = await getAttachmentsByEventId(id);
     
-    // Delete each attachment file and record
-    for (const attachment of attachments) {
-      await deleteAttachment(attachment.id);
+    if (attachments.length > 0) {
+      await Promise.all(attachments.map(a => deleteAttachment(a.id).catch(() => {})));
     }
   } catch (attachmentError) {
-    console.error('Error deleting event attachments:', attachmentError);
     // Continue with event deletion even if attachment deletion fails
   }
 

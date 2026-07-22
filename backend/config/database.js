@@ -5,6 +5,11 @@ const path = require('path');
 const dbPath = path.resolve(__dirname, '../database/tasker.db');
 const db = new sqlite3.Database(dbPath);
 
+// Enable WAL mode for better concurrent read performance
+db.run('PRAGMA journal_mode=WAL');
+db.run('PRAGMA synchronous=NORMAL');
+db.run('PRAGMA cache_size=-64000');
+
 // Database initialization function
 function setupDatabase(callback) {
   // Initialize the status tracker
@@ -165,6 +170,19 @@ function createOtherTablesAndColumns(callback) {
   db.run(`CREATE INDEX IF NOT EXISTS idx_task_sub_types_user_id ON task_sub_types(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_event_categories_user_id ON event_categories(user_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_event_types_user_id ON event_types(user_id)`);
+
+  // Indexes for attachments
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attachments_task_id ON attachments(task_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attachments_event_id ON attachments(event_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attachments_user_id ON attachments(user_id)`);
+
+  // Indexes for notifications
+  db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)`);
+
+  // Indexes for sessions
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`);
 
   // Add location column if it doesn't exist (for existing databases)
   db.run(`ALTER TABLE events ADD COLUMN location TEXT`, (err) => {

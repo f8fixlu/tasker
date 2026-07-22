@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -27,21 +27,6 @@ const BackupStatusPage = lazy(() => import('./pages/admin/BackupStatusPage'));
 const ModalRenderer = lazy(() => import('./components/modals/ModalRenderer'));
 
 function App() {
-  // Preload critical components for better performance
-  useEffect(() => {
-    // Preload commonly used components
-    const preloadCommonComponents = async () => {
-      // Preload common components that are likely to be used
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        // Preload dashboard and tasks if user is likely authenticated
-        import('./pages/Dashboard');
-        import('./pages/Tasks');
-      }
-    };
-
-    preloadCommonComponents();
-  }, []);
-
   return (
     <Router>
       <ThemeProvider>

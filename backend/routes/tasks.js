@@ -326,7 +326,7 @@ async function handleUpdateTask(req, res, taskId, userId) {
       status: status !== undefined && ['Pending', 'In Progress', 'Completed', 'Overdue', 'Archived'].includes(status) ? status : undefined
     };
 
-    const success = await updateTask(taskId, task);
+    const success = await updateTask(taskId, task, currentTask);
 
     if (!success) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
