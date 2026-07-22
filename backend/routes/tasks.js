@@ -570,7 +570,7 @@ async function handleUpdateOverdueTasks(req, res) {
   }
 }
 
-// Handle bulk update tasks
+// Handle bulk update tasks (batch SQL)
 async function handleBulkUpdate(req, res, userId) {
   try {
     const { taskIds, updateData } = req.body;
@@ -585,24 +585,46 @@ async function handleBulkUpdate(req, res, userId) {
       return res.end(JSON.stringify({ error: 'Update data is required' }));
     }
 
-    // In a real implementation, you would perform a bulk update
-    // For this implementation, we'll update tasks one by one
-    let updatedCount = 0;
-    for (const taskId of taskIds) {
-      // Verify that the task belongs to the user
-      const task = await getTaskById(taskId);
-      if (task && task.user_id === userId) {
-        // Prevent changing status to 'Overdue' if the task is already 'Archived'
-        if (task.status === 'Archived' && updateData.status === 'Overdue') {
-          continue; // Skip this task update
-        }
-        await updateTask(taskId, updateData);
-        updatedCount++;
-      }
+    // Build dynamic SET clause from updateData
+    const setClauses = [];
+    const params = [];
+    
+    if (updateData.status !== undefined) {
+      setClauses.push('status = ?');
+      params.push(updateData.status);
+    }
+    if (updateData.priority !== undefined) {
+      setClauses.push('priority = ?');
+      params.push(updateData.priority);
+    }
+    // Add other fields as needed for bulk update
+
+    if (setClauses.length === 0) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'No valid fields to update' }));
     }
 
+    // Always update edited_date
+    setClauses.push('edited_date = ?');
+    params.push(new Date().toISOString());
+
+    // Create placeholders for the IN clause
+    const placeholders = taskIds.map(() => '?').join(',');
+
+    // Batch update: update all matching tasks in one query
+    // Exclude tasks that are Archived when trying to set status to Overdue
+    let sql = `UPDATE tasks SET ${setClauses.join(', ')} WHERE id IN (${placeholders}) AND user_id = ?`;
+    params.push(...taskIds, userId);
+
+    // If status is Overdue, exclude Archived tasks
+    if (updateData.status === 'Overdue') {
+      sql += ` AND status != 'Archived'`;
+    }
+
+    const result = await runQuery(sql, params);
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ message: `${updatedCount} tasks updated successfully` }));
+    res.end(JSON.stringify({ message: `${result.changes} tasks updated successfully`, updatedCount: result.changes }));
   } catch (error) {
     console.error('Bulk update error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -610,7 +632,7 @@ async function handleBulkUpdate(req, res, userId) {
   }
 }
 
-// Handle bulk delete tasks
+// Handle bulk delete tasks (batch SQL)
 async function handleBulkDelete(req, res, userId) {
   try {
     const { taskIds } = req.body;
@@ -620,53 +642,76 @@ async function handleBulkDelete(req, res, userId) {
       return res.end(JSON.stringify({ error: 'Valid task IDs array is required' }));
     }
 
-    // In a real implementation, you would perform a bulk delete
-    // For this implementation, we'll delete tasks one by one
-    let deletedCount = 0;
-    for (const taskId of taskIds) {
-      // Verify that the task belongs to the user
-      const task = await getTaskById(taskId);
-      if (task && task.user_id === userId) {
-        // Create notification for task deletion
-        try {
-          // Check if an identical notification already exists to prevent duplicates
-          const checkSql = `
-            SELECT id FROM notifications
-            WHERE user_id = ? AND related_task_id = ? AND title = ? AND message = ?
-            ORDER BY created_at DESC LIMIT 1
-          `;
-          const checkParams = [userId, taskId, 'Task Deleted', `Task "${task?.title || 'untitled'}" has been deleted`];
+    // Step 1: Fetch all tasks belonging to this user in one query
+    const placeholders = taskIds.map(() => '?').join(',');
+    const { getAll: getAllRows } = require('../utils/database');
+    const tasks = await getAllRows(
+      `SELECT id, title FROM tasks WHERE id IN (${placeholders}) AND user_id = ?`,
+      [...taskIds, userId]
+    );
 
-          const existingNotification = await require('../utils/database').getRow(checkSql, checkParams);
-
-          // Only create notification if it doesn't already exist
-          if (!existingNotification) {
-            const notificationSql = `
-              INSERT INTO notifications (title, message, type, user_id, related_task_id)
-              VALUES (?, ?, ?, ?, ?)
-            `;
-            const notificationParams = [
-              'Task Deleted',
-              `Task "${task?.title || 'untitled'}" has been deleted`,
-              'info',
-              userId,
-              taskId
-            ];
-
-            await runQuery(notificationSql, notificationParams);
-          }
-        } catch (notificationError) {
-          console.error('Error creating notification for bulk delete:', notificationError);
-          // Don't fail the whole request if notification creation fails
-        }
-
-        await deleteTask(taskId);
-        deletedCount++;
-      }
+    if (tasks.length === 0) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ message: '0 tasks deleted successfully', deletedCount: 0 }));
     }
 
+    const taskIdsToDelete = tasks.map(t => t.id);
+    const deletePlaceholders = taskIdsToDelete.map(() => '?').join(',');
+
+    // Step 2: Create notifications in batch (skip duplicates)
+    try {
+      const now = new Date().toISOString();
+      const notificationValues = [];
+      const notificationParams = [];
+      
+      for (const task of tasks) {
+        const title = 'Task Deleted';
+        const message = `Task "${task.title || 'untitled'}" has been deleted`;
+        
+        // Check for existing notification
+        const { getRow } = require('../utils/database');
+        const existing = await getRow(
+          'SELECT id FROM notifications WHERE user_id = ? AND related_task_id = ? AND title = ? AND message = ? ORDER BY created_at DESC LIMIT 1',
+          [userId, task.id, title, message]
+        );
+        
+        if (!existing) {
+          notificationValues.push('(?, ?, ?, ?, ?)');
+          notificationParams.push(title, message, 'info', userId, task.id);
+        }
+      }
+      
+      if (notificationValues.length > 0) {
+        const notifSql = `INSERT INTO notifications (title, message, type, user_id, related_task_id) VALUES ${notificationValues.join(', ')}`;
+        await runQuery(notifSql, notificationParams);
+      }
+    } catch (notificationError) {
+      console.error('Error creating notifications for bulk delete:', notificationError);
+    }
+
+    // Step 3: Delete attachments in batch (query + delete in bulk)
+    try {
+      const { deleteAttachment } = require('../models/Attachment');
+      const attachments = await getAllRows(
+        `SELECT id FROM attachments WHERE task_id IN (${deletePlaceholders})`,
+        taskIdsToDelete
+      );
+      if (attachments.length > 0) {
+        const attPlaceholders = attachments.map(() => '?').join(',');
+        await runQuery(`DELETE FROM attachments WHERE id IN (${attPlaceholders})`, attachments.map(a => a.id));
+      }
+    } catch (attachmentError) {
+      console.error('Error deleting attachments in bulk:', attachmentError);
+    }
+
+    // Step 4: Delete all tasks in one query
+    const result = await runQuery(
+      `DELETE FROM tasks WHERE id IN (${deletePlaceholders})`,
+      taskIdsToDelete
+    );
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ message: `${deletedCount} tasks deleted successfully` }));
+    res.end(JSON.stringify({ message: `${result.changes} tasks deleted successfully`, deletedCount: result.changes }));
   } catch (error) {
     console.error('Bulk delete error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });

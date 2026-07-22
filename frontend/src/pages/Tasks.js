@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import Tooltip from '../components/common/Tooltip';
+import AttachmentPreview from '../components/common/AttachmentPreview';
 import ViewTaskModal from '../components/modals/ViewTaskModal';
-import { useAuth } from '../context/AuthContext';
 import { useModal } from '../hooks/useModal';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { useDebounce } from '../hooks/useDebounce';
@@ -417,7 +417,6 @@ const ActionsDropdown = ({
 };
 
 const Option2Tasks = () => {
-  const { user } = useAuth();
   const { openNewTaskModal, openEditTaskModal, openViewTaskModal } = useModal();
   const { updateTrigger: taskUpdateTrigger, triggerTaskUpdate, dropdownUpdateTrigger } = useTaskUpdate();
 
@@ -699,7 +698,7 @@ const Option2Tasks = () => {
   };
 
   // Function to handle attachment icon click
-  const handleAttachmentClick = async (taskId, e) => {
+  const handleAttachmentClick = useCallback(async (taskId, e) => {
     e.stopPropagation(); // Prevent row click from triggering
 
     if (!taskId) return;
@@ -747,7 +746,7 @@ const Option2Tasks = () => {
       // Reset loading state for this task
       setLoadingAttachmentTaskId(null);
     }
-  };
+  }, []);
 
   // All available columns definition (used for both table and column visibility dropdown)
   const allColumnsDefinition = useMemo(() => [
@@ -926,26 +925,19 @@ const Option2Tasks = () => {
     ]);
   }, [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId, visibleColumns, allColumnsDefinition, handleAttachmentClick]);
 
-  // Load dropdowns on mount
+  // Load dropdowns on mount (parallel fetches)
   useEffect(() => {
     const load = async () => {
       try {
-        setLoadingDropdowns(prev => ({ ...prev, categories: true }));
-        const catRes = await categoryService.getAllCategories();
+        setLoadingDropdowns({ categories: true, taskTypes: true, subTypes: true });
+        const [catRes, tRes, subRes] = await Promise.all([
+          categoryService.getAllCategories(),
+          taskTypeService.getAllTaskTypes(),
+          filters.type_id ? subTypeService.getSubTypesByTypeId(filters.type_id) : subTypeService.getAllSubTypes()
+        ]);
         setCategories(catRes.categories || catRes.data || []);
-        setLoadingDropdowns(prev => ({ ...prev, taskTypes: true }));
-        const tRes = await taskTypeService.getAllTaskTypes();
         setTaskTypes(tRes.types || tRes.data || []);
-        setLoadingDropdowns(prev => ({ ...prev, subTypes: true }));
-
-        // Check if a type_id is already selected in the filters, load sub types for that type
-        if (filters.type_id) {
-          const sRes = await subTypeService.getSubTypesByTypeId(filters.type_id);
-          setSubTypes(sRes.subTypes || sRes.subtypes || sRes.data || []);
-        } else {
-          const sRes = await subTypeService.getAllSubTypes();
-          setSubTypes(sRes.subTypes || sRes.subtypes || sRes.data || []);
-        }
+        setSubTypes(subRes.subTypes || subRes.subtypes || subRes.data || []);
       } catch (err) {
         console.error('Failed to load dropdowns', err);
       } finally {
@@ -967,6 +959,7 @@ const Option2Tasks = () => {
 
   // Effect: fetch tasks when filters/pagination/sort change
   useEffect(() => {
+    const controller = new AbortController();
     const fetch = async () => {
       try {
         setLoading(true);
@@ -1014,19 +1007,26 @@ const Option2Tasks = () => {
         }
 
         const res = await taskService.getPaginatedTasks(currentPage, tasksPerPage, params, sortConfig);
-        setTasks(res.tasks || []);
-        setTotalTasks(res.total || 0);
-        setTotalPages(res.totalPages || 1);
+        if (!controller.signal.aborted) {
+          setTasks(res.tasks || []);
+          setTotalTasks(res.total || 0);
+          setTotalPages(res.totalPages || 1);
+        }
       } catch (err) {
-        console.error('Error fetching tasks', err);
-        setTasks([]);
-        setTotalTasks(0);
-        setTotalPages(1);
+        if (err.name !== 'AbortError') {
+          console.error('Error fetching tasks', err);
+          setTasks([]);
+          setTotalTasks(0);
+          setTotalPages(1);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
     fetch();
+    return () => controller.abort();
   }, [currentPage, tasksPerPage, debouncedSearchTerm, debouncedFilters, sortConfig, taskUpdateTrigger]);
 
   // Measure table dimensions after data loads
@@ -1053,26 +1053,26 @@ const Option2Tasks = () => {
     }
   }, [tasks, loading]);
 
-  const handleSearchChange = (e) => {
+  const handleSearchChange = useCallback((e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
-  };
+  }, []);
 
   // Toggle column visibility dropdown
-  const handleColumnToggleClick = (e) => {
+  const handleColumnToggleClick = useCallback((e) => {
     e.stopPropagation();
     setShowColumnVisibilityDropdown(prev => !prev);
-  };
+  }, []);
 
   // Toggle individual column visibility
-  const handleToggleColumn = (columnKey) => {
+  const handleToggleColumn = useCallback((columnKey) => {
     setVisibleColumns(prev => ({
       ...prev,
       [columnKey]: prev[columnKey] === undefined ? false : !prev[columnKey]
     }));
-  };
+  }, []);
 
-  const loadTaskTypesByCategory = async (categoryId) => {
+  const loadTaskTypesByCategory = useCallback(async (categoryId) => {
     try {
       setLoadingDropdowns(prev => ({ ...prev, taskTypes: true }));
       const res = await taskTypeService.getTaskTypesByCategoryId(categoryId);
@@ -1084,9 +1084,9 @@ const Option2Tasks = () => {
     } finally {
       setLoadingDropdowns(prev => ({ ...prev, taskTypes: false }));
     }
-  };
+  }, []);
 
-  const loadSubTypesByType = async (typeId) => {
+  const loadSubTypesByType = useCallback(async (typeId) => {
     try {
       setLoadingDropdowns(prev => ({ ...prev, subTypes: true }));
       const res = await subTypeService.getSubTypesByTypeId(typeId);
@@ -1097,9 +1097,9 @@ const Option2Tasks = () => {
     } finally {
       setLoadingDropdowns(prev => ({ ...prev, subTypes: false }));
     }
-  };
+  }, []);
 
-  const handleFilterChange = (name, value) => {
+  const handleFilterChange = useCallback((name, value) => {
     setFilters(prev => {
       let next = { ...prev, [name]: value };
       if (name === 'category_id') {
@@ -1121,9 +1121,21 @@ const Option2Tasks = () => {
       return next;
     });
     setCurrentPage(1);
-  };
+  }, [loadTaskTypesByCategory, loadSubTypesByType]);
 
-  const clearFilters = () => {
+  const loadAllTaskTypesHelper = useCallback(async () => {
+    try {
+      setLoadingDropdowns(prev => ({ ...prev, taskTypes: true }));
+      const res = await taskTypeService.getAllTaskTypes();
+      setTaskTypes(res.types || res.data || []);
+    } catch (err) {
+      setTaskTypes([]);
+    } finally {
+      setLoadingDropdowns(prev => ({ ...prev, taskTypes: false }));
+    }
+  }, []);
+
+  const clearFilters = useCallback(() => {
     setFilters({
       status: '',
       priority: '',
@@ -1142,37 +1154,25 @@ const Option2Tasks = () => {
     // reload all types/subtypes
     loadAllTaskTypesHelper();
     subTypeService.getAllSubTypes().then(res => setSubTypes(res.subtypes || res.data || [])).catch(() => setSubTypes([]));
-  };
+  }, [loadAllTaskTypesHelper]);
 
-  const loadAllTaskTypesHelper = async () => {
-    try {
-      setLoadingDropdowns(prev => ({ ...prev, taskTypes: true }));
-      const res = await taskTypeService.getAllTaskTypes();
-      setTaskTypes(res.types || res.data || []);
-    } catch (err) {
-      setTaskTypes([]);
-    } finally {
-      setLoadingDropdowns(prev => ({ ...prev, taskTypes: false }));
-    }
-  };
-
-  const handleSort = (frontendKey) => {
+  const handleSort = useCallback((frontendKey) => {
     let dir = 'asc';
     if (sortConfig.key === frontendKey && sortConfig.direction === 'asc') dir = 'desc';
     const backendField = mapSortField(frontendKey);
     setSortConfig({ key: backendField, direction: dir });
     setShowSortDropdown(false);
-  };
+  }, [sortConfig.key, sortConfig.direction]);
 
-  const handleTaskSelect = (id, checked) => {
+  const handleTaskSelect = useCallback((id, checked) => {
     setSelectedTasks(prev => checked ? [...prev, id] : prev.filter(x => x !== id));
-  };
+  }, []);
 
-  const handleSelectAll = (checked) => {
+  const handleSelectAll = useCallback((checked) => {
     setSelectedTasks(checked ? tasks.map(t => t.id) : []);
-  };
+  }, [tasks]);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     try {
       await taskService.bulkDeleteTasks(selectedTasks);
       setSelectedTasks([]);
@@ -1188,9 +1188,9 @@ const Option2Tasks = () => {
         type: 'error'
       });
     }
-  };
+  }, [selectedTasks]);
 
-  const handleConfirmAction = async () => {
+  const handleConfirmAction = useCallback(async () => {
     if (taskToDelete) {
       // Single task operation (delete)
       try {
@@ -1235,284 +1235,9 @@ const Option2Tasks = () => {
     setCurrentPage(1);
     // Trigger a refresh to update the task list in all components
     triggerTaskUpdate();
-  };
-
-  // Function to get file icon based on type
-  const getFileIcon = (type) => {
-    if (type.includes('image')) return 'image';
-    if (type.includes('pdf')) return 'picture_as_pdf';
-    if (type.includes('word')) return 'description';
-    if (type.includes('excel') || type.includes('sheet')) return 'grid_on';
-    if (type.includes('powerpoint') || type.includes('presentation')) return 'slideshow';
-    if (type.includes('zip') || type.includes('compressed')) return 'archive';
-    return 'description';
-  };
-
-  // State for image zoom and drag functionality
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  // Function to handle zoom in
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.2, 3)); // Max zoom level 3x
-  };
-
-  // Function to handle zoom out
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.2, 0.5)); // Min zoom level 0.5x
-  };
-
-  // Function to reset zoom
-  const handleResetZoom = () => {
-    setZoomLevel(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
-  // Function to handle drag start
-  const handleDragStart = (e) => {
-    if (zoomLevel > 1) { // Only allow dragging when zoomed in
-      setIsDragging(true);
-      const clientX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
-      const clientY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
-      setDragStart({
-        x: clientX - position.x,
-        y: clientY - position.y
-      });
-      e.preventDefault();
-    }
-  };
-
-  // Function to handle drag move
-  const handleDragMove = (e) => {
-    if (isDragging && zoomLevel > 1) {
-      const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
-      const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
-      setPosition({
-        x: clientX - dragStart.x,
-        y: clientY - dragStart.y
-      });
-    }
-  };
-
-  // Function to handle drag end
-  const handleDragEnd = () => {
-    setIsDragging(false);
-  };
-
-  // Function to handle wheel zoom
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const zoomIntensity = 0.1;
-    const newZoom = e.deltaY < 0 ? zoomLevel + zoomIntensity : zoomLevel - zoomIntensity;
-    setZoomLevel(Math.min(Math.max(newZoom, 0.5), 3)); // Clamp between 0.5 and 3
-  };
-
-  // Function to render the preview content based on file type
-  const renderPreviewContent = (attachment) => {
-    const { file_type: fileType } = attachment;
-
-    if (fileType.includes('image')) {
-      // Render zoomable image
-      return (
-        <div className="w-full h-full relative overflow-hidden">
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
-            <button
-              onClick={handleZoomOut}
-              className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-              aria-label="Zoom out"
-            >
-              <span className="material-symbols-outlined">zoom_out</span>
-            </button>
-            <button
-              onClick={handleResetZoom}
-              className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-              aria-label="Reset zoom"
-            >
-              <span className="text-sm">{Math.round(zoomLevel * 100)}%</span>
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-              aria-label="Zoom in"
-            >
-              <span className="material-symbols-outlined">zoom_in</span>
-            </button>
-          </div>
-
-          <div
-            className="w-full h-full flex items-center justify-center cursor-move"
-            onMouseDown={handleDragStart}
-            onMouseUp={handleDragEnd}
-          >
-            <img
-              src={attachment.previewUrl}
-              alt={attachment.filename}
-              className="max-w-none"
-              style={{
-                transform: `scale(${zoomLevel}) translate(${position.x}px, ${position.y}px)`,
-                transition: isDragging ? 'none' : 'transform 0.1s ease',
-                cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                maxWidth: '100%',
-                maxHeight: '100%'
-              }}
-              onError={(e) => {
-                console.error('Error loading image preview');
-                e.target.src = '/placeholder-image.png'; // fallback image
-              }}
-            />
-          </div>
-        </div>
-      );
-    } else if (fileType.includes('pdf')) {
-      // Render PDF using object tag
-      return (
-        <div className="w-full h-full">
-          <object
-            data={attachment.previewUrl}
-            type="application/pdf"
-            className="w-full h-full"
-            width="100%"
-            height="100%"
-          >
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-              <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">Unable to display PDF</p>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">This PDF cannot be displayed in your browser.</p>
-              <a
-                href={attachment.previewUrl}
-                download={attachment.filename}
-                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
-              >
-                Download PDF
-              </a>
-            </div>
-          </object>
-        </div>
-      );
-    } else if (fileType.includes('text/plain') || attachment.filename.toLowerCase().endsWith('.txt')) {
-      // For text files, render content using iframe to prevent XSS
-      return (
-        <div className="w-full h-full bg-white dark:bg-gray-900 p-4 overflow-auto">
-          <iframe
-            src={attachment.previewUrl}
-            className="w-full h-full border-0 text-gray-800 dark:text-gray-200"
-            title="Text file preview"
-            onLoad={(e) => {
-              // Style the text content inside iframe
-              try {
-                const iframeDoc = e.target.contentDocument || e.target.contentWindow.document;
-                if (iframeDoc) {
-                  iframeDoc.body.style.fontFamily = 'monospace, sans-serif';
-                  iframeDoc.body.style.fontSize = '14px';
-                  iframeDoc.body.style.whiteSpace = 'pre-wrap';
-                  iframeDoc.body.style.wordWrap = 'break-word';
-                }
-              } catch (err) {
-                // If there's an error accessing iframe content (due to security policies),
-                // the text might be in a different format, so use a fallback
-              }
-            }}
-          />
-        </div>
-      );
-    } else if (fileType.includes('audio/')) {
-      // For audio files, render audio player
-      return (
-        <div className="w-full h-full flex flex-col">
-          <div className="flex-1 flex items-center justify-center p-4">
-            <audio
-              src={attachment.previewUrl}
-              controls
-              className="w-full max-w-2xl h-16"
-              onLoadedMetadata={(e) => {
-                e.target.style.display = 'block';
-              }}
-            >
-              Your browser does not support the audio element.
-            </audio>
-          </div>
-        </div>
-      );
-    } else if (fileType.includes('video/')) {
-      // For video files, render video player
-      return (
-        <div className="w-full h-full flex flex-col">
-          <div className="flex-1 flex items-center justify-center p-4">
-            <video
-              src={attachment.previewUrl}
-              controls
-              className="max-h-full max-w-full"
-              onError={(e) => {
-                console.error('Error loading video preview');
-                // Fallback to providing download option
-                e.target.style.display = 'none';
-                const fallbackDiv = document.createElement('div');
-                fallbackDiv.className = 'flex flex-col items-center justify-center h-full p-8 text-center';
-                fallbackDiv.innerHTML = `
-                  <span class="material-symbols-outlined text-6xl text-gray-400 mb-4">movie</span>
-                  <p class="text-lg font-medium text-gray-800 dark:text-white mb-2">Unable to play video</p>
-                  <p class="text-gray-600 dark:text-gray-300 mb-4">This video cannot be played in your browser.</p>
-                `;
-                e.target.parentNode.appendChild(fallbackDiv);
-              }}
-            >
-              Your browser does not support the video element.
-            </video>
-          </div>
-        </div>
-      );
-    } else {
-      // For other file types, provide download button
-      return (
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">
-            {getFileIcon(fileType)}
-          </span>
-          <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">Preview not available</p>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">This file type cannot be previewed directly in the browser.</p>
-          <button
-            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
-            onClick={async () => {
-              try {
-                // Download the attachment to create a preview
-                const blob = await attachmentService.downloadAttachment(attachment.id);
-
-                // Create a temporary URL for the file for preview
-                const url = window.URL.createObjectURL(blob);
-
-                // Create a temporary link to trigger download
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = attachment.filename; // Use the original filename
-                document.body.appendChild(link);
-                link.click();
-
-                // Clean up
-                document.body.removeChild(link);
-
-                // Clean up the URL after a delay
-                setTimeout(() => {
-                  window.URL.revokeObjectURL(url);
-                }, 1000);
-              } catch (error) {
-                console.error('Error downloading attachment:', error);
-                alert('Failed to download attachment: ' + (error.message || 'Unknown error'));
-              }
-            }}
-          >
-            <span className="material-symbols-outlined mr-1">download</span>
-            Download File
-          </button>
-        </div>
-      );
-    }
-  };
+  }, [taskToDelete, selectedTasks, actionType, triggerTaskUpdate]);
 
 
-
-  // Truncate helper used in a few places
-  const truncateText = (t, len = 50) => (!t ? 'N/A' : t.length > len ? `${t.slice(0, len)}...` : t);
 
   // Render
   return (
@@ -1862,144 +1587,17 @@ const Option2Tasks = () => {
         </div>
       </Modal>
 
-      {/* Attachment Preview using React Portal */}
+      {/* Attachment Preview */}
       {previewAttachment && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-[99999] flex flex-col">
-          <div className="flex justify-between items-center p-4 bg-gray-900 text-white">
-            <p className="truncate max-w-xs">{previewAttachment.filename}</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  try {
-                    // Download the attachment to create a preview
-                    const blob = await attachmentService.downloadAttachment(previewAttachment.id);
-
-                    // Create a temporary URL for the file for preview
-                    const url = window.URL.createObjectURL(blob);
-
-                    // Create a temporary link to trigger download
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = previewAttachment.filename; // Use the original filename
-                    document.body.appendChild(link);
-                    link.click();
-
-                    // Clean up
-                    document.body.removeChild(link);
-
-                    // Clean up the URL after a delay
-                    setTimeout(() => {
-                      window.URL.revokeObjectURL(url);
-                    }, 1000);
-                  } catch (error) {
-                    console.error('Error downloading attachment:', error);
-                    alert('Failed to download attachment: ' + (error.message || 'Unknown error'));
-                  }
-                }}
-                className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
-                aria-label="Save"
-              >
-                <span className="material-symbols-outlined">download</span>
-              </button>
-              {!previewAttachment.file_type.includes('pdf') &&
-               (previewAttachment.file_type.includes('image') ||
-                previewAttachment.file_type.includes('text/plain') ||
-                previewAttachment.filename.toLowerCase().endsWith('.txt')) && (
-                <button
-                  onClick={() => {
-                    if (previewAttachment.file_type.includes('image')) {
-                      // Create a new window with the image for proper printing
-                      const printWindow = window.open('', '_blank');
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                          <head>
-                            <title>Print Image</title>
-                            <style>
-                              body {
-                                margin: 0;
-                                padding: 20px;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                min-height: 100vh;
-                                background: white;
-                              }
-                              img {
-                                max-width: 100%;
-                                max-height: 100vh;
-                                object-fit: contain;
-                              }
-                            </style>
-                          </head>
-                          <body>
-                            <img src="${previewAttachment.previewUrl}" alt="Print Preview" />
-                          </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                      printWindow.focus();
-                      printWindow.print();
-                    } else if (previewAttachment.file_type.includes('text/plain') ||
-                               previewAttachment.filename.toLowerCase().endsWith('.txt')) {
-                      // Create a new window with the text for proper printing
-                      const printWindow = window.open('', '_blank');
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                          <head>
-                            <title>Print Text</title>
-                            <style>
-                              body {
-                                margin: 20px;
-                                font-family: monospace;
-                                font-size: 14px;
-                                white-space: pre-wrap;
-                                word-wrap: break-word;
-                                background: white;
-                                color: black;
-                              }
-                            </style>
-                          </head>
-                          <body>
-                            <pre style="margin: 0;">${previewAttachment.previewUrl}</pre>
-                          </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                      printWindow.focus();
-                      printWindow.print();
-                    } else {
-                      // For other non-PDF files, we can't really print effectively
-                      alert('Printing is only available for image and text files');
-                    }
-                  }}
-                  className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
-                  aria-label="Print"
-                >
-                  <span className="material-symbols-outlined">print</span>
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  // Revoke the preview URL to free memory
-                  if (previewAttachment && previewAttachment.previewUrl) {
-                    window.URL.revokeObjectURL(previewAttachment.previewUrl);
-                  }
-                  setPreviewAttachment(null);
-                }}
-                className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
-                aria-label="Close preview"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto bg-gray-800 text-white">
-            {renderPreviewContent(previewAttachment)}
-          </div>
-        </div>
+        <AttachmentPreview
+          attachment={previewAttachment}
+          onClose={() => {
+            if (previewAttachment.previewUrl) {
+              window.URL.revokeObjectURL(previewAttachment.previewUrl);
+            }
+            setPreviewAttachment(null);
+          }}
+        />
       )}
 
       {/* Task title hover popup */}
