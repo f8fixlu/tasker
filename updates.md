@@ -1,5 +1,18 @@
 # Tasker Application Updates
 
+## Print Report Header Margin Fix
+
+### Removed Left and Right Margin from Default Header
+- Removed the 1.5cm left and right padding from the default header in PrintReport.js
+- Header now spans the full width of the page without side margins
+- Top margin (1.5cm) preserved to maintain proper spacing from page edge
+- Applied to both regular CSS and print media query styles
+
+### Files Modified
+- `frontend/src/pages/PrintReport.js`: Changed `.page-header` padding from `1.5cm 1.5cm 0 1.5cm` to `1.5cm 0 0 0` (lines 729, 793)
+
+---
+
 ## PDF Preview Font Loading Fix
 
 ### Fixed Intermittent "roboto-regular.ttf not found" Error
