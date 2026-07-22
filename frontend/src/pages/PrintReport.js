@@ -726,7 +726,7 @@ const PrintReport = () => {
         }
 
         .page-header {
-          padding: 1.5cm 1.5cm 0 1.5cm;
+          padding: 1.5cm 0 0 0;
           flex-shrink: 0;
           border-bottom: 1px solid #e5e7eb;
         }
@@ -790,7 +790,7 @@ const PrintReport = () => {
           }
 
           .page-header {
-            padding: 1.5cm 1.5cm 0 1.5cm !important;
+            padding: 1.5cm 0 0 0 !important;
             display: block !important;
             position: static !important;
             width: 100% !important;
