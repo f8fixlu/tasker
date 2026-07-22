@@ -228,19 +228,95 @@ splitChunks: {
 
 ---
 
+## Phase 5: Calendar Page Optimizations
+
+### 5.1 Switched to Calendar-Specific Endpoint with Date-Range
+**Files:** `frontend/src/pages/Calendar.js`, `frontend/src/services/eventService.js`
+
+**Problem:** Calendar fetched ALL events with `limit: 1000` via `getAllEvents()`, regardless of which month was visible. The backend already had a dedicated `GET /api/events/calendar` endpoint with `start_date`/`end_date` parameters backed by `getEventsForCalendar()`, but Calendar.js never used it.
+
+**Solution:**
+- Added `getCalendarEvents(startDate, endDate)` method to `eventService.js` that calls the `/events/calendar` endpoint
+- Updated `fetchEvents()` in Calendar.js to calculate the visible date range based on the current view (month grid, week, or day) and fetch only those events
+- `fetchEvents` is now wrapped in `useCallback` with `[currentDate, view]` dependencies, so it re-fetches when the visible range changes
+
+**Impact:** Fetches only visible events instead of all 1000. For a typical month with 10-20 events, this reduces data transfer by ~98%.
+
+### 5.2 Added skipAttachments for Calendar Endpoint
+**Files:** `backend/models/Event.js`, `backend/routes/events.js`
+
+**Problem:** `getEventsForCalendar()` ran an N+1 attachment query for every event (even though Calendar.js never renders attachments). With 1000 events, this was 1001 queries.
+
+**Solution:**
+- Added `options.skipAttachments` parameter to `getEventsForCalendar()`
+- Updated `handleGetCalendarEvents` route handler to pass `{ skipAttachments: true }`
+- When enabled, returns empty `attachments: []` array without querying
+
+**Impact:** Eliminates N+1 attachment queries for calendar view (e.g., 100 events = 100 fewer queries).
+
+### 5.3 Memoized Calendar Day Generation and Event Filtering
+**File:** `frontend/src/pages/Calendar.js`
+
+**Problem:**
+- `generateCalendarDays()` was called directly in JSX, creating a new 42-element array on every render
+- `getEventsForDate()` was called per-cell inside the `.map()`, filtering the full events/holidays arrays 42 times per render (84 full array scans)
+
+**Solution:**
+- Converted `generateCalendarDays()` to `calendarDays` via `useMemo` with `[currentDate.getFullYear(), currentDate.getMonth()]` dependencies
+- Wrapped `getEventsForDate` in `useCallback` with `[events, holidays]` dependencies
+
+**Impact:** Calendar day grid only recalculates when the month changes. Event filtering only recalculates when events/holidays data changes.
+
+### 5.4 Memoized "Today" Date Computation
+**File:** `frontend/src/pages/Calendar.js`
+
+**Problem:** `new Date()` was called 3 times per cell in the month view (42 cells = 126 Date objects per render), plus 3 more times in the week view header. Each `new Date()` allocates a new object.
+
+**Solution:** Created a `today` useMemo at the top of the component that computes the date once per render:
+```javascript
+const today = useMemo(() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return { date: d.getDate(), month: d.getMonth(), year: d.getFullYear(), raw: d };
+}, []);
+```
+Updated all `isToday` checks in month view and week view to use `today.date`, `today.month`, `today.year`.
+Updated `isDateInPast` to use `today.raw` via `useCallback`.
+
+**Impact:** Reduces from 129+ `new Date()` calls per render to 1.
+
+### 5.5 Lazy-Loaded Calendar Modals
+**File:** `frontend/src/pages/Calendar.js`
+
+**Problem:** `NewEventModal` and `ViewEventModal` were eagerly imported, loading into the Calendar chunk regardless of whether the user ever opens a modal.
+
+**Solution:**
+- Converted to `React.lazy()` dynamic imports
+- Wrapped in `<React.Suspense fallback={null}>` (modals are overlay-only)
+
+**Impact:** Reduces Calendar.js initial chunk size by removing modal component code.
+
+### 5.6 classList Anti-Pattern (Skipped)
+**Note:** The `classList.add/remove` calls in Calendar.js are for drag-and-drop states (`drag-over`, `dragging`). These are only modified on user interaction (drag events), not on render. Converting to React state would add unnecessary re-renders for interactive drag feedback. The current approach is correct for this use case.
+
+---
+
 ## Files Modified Summary
 
 | File | Changes |
 |------|---------|
-| `backend/models/Event.js` | Added `skipAttachments` option, parallelized `getEventStats`, fixed date anti-patterns |
+| `backend/models/Event.js` | Added `skipAttachments` option, parallelized `getEventStats`, fixed date anti-patterns, calendar skipAttachments |
 | `backend/models/Task.js` | Added `skipAttachmentCount` option, fixed date anti-patterns in `getTaskStats` |
 | `backend/config/database.js` | Added `idx_tasks_user_task_date` composite index |
 | `backend/routes/dashboard.js` | Rewrote to serve `/api/dashboard/stats` endpoint |
+| `backend/routes/events.js` | Calendar endpoint passes `skipAttachments: true` |
 | `backend/routes/tasks.js` | Batch SQL for bulk update/delete (Phase 4.5) |
 | `backend/server.js` | Mounted dashboard routes before other API routes |
 | `frontend/src/pages/Dashboard.js` | Fixed double fetch, removed ~300 lines dead code, removed 7 unused imports |
 | `frontend/src/pages/Tasks.js` | Parallel dropdowns, useCallback handlers, AbortController, dead code removal (Phase 4) |
+| `frontend/src/pages/Calendar.js` | Date-range fetch, memoization, lazy modals (Phase 5) |
 | `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js (Phase 4.6) |
+| `frontend/src/services/eventService.js` | Added `getCalendarEvents()` method (Phase 5.1) |
 | `frontend/src/App.js` | Lazy-loaded ModalRenderer |
 | `frontend/config-overrides.js` | Added splitChunks configuration |
 | `frontend/src/pages/Reports.js` | Converted pdfjs-dist to dynamic import |
@@ -255,8 +331,12 @@ splitChunks: {
 | API calls on task update | 8 (4 duplicate) | 4 |
 | Dashboard.js line count | 1,177 | ~880 |
 | Tasks.js line count | 2,080 | ~1,680 |
+| Calendar events fetched | All 1000 (limit) | Only visible range (~10-20) |
+| Calendar attachment queries | N+1 (1000 queries) | 0 (skipAttachments) |
+| Calendar `new Date()` per render | 129+ | 1 |
 | Dead code lines | ~300 | 0 |
 | ModalRenderer in main bundle | Yes (10 modals) | No (lazy) |
+| Calendar modals in bundle | Eager | Lazy |
 | pdfjs-dist in Reports chunk | Static (~1.5MB) | Dynamic (on-demand) |
 | React/Chart.js caching | Shared chunks | Separate vendor chunks |
 | Tasks dropdown load time | 3x sequential | 1x parallel |

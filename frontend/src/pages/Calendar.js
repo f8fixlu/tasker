@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Button from '../components/common/Button';
-import NewEventModal from '../components/modals/NewEventModal';
-import ViewEventModal from '../components/modals/ViewEventModal';
-import { eventService } from '../services/eventService';
-import { holidayService } from '../services/holidayService';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { useNotifications } from '../hooks/useNotifications';
+import { eventService } from '../services/eventService';
+import { holidayService } from '../services/holidayService';
+
+const NewEventModal = React.lazy(() => import('../components/modals/NewEventModal'));
+const ViewEventModal = React.lazy(() => import('../components/modals/ViewEventModal'));
 
 // Add custom CSS for hiding scrollbars and drag effects
 const scrollbarHideStyle = `
@@ -44,13 +45,43 @@ const Calendar = () => {
   const popupTimeoutRef = useRef(null);
   const [savedHolidayKeys, setSavedHolidayKeys] = useState(new Set());
 
-  // Function to fetch events from the database
-  const fetchEvents = async () => {
+  // Compute "today" once per render to avoid 126+ new Date() calls per render
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return { date: d.getDate(), month: d.getMonth(), year: d.getFullYear(), raw: d };
+  }, []);
+
+  // Function to fetch events from the database using calendar endpoint
+  const fetchEvents = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch all events without any limit by explicitly setting high limit
-      const response = await eventService.getAllEvents({ limit: 1000 });
-      setEvents(response.events || response);
+      // Calculate visible date range based on current view
+      let startDate, endDate;
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      if (view === 'month') {
+        // Full visible month grid: previous month overflow + current month + next month overflow
+        const firstDay = new Date(year, month, 1);
+        const startOffset = firstDay.getDay(); // Day of week of first day
+        startDate = new Date(year, month, 1 - startOffset);
+        endDate = new Date(year, month + 1, 6); // 6 extra days for next month grid
+      } else if (view === 'week') {
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        startDate = startOfWeek;
+        endDate = new Date(startOfWeek);
+        endDate.setDate(startOfWeek.getDate() + 6);
+      } else {
+        // Day view - just fetch the current day
+        startDate = new Date(currentDate);
+        endDate = new Date(currentDate);
+      }
+
+      const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const response = await eventService.getCalendarEvents(formatDate(startDate), formatDate(endDate));
+      setEvents(response.events || []);
     } catch (error) {
       console.error('Error fetching events:', error);
       setEvents([]);
@@ -60,7 +91,7 @@ const Calendar = () => {
         setInitialLoadComplete(true);
       }
     }
-  };
+  }, [currentDate, view, initialLoadComplete]);
 
   // Fetch Philippine holidays from the backend
   const fetchHolidays = async () => {
@@ -102,7 +133,7 @@ const Calendar = () => {
   useEffect(() => {
     fetchEvents();
     fetchHolidays();
-  }, []);
+  }, [fetchEvents]);
 
   // Re-fetch holidays when the viewed year changes
   useEffect(() => {
@@ -112,11 +143,9 @@ const Calendar = () => {
   }, [currentDate.getFullYear()]);
 
   // Function to check if a date is in the past
-  const isDateInPast = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
-    return date < today;
-  };
+  const isDateInPast = useCallback((date) => {
+    return date < today.raw;
+  }, [today.raw]);
 
   // Function to handle day click - opens new event modal with pre-filled date (if not in past)
   const handleDayClick = (date) => {
@@ -158,8 +187,8 @@ const Calendar = () => {
     return getFirstDayOfMonth(date).getDay();
   };
 
-  // Generate calendar days for month view
-  const generateCalendarDays = () => {
+  // Generate calendar days for month view (memoized)
+  const calendarDays = useMemo(() => {
     const days = [];
     const firstDayOfWeek = getFirstDayOfWeek(currentDate);
     const daysInMonth = getDaysInMonth(currentDate);
@@ -187,10 +216,10 @@ const Calendar = () => {
     }
 
     return days;
-  };
+  }, [currentDate.getFullYear(), currentDate.getMonth()]);
 
-  // Helper function to filter events and holidays for a specific date
-  const getEventsForDate = (date) => {
+  // Helper function to filter events and holidays for a specific date (memoized per events/holidays change)
+  const getEventsForDate = useCallback((date) => {
     const eventResults = events.filter(event => {
       const eventDate = new Date(event.startDate || event.start_date);
       return (
@@ -213,7 +242,7 @@ const Calendar = () => {
       .map(h => holidayToEvent(h));
 
     return [...holidayResults, ...eventResults];
-  };
+  }, [events, holidays]);
 
   // Function to update an event's dates only (preserving times)
   const updateEventDates = async (event, newStartDate, newEndDate) => {
@@ -510,16 +539,16 @@ const Calendar = () => {
               </div>
               
               <div className="grid grid-cols-7">
-                {generateCalendarDays().map((day, index) => {
+                {calendarDays.map((day, index) => {
                   const isSelected = 
                     day.date.getDate() === currentDate.getDate() &&
                     day.date.getMonth() === currentDate.getMonth() &&
                     day.date.getFullYear() === currentDate.getFullYear();
                   
                   const isToday = 
-                    day.date.getDate() === new Date().getDate() &&
-                    day.date.getMonth() === new Date().getMonth() &&
-                    day.date.getFullYear() === new Date().getFullYear();
+                    day.date.getDate() === today.date &&
+                    day.date.getMonth() === today.month &&
+                    day.date.getFullYear() === today.year;
                   
                   const dayEvents = getEventsForDate(day.date);
                   
@@ -731,9 +760,9 @@ const Calendar = () => {
                   date.setDate(currentDate.getDate() + dayOffset);
                   
                   const isToday = 
-                    date.getDate() === new Date().getDate() &&
-                    date.getMonth() === new Date().getMonth() &&
-                    date.getFullYear() === new Date().getFullYear();
+                    date.getDate() === today.date &&
+                    date.getMonth() === today.month &&
+                    date.getFullYear() === today.year;
                   
                   return (
                     <div 
@@ -1169,23 +1198,25 @@ const Calendar = () => {
         </>
       )}
       
-      <NewEventModal 
-        isOpen={isNewEventModalOpen} 
-        onClose={() => setIsNewEventModalOpen(false)} 
-        prefillData={newEventPrefillData}
-        onSave={handleSaveEvent}
-      />
-      
-      <ViewEventModal
-        isOpen={isViewEventModalOpen}
-        onClose={() => setIsViewEventModalOpen(false)}
-        event={selectedEvent}
-        onEventUpdate={() => {
-          fetchEvents();
-          triggerTaskUpdate();
-          setTimeout(() => fetchNotifications(), 100);
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <NewEventModal 
+          isOpen={isNewEventModalOpen} 
+          onClose={() => setIsNewEventModalOpen(false)} 
+          prefillData={newEventPrefillData}
+          onSave={handleSaveEvent}
+        />
+        
+        <ViewEventModal
+          isOpen={isViewEventModalOpen}
+          onClose={() => setIsViewEventModalOpen(false)}
+          event={selectedEvent}
+          onEventUpdate={() => {
+            fetchEvents();
+            triggerTaskUpdate();
+            setTimeout(() => fetchNotifications(), 100);
+          }}
+        />
+      </React.Suspense>
       
       {/* Event hover popup */}
       {calendarEventPopup && (

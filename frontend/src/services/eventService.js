@@ -239,6 +239,33 @@ export const eventService = {
     }
   },
 
+  // Get events for calendar view (optimized date-range query, no attachments)
+  async getCalendarEvents(startDate, endDate) {
+    const params = { start_date: startDate, end_date: endDate };
+    const cacheKey = getCacheKey('/events/calendar', params);
+    const cachedData = cache.get(cacheKey);
+
+    try {
+      const response = await api.get('/events/calendar', params);
+      const transformedEvents = Array.isArray(response.events) ?
+        response.events.map(event => transformEventForFrontend(event)) :
+        Array.isArray(response) ?
+        response.map(event => transformEventForFrontend(event)) :
+        response;
+
+      const result = Array.isArray(response.events) ? { events: transformedEvents } : { events: transformedEvents };
+
+      cache.set(cacheKey, result, 30000);
+      return result;
+    } catch (error) {
+      if (cachedData) {
+        console.warn(`Using cached data for ${cacheKey} due to API error:`, error.message);
+        return cachedData;
+      }
+      throw error;
+    }
+  },
+
   // Get events by category
   async getEventsByCategory(categoryId) {
     try {

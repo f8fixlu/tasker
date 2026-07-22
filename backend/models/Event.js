@@ -346,7 +346,7 @@ async function getEventsByUserId(user_id, options = {}) {
 }
 
 // Get events for calendar view (by date range)
-async function getEventsForCalendar(user_id, start_date, end_date) {
+async function getEventsForCalendar(user_id, start_date, end_date, options = {}) {
   const sql = `
     SELECT
       e.id, e.title, e.start_date, e.end_date, e.is_whole_day, e.description, e.status,
@@ -365,6 +365,19 @@ async function getEventsForCalendar(user_id, start_date, end_date) {
 
   try {
     let events = await getAll(sql, params);
+
+    if (options.skipAttachments) {
+      events = events.map(event => ({
+        ...event,
+        start_date: convertUTCToLocal(event.start_date),
+        end_date: convertUTCToLocal(event.end_date),
+        category: event.category || null,
+        event_type: event.event_type || null,
+        attachments: []
+      }));
+      return events;
+    }
+
     // Convert UTC dates to local time for all events and add attachments
     const { getAttachmentsByEventId } = require('./Attachment');
 

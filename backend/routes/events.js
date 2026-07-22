@@ -129,7 +129,7 @@ async function handleGetCalendarEvents(req, res, userId, query) {
       return res.end(JSON.stringify({ error: 'start_date and end_date are required for calendar view' }));
     }
     
-    const events = await getEventsForCalendar(userId, start_date, end_date);
+    const events = await getEventsForCalendar(userId, start_date, end_date, { skipAttachments: true });
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ events }));
