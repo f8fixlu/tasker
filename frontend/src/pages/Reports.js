@@ -38,34 +38,41 @@ const loadPdfMake = async () => {
   return pdfMake;
 };
 
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip as ChartTooltip,
-  Legend as ChartLegend,
-  ArcElement,
-  Filler
-} from 'chart.js';
+// Deferred Chart.js registration - only loads ~200KB when charts are actually needed
+let chartsRegistered = false;
+const ensureChartsRegistered = async () => {
+  if (chartsRegistered) return;
+  const chartJS = await import('chart.js');
+  const { CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler } = chartJS;
+  chartJS.Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, Filler);
+  chartsRegistered = true;
+};
 
 const Line = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Line })));
 const Pie = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Pie })));
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  ChartTooltip,
-  ChartLegend,
-  ArcElement,
-  Filler
-);
+// Wrapper that ensures Chart.js is registered before rendering
+const LazyLine = (props) => {
+  const [ready, setReady] = React.useState(chartsRegistered);
+  React.useEffect(() => {
+    if (!chartsRegistered) {
+      ensureChartsRegistered().then(() => setReady(true));
+    }
+  }, []);
+  if (!ready) return null;
+  return <Line {...props} />;
+};
+
+const LazyPie = (props) => {
+  const [ready, setReady] = React.useState(chartsRegistered);
+  React.useEffect(() => {
+    if (!chartsRegistered) {
+      ensureChartsRegistered().then(() => setReady(true));
+    }
+  }, []);
+  if (!ready) return null;
+  return <Pie {...props} />;
+};
 
 // Create a custom hook for outside click detection
 const useOutsideClick = (ref, callback) => {
@@ -612,14 +619,14 @@ const Reports = () => {
             <div className="bg-gray-50 p-4 rounded">
               <h3 className="text-center font-medium mb-2">Task Completion Rate</h3>
               <div className="h-64">
-                <Line data={taskCompletionData} options={lineChartOptions} />
+                <LazyLine data={taskCompletionData} options={lineChartOptions} />
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded">
               <h3 className="text-center font-medium mb-2">Activity Breakdown</h3>
               <div className="h-64 flex flex-row items-center">
                 <div className="w-1/2 h-48 flex items-center justify-center">
-                  <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
+                  <LazyPie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
                 </div>
                 <div className="w-1/2 flex flex-col justify-center pl-2">
                   {activityBreakdownChartData.labels.map((label, index) => (
@@ -2390,7 +2397,7 @@ const generatePDF = async () => {
                 <h3 className="text-lg font-medium text-[#617589] dark:text-gray-400 mb-2 text-left">Task Completion Rate</h3>
                 <div className="h-full">
                   <div className="h-full flex justify-start">
-                    <Line data={taskCompletionData} options={lineChartOptions} />
+                    <LazyLine data={taskCompletionData} options={lineChartOptions} />
                   </div>
                 </div>
               </div>
@@ -2399,7 +2406,7 @@ const generatePDF = async () => {
                 <div className="h-full">
                   <div className="h-full flex flex-row items-center">
                     <div className="w-1/2 h-32 sm:h-40 flex items-center justify-center">
-                      <Pie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
+                      <LazyPie type="doughnut" data={activityBreakdownChartData} options={pieChartOptions} />
                     </div>
                     <div className="w-1/2 flex flex-col justify-center pl-2 sm:pl-4">
                       {activityBreakdownChartData.labels.map((label, index) => (

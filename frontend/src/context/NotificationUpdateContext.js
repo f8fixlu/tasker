@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const NotificationUpdateContext = createContext();
 
@@ -13,14 +13,14 @@ export const useNotificationUpdate = () => {
 export const NotificationUpdateProvider = ({ children }) => {
   const [updateTrigger, setUpdateTrigger] = useState(0);
 
-  const triggerNotificationUpdate = () => {
+  const triggerNotificationUpdate = useCallback(() => {
     setUpdateTrigger(prev => prev + 1);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     updateTrigger,
     triggerNotificationUpdate
-  };
+  }), [updateTrigger, triggerNotificationUpdate]);
 
   return (
     <NotificationUpdateContext.Provider value={value}>

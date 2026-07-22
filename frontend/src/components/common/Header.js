@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -7,10 +7,11 @@ import { useNotificationUpdate } from '../../context/NotificationUpdateContext';
 import { formatToLocalDateTime } from '../../utils/date';
 import Button from './Button';
 import Modal from './Modal';
-import SettingsModal from './SettingsModal';
-import NotificationsModal from '../modals/NotificationsModal';
 import ThemeToggle from './ThemeToggle';
-import MobileSidebar from './MobileSidebar';
+
+const SettingsModal = React.lazy(() => import('./SettingsModal'));
+const NotificationsModal = React.lazy(() => import('../modals/NotificationsModal'));
+const MobileSidebar = React.lazy(() => import('./MobileSidebar'));
 
 const Header = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -362,19 +363,21 @@ const Header = () => {
       </div>
 
       {/* Mobile Sidebar */}
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-        onOpenSettings={() => {
-          setIsSettingsOpen(true);
-          setIsMobileSidebarOpen(false);
-        }}
-      />
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        user={user}
-      />
+      <Suspense fallback={null}>
+        <MobileSidebar
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+          onOpenSettings={() => {
+            setIsSettingsOpen(true);
+            setIsMobileSidebarOpen(false);
+          }}
+        />
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          user={user}
+        />
+      </Suspense>
 
       {/* Logout Confirmation Modal */}
       <Modal
@@ -395,10 +398,12 @@ const Header = () => {
           </div>
         </div>
       </Modal>
-      <NotificationsModal
-        isOpen={isAllNotificationsModalOpen}
-        onClose={() => setIsAllNotificationsModalOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <NotificationsModal
+          isOpen={isAllNotificationsModalOpen}
+          onClose={() => setIsAllNotificationsModalOpen(false)}
+        />
+      </Suspense>
     </header>
   );
 };

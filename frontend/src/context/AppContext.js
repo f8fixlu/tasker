@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const AppContext = createContext();
 
@@ -15,7 +15,7 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const addNotification = (notification) => {
+  const addNotification = useCallback((notification) => {
     const id = Date.now() + Math.random();
     const newNotification = {
       id,
@@ -23,29 +23,29 @@ export const AppProvider = ({ children }) => {
       timestamp: new Date().toISOString(),
     };
     setNotifications(prev => [newNotification, ...prev]);
-  };
+  }, []);
 
-  const removeNotification = (id) => {
+  const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(notification => notification.id !== id));
-  };
+  }, []);
 
-  const clearNotifications = () => {
+  const clearNotifications = useCallback(() => {
     setNotifications([]);
-  };
+  }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  }, []);
 
-  const showLoading = () => {
+  const showLoading = useCallback(() => {
     setIsLoading(true);
-  };
+  }, []);
 
-  const hideLoading = () => {
+  const hideLoading = useCallback(() => {
     setIsLoading(false);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     theme,
     setTheme,
     toggleTheme,
@@ -56,7 +56,7 @@ export const AppProvider = ({ children }) => {
     isLoading,
     showLoading,
     hideLoading,
-  };
+  }), [theme, notifications, isLoading, toggleTheme, addNotification, removeNotification, clearNotifications, showLoading, hideLoading]);
 
   return (
     <AppContext.Provider value={value}>

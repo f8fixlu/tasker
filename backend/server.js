@@ -17,6 +17,10 @@ const http = require('http');
 const url = require('url');
 const zlib = require('zlib');
 
+// Gzip cache: store compressed buffers keyed by "filePath:mtime" to avoid recompressing
+const gzipCache = new Map();
+const GZIP_CACHE_MAX = 200; // max entries
+
 // Import configuration and utilities
 const { setupDatabase } = require('./config/database');
 const { authenticateToken, requestLogger } = require('./middleware/auth');
@@ -333,20 +337,35 @@ function handleStaticFile(req, res, pathname) {
         headers['Cache-Control'] = 'no-cache';
       }
 
-      // Apply gzip compression for text-based responses
+      // Apply gzip compression for text-based responses with caching
       const acceptEncoding = req.headers['accept-encoding'] || '';
       if (isStaticAsset && acceptEncoding.includes('gzip') && /\.(js|css|html|svg|json|text)$/i.test(filePath)) {
-        zlib.gzip(content, (err, compressed) => {
-          if (err) {
-            res.writeHead(200, headers);
-            res.end(content, 'utf-8');
-          } else {
-            headers['Content-Encoding'] = 'gzip';
-            headers['Content-Length'] = compressed.length;
-            res.writeHead(200, headers);
-            res.end(compressed);
-          }
-        });
+        const cacheKey = filePath + ':' + (content.mtime || '');
+        const cached = gzipCache.get(cacheKey);
+        if (cached) {
+          headers['Content-Encoding'] = 'gzip';
+          headers['Content-Length'] = cached.length;
+          res.writeHead(200, headers);
+          res.end(cached);
+        } else {
+          zlib.gzip(content, (err, compressed) => {
+            if (err) {
+              res.writeHead(200, headers);
+              res.end(content, 'utf-8');
+            } else {
+              // Evict oldest entry if cache is full
+              if (gzipCache.size >= GZIP_CACHE_MAX) {
+                const firstKey = gzipCache.keys().next().value;
+                gzipCache.delete(firstKey);
+              }
+              gzipCache.set(cacheKey, compressed);
+              headers['Content-Encoding'] = 'gzip';
+              headers['Content-Length'] = compressed.length;
+              res.writeHead(200, headers);
+              res.end(compressed);
+            }
+          });
+        }
       } else {
         res.writeHead(200, headers);
         res.end(content, 'utf-8');
@@ -395,7 +414,7 @@ server.listen(PORT, () => {
   console.log(`Database initialized and ready`);
 
   // Start the session cleanup job (check every 5 minutes for sessions inactive for 15 minutes)
-  startSessionCleanupJob(5, 15);
+  startSessionCleanupJob(5, 60);
 
   // Start the notification jobs (check every 5 minutes for overdue tasks and upcoming events)
   startNotificationJobs(5);

@@ -440,6 +440,13 @@ function createOtherTablesAndColumns(callback) {
     }
   });
 
+  // Add last_login_at column to persist login timestamps across session deletions
+  db.run(`ALTER TABLE users ADD COLUMN last_login_at DATETIME`, (err) => {
+    if (err) {
+      // Column might already exist, which is fine
+    }
+  });
+
   console.log('Database initialized successfully');
 
   if (callback) callback(null);

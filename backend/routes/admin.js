@@ -6,8 +6,6 @@ function adminRoutes(req, res, parsedUrl) {
   const pathname = parsedUrl.pathname;
   const method = req.method;
 
-  console.log(`Admin route handler called - Method: ${method}, Path: ${pathname}`);
-
   if (method === 'GET' && pathname === '/api/admin/stats') {
     // Apply admin authentication middleware
     const { authenticateToken, isAdmin } = require('../middleware/auth');
@@ -204,13 +202,8 @@ async function handleGetUsers(req, res, parsedUrl) {
     // Build the query
     let query = `
       SELECT u.id, u.email, u.full_name, u.profile_image_url, u.created_at,
-             s.last_activity_at as last_login
+             u.last_login_at as last_login
       FROM users u
-      LEFT JOIN (
-        SELECT user_id, MAX(last_activity_at) as last_activity_at
-        FROM sessions
-        GROUP BY user_id
-      ) s ON u.id = s.user_id
     `;
     let countQuery = `SELECT COUNT(*) as count FROM users`;
     let params = [];
@@ -459,13 +452,11 @@ async function isUserCurrentlyActive(userId) {
 // Helper function to get active session count
 async function getActiveSessionCount() {
   return new Promise((resolve, reject) => {
-    // Sessions that have been active in the last 30 minutes
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     db.get(`
       SELECT COUNT(*) as count
       FROM sessions
-      WHERE last_activity_at >= ?
-    `, [thirtyMinutesAgo], (err, row) => {
+      WHERE last_activity_at >= datetime('now', '-30 minutes')
+    `, (err, row) => {
       if (err) reject(err);
       else resolve(row.count);
     });
