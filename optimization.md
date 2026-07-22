@@ -371,7 +371,30 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 
 ---
 
-## Files Modified Summary
+## Phase 7: Shared Context Optimizations
+
+### 7.1 Memoized TaskUpdateContext Value
+**File:** `frontend/src/context/TaskUpdateContext.js`
+
+**Problem:** `TaskUpdateProvider` created a new `value` object on every render. The `triggerTaskUpdate` and `triggerDropdownUpdate` functions were plain arrow functions recreated on every render. This meant every component consuming `useTaskUpdate()` (8 consumers: Dashboard, Tasks, Calendar, Reports, Header, ModalRenderer, NewTaskModal, EditTaskModal) re-rendered on every parent re-render, even when `updateTrigger`/`dropdownUpdateTrigger` hadn't changed.
+
+**Solution:**
+- Wrapped `triggerTaskUpdate` and `triggerDropdownUpdate` in `useCallback` (empty dependency arrays — they only call state setters)
+- Memoized the `value` object with `useMemo` depending on `[updateTrigger, triggerTaskUpdate, dropdownUpdateTrigger, triggerDropdownUpdate]`
+
+**Impact:** Context consumers only re-render when `updateTrigger` or `dropdownUpdateTrigger` actually change, not on every provider re-render. This eliminates unnecessary re-renders in 8 components including the expensive Dashboard and Tasks pages.
+
+### 7.2 Memoized ModalContext Value
+**File:** `frontend/src/context/ModalContext.js`
+
+**Problem:** `ModalProvider` created a new `value` object on every render. The `openModal`, `closeModal`, and `closeAllModals` functions were plain arrow functions recreated on every render. This meant every component consuming `useModal()` (5 consumers: Tasks, Dashboard, ModalRenderer, Footer, plus the useModal hook wrapper) re-rendered on every parent re-render, even when modal state hadn't changed.
+
+**Solution:**
+- Wrapped `openModal`, `closeModal`, and `closeAllModals` in `useCallback` (empty dependency arrays — they only call state setters)
+- `setSelectedTask` and `setSelectedEvent` are already stable references from `useState`
+- Memoized the `value` object with `useMemo` depending on `[modals, openModal, closeModal, closeAllModals, selectedTask, selectedEvent]`
+
+**Impact:** Context consumers only re-render when `modals` state or `selectedTask`/`selectedEvent` actually change, not on every provider re-render. This eliminates unnecessary re-renders in 5 components including the expensive Tasks page and ModalRenderer.
 
 | File | Changes |
 |------|---------|
@@ -387,6 +410,8 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 | `frontend/src/pages/Tasks.js` | Parallel dropdowns, useCallback handlers, AbortController, dead code removal (Phase 4) |
 | `frontend/src/pages/Calendar.js` | Date-range fetch, memoization, lazy modals (Phase 5) |
 | `frontend/src/pages/Reports.js` | Removed duplicate fetches, useCallback/useMemo, lazy charts, debug logs, dead code (Phase 6) |
+| `frontend/src/context/TaskUpdateContext.js` | Memoized value with useCallback/useMemo (Phase 7.1) |
+| `frontend/src/context/ModalContext.js` | Memoized value with useCallback/useMemo (Phase 7.2) |
 | `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js (Phase 4.6) |
 | `frontend/src/components/common/CategoryFiltersDropdown.js` | New component extracted from Reports.js (Phase 6.2) |
 | `frontend/src/services/eventService.js` | Added `getCalendarEvents()` method (Phase 5.1) |
@@ -421,3 +446,5 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 | CategoryFiltersDropdown in Reports.js | ~70 lines inline | Extracted component |
 | Reports debug console.logs | 13 log statements | 0 (errors only) |
 | Reports dashboard stats backend | 5 sequential queries | 4 parallel queries |
+| TaskUpdateContext unnecessary re-renders | All 8 consumers on every render | Only when updateTrigger changes |
+| ModalContext unnecessary re-renders | All 5 consumers on every render | Only when modals/selection changes |

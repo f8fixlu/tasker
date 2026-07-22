@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const ModalContext = createContext();
 
@@ -27,21 +27,21 @@ export const ModalProvider = ({ children }) => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  const openModal = (modalName) => {
+  const openModal = useCallback((modalName) => {
     setModals(prev => ({
       ...prev,
       [modalName]: true
     }));
-  };
+  }, []);
 
-  const closeModal = (modalName) => {
+  const closeModal = useCallback((modalName) => {
     setModals(prev => ({
       ...prev,
       [modalName]: false
     }));
-  };
+  }, []);
 
-  const closeAllModals = () => {
+  const closeAllModals = useCallback(() => {
     setModals({
       showNewTask: false,
       showViewTask: false,
@@ -54,9 +54,9 @@ export const ModalProvider = ({ children }) => {
       showNewSubType: false,
       showAbout: false,
     });
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     modals,
     openModal,
     closeModal,
@@ -65,7 +65,7 @@ export const ModalProvider = ({ children }) => {
     setSelectedTask,
     selectedEvent,
     setSelectedEvent
-  };
+  }), [modals, openModal, closeModal, closeAllModals, selectedTask, selectedEvent]);
 
   return (
     <ModalContext.Provider value={value}>

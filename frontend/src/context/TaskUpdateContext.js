@@ -1,7 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
-import { categoryService } from '../services/categoryService';
-import { taskTypeService } from '../services/taskTypeService';
-import { subTypeService } from '../services/subTypeService';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const TaskUpdateContext = createContext();
 
@@ -17,22 +14,20 @@ export const TaskUpdateProvider = ({ children }) => {
   const [updateTrigger, setUpdateTrigger] = useState(0);
   const [dropdownUpdateTrigger, setDropdownUpdateTrigger] = useState(0);
 
-  const triggerTaskUpdate = () => {
+  const triggerTaskUpdate = useCallback(() => {
     setUpdateTrigger(prev => prev + 1);
-  };
+  }, []);
 
-  // Function to trigger dropdown refresh in parent components
-  const triggerDropdownUpdate = (type = 'all') => {
-    // Pass the type of dropdown that needs refresh so parent components can decide what to update
+  const triggerDropdownUpdate = useCallback((type = 'all') => {
     setDropdownUpdateTrigger(prev => prev + 1);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     updateTrigger,
     triggerTaskUpdate,
     dropdownUpdateTrigger,
     triggerDropdownUpdate
-  };
+  }), [updateTrigger, triggerTaskUpdate, dropdownUpdateTrigger, triggerDropdownUpdate]);
 
   return (
     <TaskUpdateContext.Provider value={value}>
