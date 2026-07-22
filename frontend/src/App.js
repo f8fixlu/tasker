@@ -23,7 +23,8 @@ const AdminStatsPage = lazy(() => import('./pages/admin/AdminStatsPage'));
 const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
 const BackupStatusPage = lazy(() => import('./pages/admin/BackupStatusPage'));
 
-import ModalRenderer from './components/modals/ModalRenderer';
+// Lazy load ModalRenderer to avoid bundling all modals in main chunk
+const ModalRenderer = lazy(() => import('./components/modals/ModalRenderer'));
 
 function App() {
   // Preload critical components for better performance
@@ -226,7 +227,9 @@ function App() {
                     }
                   />
                 </Routes>
-                <ModalRenderer />
+                <Suspense fallback={null}>
+                  <ModalRenderer />
+                </Suspense>
               </ModalProvider>
             </NotificationUpdateProvider>
           </TaskUpdateProvider>

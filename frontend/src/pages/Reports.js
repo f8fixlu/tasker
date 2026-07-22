@@ -10,11 +10,20 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { formatToLocalDateTime } from '../utils/date';
-import * as pdfjsLib from 'pdfjs-dist';
-import { GlobalWorkerOptions } from 'pdfjs-dist';
 
-// Initialize pdfjs worker
-GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Lazy load pdfjs-dist to reduce initial bundle size (1.5MB+ library)
+let pdfjsLib = null;
+let GlobalWorkerOptions = null;
+const loadPdfjs = async () => {
+  if (!pdfjsLib) {
+    const pdfjsModule = await import('pdfjs-dist');
+    pdfjsLib = pdfjsModule;
+    GlobalWorkerOptions = pdfjsModule.GlobalWorkerOptions;
+    // Initialize pdfjs worker
+    GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  }
+  return { pdfjsLib, GlobalWorkerOptions };
+};
 
 // Import pdfmake dynamically
 let pdfMake = null;

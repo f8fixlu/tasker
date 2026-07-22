@@ -10,6 +10,40 @@ module.exports = {
 
       // Disable source maps in production to reduce bundle size
       config.devtool = false;
+
+      // Add splitChunks configuration for better caching
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          maxInitialRequests: 25,
+          minSize: 20000,
+          cacheGroups: {
+            defaultVendors: {
+              test: /[\\/]node_modules[\\/]/,
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+            react: {
+              test: /[\\/]node_modules[\\/](react|react-dom|react-router-dom)[\\/]/,
+              name: 'vendor-react',
+              chunks: 'all',
+              priority: 10,
+            },
+            chartjs: {
+              test: /[\\/]node_modules[\\/](chart\.js|react-chartjs-2)[\\/]/,
+              name: 'vendor-chartjs',
+              chunks: 'all',
+              priority: 10,
+            },
+            common: {
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
     }
 
     // Add bundle analyzer for production builds when ANALYZE_BUNDLE environment variable is set

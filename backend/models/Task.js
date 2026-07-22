@@ -329,12 +329,19 @@ async function getTasksCountByUserId(user_id, options = {}) {
 
 // Get tasks by user ID
 async function getTasksByUserId(user_id, options = {}) {
+  // Skip attachment_count subquery when not needed (dashboard doesn't use it)
+  const selectFields = options.skipAttachmentCount
+    ? `t.id, t.title, t.description, t.category_id, t.type_id, t.sub_type_id, t.quantity, t.priority, t.due_date, t.task_date,
+       t.created_date, t.status, t.user_id, t.edited_date,
+       tc.name as category_name, tt.name as type_name, tst.name as sub_type_name`
+    : `t.id, t.title, t.description, t.category_id, t.type_id, t.sub_type_id, t.quantity, t.priority, t.due_date, t.task_date,
+       t.created_date, t.status, t.user_id, t.edited_date,
+       tc.name as category_name, tt.name as type_name, tst.name as sub_type_name,
+       (SELECT COUNT(*) FROM attachments a WHERE a.task_id = t.id) as attachment_count`;
+
   let sql = `
     SELECT
-      t.id, t.title, t.description, t.category_id, t.type_id, t.sub_type_id, t.quantity, t.priority, t.due_date, t.task_date,
-      t.created_date, t.status, t.user_id, t.edited_date,
-      tc.name as category_name, tt.name as type_name, tst.name as sub_type_name,
-      (SELECT COUNT(*) FROM attachments a WHERE a.task_id = t.id) as attachment_count
+      ${selectFields}
     FROM tasks t
     LEFT JOIN task_categories tc ON t.category_id = tc.id
     LEFT JOIN task_types tt ON t.type_id = tt.id
@@ -782,21 +789,23 @@ async function getTaskStats(user_id, startDate = null, endDate = null, categoryF
   `;
   let recentParams = [user_id];
 
-  // Tasks today query - using task_date instead of created_date
+  // Tasks today query - using range comparison instead of DATE() to enable index usage
   let todaySql = `
     SELECT COUNT(*) as tasks_today
     FROM tasks
     WHERE user_id = ?
-    AND DATE(task_date) = DATE('now', 'localtime')
+    AND task_date >= datetime('now', 'start of day', 'localtime')
+    AND task_date < datetime('now', '+1 day', 'start of day', 'localtime')
   `;
   let todayParams = [user_id];
 
-  // Tasks this month query - using task_date instead of created_date
+  // Tasks this month query - using range comparison instead of strftime() to enable index usage
   let monthSql = `
     SELECT COUNT(*) as tasks_this_month
     FROM tasks
     WHERE user_id = ?
-    AND strftime('%Y-%m', task_date) = strftime('%Y-%m', 'now', 'localtime')
+    AND task_date >= date('now', 'start of month', 'localtime')
+    AND task_date < date('now', '+1 month', 'start of month', 'localtime')
   `;
   let monthParams = [user_id];
 

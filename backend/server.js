@@ -195,7 +195,9 @@ const server = http.createServer((req, res) => {
       authenticateToken(req, res, () => {
         sanitizeMiddleware(req, res, () => {
           // API routes - ORDER MATTERS: more specific routes first
-          if (pathname.startsWith('/api/reports')) {
+          if (pathname.startsWith('/api/dashboard')) {
+            dashboardRoutes(req, res, parsedUrl);
+          } else if (pathname.startsWith('/api/reports')) {
             reportRoutes(req, res, parsedUrl);
           } else if (pathname.startsWith('/api/tasks/categories')) {
             categoryRoutes(req, res, parsedUrl);

@@ -314,25 +314,30 @@ async function getEventsByUserId(user_id, options = {}) {
 
   try {
     let events = await getAll(sql, params);
-    // Convert UTC dates to local time for all events and add attachments
-    const { getAttachmentsByEventId } = require('./Attachment');
 
-    events = await Promise.all(events.map(async (event) => {
-      const eventWithDates = {
-        ...event,
-        start_date: convertUTCToLocal(event.start_date),
-        end_date: convertUTCToLocal(event.end_date),
-        created_at: convertUTCToLocal(event.created_at),
-        updated_at: convertUTCToLocal(event.updated_at),
-        category: event.category || null,
-        event_type: event.event_type || null
-      };
-
-      // Add attachments for this event
-      eventWithDates.attachments = await getAttachmentsByEventId(event.id);
-
-      return eventWithDates;
+    // Convert UTC dates to local time for all events
+    events = events.map(event => ({
+      ...event,
+      start_date: convertUTCToLocal(event.start_date),
+      end_date: convertUTCToLocal(event.end_date),
+      created_at: convertUTCToLocal(event.created_at),
+      updated_at: convertUTCToLocal(event.updated_at),
+      category: event.category || null,
+      event_type: event.event_type || null
     }));
+
+    // Only fetch attachments if not skipped (dashboard doesn't need them)
+    if (!options.skipAttachments) {
+      const { getAttachmentsByEventId } = require('./Attachment');
+      events = await Promise.all(events.map(async (event) => {
+        const eventWithAttachments = { ...event };
+        eventWithAttachments.attachments = await getAttachmentsByEventId(event.id);
+        return eventWithAttachments;
+      }));
+    } else {
+      // Add empty attachments array for consistency
+      events = events.map(event => ({ ...event, attachments: [] }));
+    }
 
     return events;
   } catch (error) {
@@ -554,31 +559,29 @@ async function getEventStats(user_id) {
     
     console.log('Proceeding with valid user_id:', user_id);
     
-    // Simple query to get total events count
+    // Run all queries in parallel for better performance (was sequential before)
     const countSql = 'SELECT COUNT(*) as total_events FROM events WHERE user_id = ?';
-    console.log('Executing count query:', countSql, 'with params:', [user_id]);
-    const countResult = await getRow(countSql, [user_id]);
-    
-    // Query to get completed events count
     const completedCountSql = 'SELECT COUNT(*) as completed_events FROM events WHERE user_id = ? AND status = ?';
-    console.log('Executing completed count query:', completedCountSql, 'with params:', [user_id, 'Completed']);
-    const completedCountResult = await getRow(completedCountSql, [user_id, 'Completed']);
     
-    // For today's events, using SQLite date functions
-    // Format in DB is 'YYYY-MM-DD HH:MM:SS', so we extract the date part
-    // Use 'start of day' to ensure we get all events for the current day regardless of time
+    // Use range comparisons instead of DATE() function to enable index usage
     const todaySql = `SELECT COUNT(*) as events_today FROM events 
                       WHERE user_id = ? 
-                      AND DATE(start_date) = DATE('now')`;
-    console.log('Executing today query:', todaySql, 'with params:', [user_id]);
-    const todayResult = await getRow(todaySql, [user_id]);
+                      AND start_date >= datetime('now', 'start of day', 'localtime')
+                      AND start_date < datetime('now', '+1 day', 'start of day', 'localtime')`;
     
-    // For this month's events - compare year-month part of dates
+    // Use range comparisons instead of strftime() function to enable index usage
     const monthSql = `SELECT COUNT(*) as events_this_month FROM events 
                       WHERE user_id = ? 
-                      AND strftime('%Y-%m', start_date) = strftime('%Y-%m', 'now')`;
-    console.log('Executing month query:', monthSql, 'with params:', [user_id]);
-    const monthResult = await getRow(monthSql, [user_id]);
+                      AND start_date >= date('now', 'start of month', 'localtime')
+                      AND start_date < date('now', '+1 month', 'start of month', 'localtime')`;
+    
+    // Execute all 4 queries in parallel
+    const [countResult, completedCountResult, todayResult, monthResult] = await Promise.all([
+      getRow(countSql, [user_id]),
+      getRow(completedCountSql, [user_id, 'Completed']),
+      getRow(todaySql, [user_id]),
+      getRow(monthSql, [user_id])
+    ]);
     
     console.log('Final event stats result:', {
       total_events: countResult.total_events || 0,

@@ -148,6 +148,7 @@ function createOtherTablesAndColumns(callback) {
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user_category ON tasks(user_id, category_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks(user_id, due_date)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user_created_date ON tasks(user_id, created_date)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_user_task_date ON tasks(user_id, task_date)`);
 
   // Additional indexes for events
   db.run(`CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date)`);
