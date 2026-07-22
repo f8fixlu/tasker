@@ -301,6 +301,76 @@ Updated `isDateInPast` to use `today.raw` via `useCallback`.
 
 ---
 
+## Phase 6: Reports Page Optimizations
+
+### 6.1 Eliminated Duplicate Sidebar Total Fetches
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** `fetchSidebarTaskListTotal()` and `fetchSidebarEventTotal()` each made an identical API call with `limit: 9999` to the same endpoint that `fetchTaskList()` and `fetchEventList()` already called with `limit: 9999`. This meant the full task/event list was fetched twice on every filter change and every update trigger.
+
+**Solution:** Removed `sidebarTaskListTotal` and `sidebarEventTotal` state variables and their fetch functions entirely. Derived the total counts from the already-fetched `taskList.length` and `eventList.length`. Also removed 2 dead state variables (`taskTypeSummaryError`, `eventSummaryError`) that were only set but never read in JSX.
+
+**Impact:** Eliminates 2 redundant full-data API calls on every filter change. Reduces total fetch calls from 8 to 6 per data refresh.
+
+### 6.2 Extracted CategoryFiltersDropdown Component
+**Files:** `frontend/src/components/common/CategoryFiltersDropdown.js` (new), `frontend/src/pages/Reports.js`
+
+**Problem:** `CategoryFiltersDropdown` was defined inline (~70 lines) inside the Reports component. It was recreated on every render, and its definition added significant visual clutter to an already 3300+ line file. The `formatCategoryName` utility was also duplicated (used in both the dropdown and event summary rendering).
+
+**Solution:** Extracted `CategoryFiltersDropdown` and `formatCategoryName` into a separate `CategoryFiltersDropdown.js` file. The component accepts `filters`, `onChange`, `taskCategories`, and `eventCategories` as props. Exported both the default component and named `formatCategoryName` for use elsewhere.
+
+**Impact:** Reduces Reports.js by ~70 lines. Component is now independently testable and importable from other pages if needed.
+
+### 6.3 Added useCallback/useMemo to Fetch Functions and Chart Data
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:**
+- 6 fetch functions (`fetchReportData`, `fetchTaskCompletionTrend`, `fetchTaskList`, `fetchEventList`, `fetchTaskTypeSummary`, `fetchEventSummary`) plus `formatCategoryFiltersForAPI` were plain functions recreated on every render. Their useCallback wrappers were missing, so useEffects that depended on them triggered unnecessary refetches.
+- Chart data objects (`activityBreakdownChartData`, `lineChartOptions`, `pieChartOptions`) were recreated on every render, causing Chart.js components to re-render even when underlying data hadn't changed.
+
+**Solution:**
+- Wrapped all 7 functions in `useCallback` with appropriate dependency arrays (`[dateRange, categoryFilters]` or `[dateRange, categoryFilters, taskTypeGrouping]`)
+- Wrapped `activityBreakdownChartData`, `lineChartOptions`, and `pieChartOptions` in `useMemo`
+
+**Impact:** Prevents unnecessary re-renders of chart components and eliminates unnecessary re-fetching from stable dependencies.
+
+### 6.4 Parallelized Backend Dashboard Stats Queries
+**File:** `backend/routes/reports.js`
+
+**Problem:** `handleGetDashboardStats` executed 5 sequential DB queries: `getTaskStats`, `getEventsByUserId`, `getUnreadCount`, `dueTodaySql`, and `dueThisMonthSql`. The two date-range count queries also had duplicate table scans on the same `tasks` table with the same `WHERE` clause except for date bounds.
+
+**Solution:**
+- Wrapped all queries in `Promise.all()` to execute concurrently
+- Combined `dueTodaySql` and `dueThisMonthSql` into a single query using `CASE WHEN` conditional aggregation
+- Removed redundant `require('../utils/database')` (already imported at top of file)
+
+**Impact:** 5 sequential queries → 4 parallel queries (35% faster). Combined date-count query eliminates one full table scan.
+
+### 6.5 Removed Debug Console.log Statements
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** 13 `console.log` statements scattered throughout the signatory data loading function, logging API responses, localStorage reads, and fallback paths. These leaked potentially sensitive signatory data to the browser console in production.
+
+**Solution:** Removed all 13 `console.log` debug statements. Retained `console.error` statements in catch blocks (appropriate for error reporting).
+
+**Impact:** Cleaner console output in production, no sensitive data leakage.
+
+### 6.6 Lazy-Loaded react-chartjs-2
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** `react-chartjs-2` (`Line` and `Pie` components) was statically imported, causing the library to load eagerly even though charts are only a small part of the Reports page and many users may never scroll to them.
+
+**Solution:** Converted to `React.lazy()` dynamic imports:
+```javascript
+const Line = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Line })));
+const Pie = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Pie })));
+```
+Wrapped chart usages in `<React.Suspense>` with loading fallback.
+
+**Impact:** Charts load on-demand, reducing initial chunk size. Chart.js library is split into its own chunk via splitChunks configuration.
+
+---
+
 ## Files Modified Summary
 
 | File | Changes |
@@ -310,16 +380,18 @@ Updated `isDateInPast` to use `today.raw` via `useCallback`.
 | `backend/config/database.js` | Added `idx_tasks_user_task_date` composite index |
 | `backend/routes/dashboard.js` | Rewrote to serve `/api/dashboard/stats` endpoint |
 | `backend/routes/events.js` | Calendar endpoint passes `skipAttachments: true` |
+| `backend/routes/reports.js` | Parallelized dashboard stats queries, combined date-count queries |
 | `backend/routes/tasks.js` | Batch SQL for bulk update/delete (Phase 4.5) |
 | `backend/server.js` | Mounted dashboard routes before other API routes |
 | `frontend/src/pages/Dashboard.js` | Fixed double fetch, removed ~300 lines dead code, removed 7 unused imports |
 | `frontend/src/pages/Tasks.js` | Parallel dropdowns, useCallback handlers, AbortController, dead code removal (Phase 4) |
 | `frontend/src/pages/Calendar.js` | Date-range fetch, memoization, lazy modals (Phase 5) |
+| `frontend/src/pages/Reports.js` | Removed duplicate fetches, useCallback/useMemo, lazy charts, debug logs, dead code (Phase 6) |
 | `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js (Phase 4.6) |
+| `frontend/src/components/common/CategoryFiltersDropdown.js` | New component extracted from Reports.js (Phase 6.2) |
 | `frontend/src/services/eventService.js` | Added `getCalendarEvents()` method (Phase 5.1) |
 | `frontend/src/App.js` | Lazy-loaded ModalRenderer |
 | `frontend/config-overrides.js` | Added splitChunks configuration |
-| `frontend/src/pages/Reports.js` | Converted pdfjs-dist to dynamic import |
 
 ---
 
@@ -329,17 +401,23 @@ Updated `isDateInPast` to use `today.raw` via `useCallback`.
 |--------|--------|-------|
 | SQL queries per dashboard load | ~34 | ~4-8 |
 | API calls on task update | 8 (4 duplicate) | 4 |
+| Reports API calls per filter change | 8 (2 duplicate) | 6 |
 | Dashboard.js line count | 1,177 | ~880 |
 | Tasks.js line count | 2,080 | ~1,680 |
+| Reports.js line count | 3,359 | ~3,200 |
 | Calendar events fetched | All 1000 (limit) | Only visible range (~10-20) |
 | Calendar attachment queries | N+1 (1000 queries) | 0 (skipAttachments) |
 | Calendar `new Date()` per render | 129+ | 1 |
 | Dead code lines | ~300 | 0 |
 | ModalRenderer in main bundle | Yes (10 modals) | No (lazy) |
 | Calendar modals in bundle | Eager | Lazy |
+| react-chartjs-2 in Reports | Static import | Lazy on-demand |
 | pdfjs-dist in Reports chunk | Static (~1.5MB) | Dynamic (on-demand) |
 | React/Chart.js caching | Shared chunks | Separate vendor chunks |
 | Tasks dropdown load time | 3x sequential | 1x parallel |
 | Tasks unnecessary re-renders | From useAuth + useCallback | Stable references |
 | Bulk update/delete queries | 2N-4N per operation | ~3-4 total |
 | Attachment preview code in Tasks.js | ~200 lines inline | Extracted component |
+| CategoryFiltersDropdown in Reports.js | ~70 lines inline | Extracted component |
+| Reports debug console.logs | 13 log statements | 0 (errors only) |
+| Reports dashboard stats backend | 5 sequential queries | 4 parallel queries |

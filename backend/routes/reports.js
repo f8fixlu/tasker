@@ -41,62 +41,43 @@ async function handleGetDashboardStats(req, res, userId, query = {}) {
   try {
     const { start_date: startDate, end_date: endDate } = query;
     
-    // Get task statistics with date range support
     const categoryFilters = query.category_filters ? 
       (typeof query.category_filters === 'string' ? 
         JSON.parse(query.category_filters) : 
         query.category_filters) : null;
-    const taskStats = await getTaskStats(userId, startDate, endDate, categoryFilters);
     
-    // Get upcoming events (next 7 days)
-    const upcomingEvents = await getEventsByUserId(userId, {
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Next 7 days
-    });
-    
-    // Get unread notifications count
-    const unreadCount = await getUnreadCount(userId);
-    
-    // Calculate due today count (this should remain based on due_date, not creation date)
-    const { getAll } = require('../utils/database');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const dueTodaySql = `
-      SELECT COUNT(*) as count 
-      FROM tasks 
-      WHERE user_id = ? 
-      AND due_date >= ? 
-      AND due_date < ? 
-      AND status != 'Completed'
-    `;
-    const dueTodayParams = [userId, today.toISOString(), tomorrow.toISOString()];
-    const dueTodayResult = await getAll(dueTodaySql, dueTodayParams);
-    const dueTodayCount = dueTodayResult[0]?.count || 0;
-    
-    // Calculate due this month count (this should remain based on due_date, not creation date)
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const dueThisMonthSql = `
-      SELECT COUNT(*) as count 
-      FROM tasks 
-      WHERE user_id = ? 
-      AND due_date >= ? 
-      AND due_date < ? 
-      AND status != 'Completed'
-    `;
-    const dueThisMonthParams = [userId, startOfMonth.toISOString(), endOfMonth.toISOString()];
-    const dueThisMonthResult = await getAll(dueThisMonthSql, dueThisMonthParams);
-    const dueThisMonthCount = dueThisMonthResult[0]?.count || 0;
+
+    const [taskStats, upcomingEvents, unreadCount, dueCounts] = await Promise.all([
+      getTaskStats(userId, startDate, endDate, categoryFilters),
+      getEventsByUserId(userId, {
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }),
+      getUnreadCount(userId),
+      getAll(`
+        SELECT 
+          SUM(CASE WHEN due_date >= ? AND due_date < ? AND status != 'Completed' THEN 1 ELSE 0 END) as dueTodayCount,
+          SUM(CASE WHEN due_date >= ? AND due_date < ? AND status != 'Completed' THEN 1 ELSE 0 END) as dueThisMonthCount
+        FROM tasks 
+        WHERE user_id = ?
+      `, [today.toISOString(), tomorrow.toISOString(), startOfMonth.toISOString(), endOfMonth.toISOString(), userId])
+    ]);
+
+    const dueTodayCount = dueCounts[0]?.dueTodayCount || 0;
+    const dueThisMonthCount = dueCounts[0]?.dueThisMonthCount || 0;
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       taskStats,
       upcomingEvents: {
         count: upcomingEvents.length,
-        events: upcomingEvents.slice(0, 5) // Return top 5 events
+        events: upcomingEvents.slice(0, 5)
       },
       dueTodayCount,
       dueThisMonthCount,

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
-import Modal from '../components/common/Modal';
 import MarginSettingsModal from '../components/common/MarginSettingsModal';
 import { reportsService } from '../services/reportsService';
 import { categoryService } from '../services/categoryService';
@@ -10,6 +9,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { formatToLocalDateTime } from '../utils/date';
+import CategoryFiltersDropdown, { formatCategoryName } from '../components/common/CategoryFiltersDropdown';
 
 // Lazy load pdfjs-dist to reduce initial bundle size (1.5MB+ library)
 let pdfjsLib = null;
@@ -51,7 +51,8 @@ import {
   Filler
 } from 'chart.js';
 
-import { Line, Pie } from 'react-chartjs-2';
+const Line = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Line })));
+const Pie = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Pie })));
 
 // Register Chart.js components
 ChartJS.register(
@@ -116,7 +117,7 @@ const Reports = () => {
   const [taskTypeSummary, setTaskTypeSummary] = useState([]);
   const [taskTypeSummaryLoading, setTaskTypeSummaryLoading] = useState(false);
   const [taskTypeSummaryLoaded, setTaskTypeSummaryLoaded] = useState(false);
-  const [taskTypeSummaryError, setTaskTypeSummaryError] = useState(null);
+
   const [taskTypeGrouping, setTaskTypeGrouping] = useState('combined'); // only 'combined' available now
 
   // State for task hover popup
@@ -127,84 +128,6 @@ const Reports = () => {
   const [eventSummary, setEventSummary] = useState([]);
   const [eventSummaryLoading, setEventSummaryLoading] = useState(false);
   const [eventSummaryLoaded, setEventSummaryLoaded] = useState(false);
-  const [eventSummaryError, setEventSummaryError] = useState(null);
-
-  // Format category name to have proper capitalization (WORK -> Work, personal -> Personal)
-  const formatCategoryName = (name) => {
-    if (!name) return '';
-    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-  };
-
-  // Dynamic Category Filters Dropdown
-  const CategoryFiltersDropdown = ({ filters, onChange, onClear, taskCategories, eventCategories }) => {
-    const handleClearTaskCategories = () => {
-      // Reset all task category filters to false
-      taskCategories.forEach(category => {
-        onChange('task', category.name.toLowerCase(), false);
-      });
-    };
-
-    const handleClearEventCategories = () => {
-      // Reset all event category filters to false
-      eventCategories.forEach(category => {
-        onChange('event', category.name.toLowerCase(), false);
-      });
-    };
-
-    return (
-      <div className="absolute left-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 py-2 border border-gray-200 dark:border-gray-700">
-        <div className="px-4 py-2 space-y-1">
-          <div className="flex justify-between items-center mb-2">
-            <div className="font-medium text-sm text-gray-500 dark:text-gray-400">Task</div>
-            <button
-              type="button"
-              className="text-xs text-primary hover:text-primary-600 dark:hover:text-primary-400"
-              onClick={handleClearTaskCategories}
-            >
-              Clear All
-            </button>
-          </div>
-          {taskCategories.map((category) => (
-            <div key={`task-${category.name.toLowerCase()}`} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.task[category.name.toLowerCase()] || false}
-                  onChange={(e) => onChange('task', category.name.toLowerCase(), e.target.checked)}
-                  className="rounded text-primary focus:ring-primary"
-                />
-                <span>{formatCategoryName(category.name)}</span>
-              </label>
-            </div>
-          ))}
-
-          <div className="flex justify-between items-center mb-2 mt-3">
-            <div className="font-medium text-sm text-gray-500 dark:text-gray-400">Event</div>
-            <button
-              type="button"
-              className="text-xs text-primary hover:text-primary-600 dark:hover:text-primary-400"
-              onClick={handleClearEventCategories}
-            >
-              Clear All
-            </button>
-          </div>
-          {eventCategories.map((category) => (
-            <div key={`event-${category.name.toLowerCase()}`} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.event[category.name.toLowerCase()] || false}
-                  onChange={(e) => onChange('event', category.name.toLowerCase(), e.target.checked)}
-                  className="rounded text-primary focus:ring-primary"
-                />
-                <span>{formatCategoryName(category.name)}</span>
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   // Handle outside click for category filters dropdown
   useOutsideClick(categoryFiltersDropdownRef, () => {
@@ -252,13 +175,13 @@ const Reports = () => {
   });
 
   // Helper function to format category filters for API
-  const formatCategoryFiltersForAPI = () => {
+  const formatCategoryFiltersForAPI = useCallback(() => {
     // Create a copy of the current category filters to send to the API
     return {
       task: { ...categoryFilters.task },
       event: { ...categoryFilters.event }
     };
-  };
+  }, [categoryFilters]);
 
   const handleCategoryFilterChange = (type, filterName, checked) => {
     setCategoryFilters(prev => ({
@@ -295,19 +218,15 @@ const Reports = () => {
     if (user) {
       try {
         // First try to get from API via user profile
-        console.log('Loading signatory data from API...');
         const userData = await api.get('/users/profile');
-        console.log('User data received:', userData);
 
         // Check if signatory data exists in user profile
         if (userData.user?.signatories) {
-          console.log('Signatories found in user data:', userData.user.signatories);
           let newData = [];
           
           // If signatories is an array (like from DB), use it directly
           if (Array.isArray(userData.user.signatories)) {
             newData = userData.user.signatories;
-            console.log('Loaded signatory data from API (array format):', newData);
           } else if (typeof userData.user.signatories === 'object') {
             // If it's in object format, convert to array format
             const signatoryArray = [];
@@ -352,7 +271,6 @@ const Reports = () => {
             }
 
             newData = signatoryArray;
-            console.log('Loaded signatory data from API (object format):', newData);
           }
 
           // Only update state if the data has actually changed
@@ -412,10 +330,7 @@ const Reports = () => {
 
           return; // Exit early since we got data from API
         } else {
-          console.log('No signatories in API response, trying localStorage');
-        }
-
-        // If no signatories in API, try localStorage as fallback
+          // If no signatories in API, try localStorage as fallback
         const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
         if (savedSignatories) {
           const parsedData = JSON.parse(savedSignatories);
@@ -451,7 +366,6 @@ const Reports = () => {
           if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
             setSignatoryData(newData);
           }
-          console.log('Loaded signatory data from localStorage:', newData);
         } else {
           // If no data in localStorage, set to empty array only if current state is not already empty
           if (JSON.stringify(signatoryData) !== JSON.stringify([])) {
@@ -459,9 +373,7 @@ const Reports = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading signatory data from API:', error);
         // Fallback to localStorage if API fails
-        console.log('Falling back to localStorage due to API error');
         try {
           const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
           if (savedSignatories) {
@@ -490,10 +402,9 @@ const Reports = () => {
             if (JSON.stringify(newData) !== JSON.stringify(signatoryData)) {
               setSignatoryData(newData);
             }
-            console.log('Loaded signatory data from localStorage (fallback):', newData);
           }
         } catch (localStorageError) {
-          console.error('Error loading from localStorage:', localStorageError);
+          // localStorage fallback failed
         }
         
         // Set default empty array if there's an error, only if current state is not already empty
@@ -695,6 +606,7 @@ const Reports = () => {
       staticContent.push(
         <div key="charts" className="chart-section p-4 border border-gray-200 rounded mb-8">
           <h2 className="font-bold mb-3">PERFORMANCE CHARTS</h2>
+          <React.Suspense fallback={<div className="h-64 flex items-center justify-center">Loading charts...</div>}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-gray-50 p-4 rounded">
               <h3 className="text-center font-medium mb-2">Task Completion Rate</h3>
@@ -722,6 +634,7 @@ const Reports = () => {
               </div>
             </div>
           </div>
+          </React.Suspense>
         </div>
       );
     }
@@ -954,7 +867,7 @@ const Reports = () => {
   };
 
   // Fetch report data on component mount
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     try {
       // Don't set loading to true when using cached data to avoid flickering
       setError(null); // Clear any previous errors
@@ -984,7 +897,7 @@ const Reports = () => {
       console.error('Error fetching report data:', err);
       setError('Failed to load report data');
     }
-  };
+  }, [dateRange, categoryFilters]);
 
   useEffect(() => {
     setLoading(true); // Set loading to true initially
@@ -1083,7 +996,6 @@ const Reports = () => {
   const [sidebarEventListLoaded, setSidebarEventListLoaded] = useState(false);
   const [sidebarEventListPage, setSidebarEventListPage] = useState(1);
   const [sidebarEventListHasMore, setSidebarEventListHasMore] = useState(true);
-  const [sidebarEventTotal, setSidebarEventTotal] = useState(0);
   const [sidebarEventListLoadingMore, setSidebarEventListLoadingMore] = useState(false);
   const eventListContainerRef = useRef(null);
 
@@ -1093,7 +1005,6 @@ const Reports = () => {
   const [sidebarTaskListLoaded, setSidebarTaskListLoaded] = useState(false);
   const [sidebarTaskListPage, setSidebarTaskListPage] = useState(1);
   const [sidebarTaskListHasMore, setSidebarTaskListHasMore] = useState(true);
-  const [sidebarTaskListTotal, setSidebarTaskListTotal] = useState(0);
   const [sidebarTaskListLoadingMore, setSidebarTaskListLoadingMore] = useState(false);
   const taskListContainerRef = useRef(null);
   const [sidebarTaskPopup, setSidebarTaskPopup] = useState(null);
@@ -1104,7 +1015,7 @@ const Reports = () => {
   const consolidatedEventPopupTimeoutRef = useRef(null);
 
   // Fetch task completion trend data
-  const fetchTaskCompletionTrend = async () => {
+  const fetchTaskCompletionTrend = useCallback(async () => {
     try {
       const data = await reportsService.getTaskCompletionTrend({
         start_date: dateRange.startDate,
@@ -1152,7 +1063,7 @@ const Reports = () => {
         ]
       });
     }
-  };
+  }, [dateRange, categoryFilters]);
 
   // Load task completion trend when component mounts or report stats change
   useEffect(() => {
@@ -1162,7 +1073,7 @@ const Reports = () => {
   }, [loading, dateRange, categoryFilters]);
 
   // Fetch task list for report
-  const fetchTaskList = async () => {
+  const fetchTaskList = useCallback(async () => {
     setTaskListLoading(true);
     try {
       const data = await reportsService.getTaskListForReport({
@@ -1220,10 +1131,10 @@ const Reports = () => {
     } finally {
       setTaskListLoading(false);
     }
-  };
+  }, [dateRange, categoryFilters]);
 
   // Fetch event list for report
-  const fetchEventList = async () => {
+  const fetchEventList = useCallback(async () => {
     setEventListLoading(true);
     try {
       const data = await reportsService.getEventListForReport({
@@ -1281,27 +1192,7 @@ const Reports = () => {
     } finally {
       setEventListLoading(false);
     }
-  };
-
-  // Fetch sidebar task total count
-  const fetchSidebarTaskListTotal = async () => {
-    try {
-      // Fetch total count by requesting with a high limit to get all matching records
-      const totalData = await reportsService.getTaskListForReport({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-        category_filters: JSON.stringify(formatCategoryFiltersForAPI()),
-        limit: 9999  // High limit to get all matching records
-      });
-      
-      // Use the count of returned tasks as the total
-      const totalFromResponse = totalData.tasks?.length || 0;
-      setSidebarTaskListTotal(totalFromResponse);
-    } catch (error) {
-      console.error('Error fetching sidebar task list total:', error);
-      setSidebarTaskListTotal(0);
-    }
-  };
+  }, [dateRange, categoryFilters]);
 
   // Fetch sidebar task list
   const fetchSidebarTaskList = async (page = 1, append = false) => {
@@ -1341,26 +1232,6 @@ const Reports = () => {
     } finally {
       setSidebarTaskListLoading(page === 1 ? false : false);
       setSidebarTaskListLoadingMore(false);
-    }
-  };
-
-  // Fetch sidebar event total count
-  const fetchSidebarEventTotal = async () => {
-    try {
-      // Fetch total count by requesting with a high limit to get all matching records
-      const totalData = await reportsService.getEventListForReport({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-        category_filters: JSON.stringify(formatCategoryFiltersForAPI()), // Include category filters
-        limit: 9999  // High limit to get all matching records
-      });
-
-      // Use the count of returned events as the total
-      const totalFromResponse = totalData.events?.length || 0;
-      setSidebarEventTotal(totalFromResponse);
-    } catch (error) {
-      console.error('Error fetching sidebar event total:', error);
-      setSidebarEventTotal(0);
     }
   };
 
@@ -1415,13 +1286,11 @@ const Reports = () => {
       setEventSummaryLoaded(false);
 
       fetchTaskList();
-      fetchEventList();  // Also fetch events
-      fetchSidebarTaskList(1, false); // Fetch first page, don't append
-      fetchSidebarTaskListTotal(); // Fetch total count
-      fetchSidebarEventList(1, false); // Fetch first page, don't append
-      fetchSidebarEventTotal(); // Fetch total count
-      fetchTaskTypeSummary(); // Fetch task type summary
-      fetchEventSummary(); // Fetch event summary
+      fetchEventList();
+      fetchSidebarTaskList(1, false);
+      fetchSidebarEventList(1, false);
+      fetchTaskTypeSummary();
+      fetchEventSummary();
     }
   }, [loading, dateRange, categoryFilters]);
 
@@ -1469,9 +1338,8 @@ const Reports = () => {
   }, [sidebarTaskListHasMore, sidebarTaskListLoadingMore, sidebarTaskListPage, fetchSidebarTaskList]);
 
   // Fetch task type summary data
-  const fetchTaskTypeSummary = async () => {
+  const fetchTaskTypeSummary = useCallback(async () => {
     setTaskTypeSummaryLoading(true);
-    setTaskTypeSummaryError(null);
     try {
       const data = await reportsService.getTaskTypeSummary({
         start_date: dateRange.startDate,
@@ -1488,12 +1356,11 @@ const Reports = () => {
     } finally {
       setTaskTypeSummaryLoading(false);
     }
-  };
+  }, [dateRange, categoryFilters, taskTypeGrouping]);
 
   // Fetch event summary data
-  const fetchEventSummary = async () => {
+  const fetchEventSummary = useCallback(async () => {
     setEventSummaryLoading(true);
-    setEventSummaryError(null);
     try {
       const data = await reportsService.getConsolidatedEventSummary({
         start_date: dateRange.startDate,
@@ -1509,7 +1376,7 @@ const Reports = () => {
     } finally {
       setEventSummaryLoading(false);
     }
-  };
+  }, [dateRange, categoryFilters]);
 
   // Load more events when scrolling in event container
   useEffect(() => {
@@ -1559,14 +1426,12 @@ const Reports = () => {
     if (!loading) {
       fetchReportData();
       fetchTaskList();
-      fetchEventList();  // Also refresh events
-      fetchSidebarTaskList(1, false); // Fetch first page, don't append
-      fetchSidebarTaskListTotal(); // Fetch total count
-      fetchSidebarEventList(1, false); // Fetch first page, don't append
-      fetchSidebarEventTotal(); // Fetch total count
+      fetchEventList();
+      fetchSidebarTaskList(1, false);
+      fetchSidebarEventList(1, false);
       fetchTaskCompletionTrend();
-      fetchTaskTypeSummary(); // Refresh task type summary
-      fetchEventSummary(); // Refresh event summary
+      fetchTaskTypeSummary();
+      fetchEventSummary();
     }
   }, [updateTrigger, dateRange]);
 
@@ -1674,7 +1539,7 @@ const Reports = () => {
   }, []);
 
   // Generate activity breakdown chart data for Chart.js
-  const activityBreakdownChartData = {
+  const activityBreakdownChartData = useMemo(() => ({
     labels: ['Pending', 'In Progress', 'Overdue', 'Completed'],
     datasets: [
       {
@@ -1685,11 +1550,11 @@ const Reports = () => {
           reportStats.taskStats.overdue_tasks || 0,
           reportStats.taskStats.completed_tasks || 0
         ],
-        backgroundColor: ['#2196F3', '#3F51B5', '#00BCD4', '#4CAF50'], // Shades of blue and green
+        backgroundColor: ['#2196F3', '#3F51B5', '#00BCD4', '#4CAF50'],
         hoverOffset: 4
       }
     ]
-  };
+  }), [reportStats.taskStats]);
 
   // Add custom CSS for list heights
   useEffect(() => {
@@ -1711,7 +1576,7 @@ const Reports = () => {
   }, []);
 
   // Chart options
-  const lineChartOptions = {
+  const lineChartOptions = useMemo(() => ({
     responsive: true,
     plugins: {
       legend: {
@@ -1738,15 +1603,15 @@ const Reports = () => {
         }
       }
     }
-  };
+  }), []);
 
-  const pieChartOptions = {
+  const pieChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '50%', // Creates the doughnut hole in the center
+    cutout: '50%',
     plugins: {
       legend: {
-        display: false, // Hide the built-in legend since we're using custom legend
+        display: false,
       },
       tooltip: {
         callbacks: {
@@ -1760,17 +1625,7 @@ const Reports = () => {
         }
       }
     }
-  };
-
-  // Helper function to determine if signature section has all fields populated (dynamic signatory system)
-  const hasAllSignatureFields = () => {
-    // Check if signatoryData is in array format
-    if (Array.isArray(signatoryData)) {
-      return signatoryData.length > 0 && signatoryData.every(sig => sig.name && sig.position);
-    }
-    
-    return false;
-  };
+  }), []);
 
   // Function to create PDFMake document definition for the report
   const createReportDefinition = async (customHeaderImage, customFooterImage) => {
@@ -2528,6 +2383,7 @@ const generatePDF = async () => {
           {/* Combined chart card for Task Completion Rate and Activity Breakdown */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-4">Performance Overview</h2>
+            <React.Suspense fallback={<div className="h-64 flex items-center justify-center">Loading charts...</div>}>
             <div className="space-y-2 sm:space-y-4">
               <div className="h-56 sm:h-64">
                 <h3 className="text-lg font-medium text-[#617589] dark:text-gray-400 mb-2 text-left">Task Completion Rate</h3>
@@ -2559,15 +2415,14 @@ const generatePDF = async () => {
                 </div>
               </div>
             </div>
+            </React.Suspense>
           </div>
-
-          {/* Task List Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-2">
               Task List
-              {sidebarTaskListTotal > 0 && (
+              {taskList.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                  ({sidebarTaskListTotal})
+                  ({taskList.length})
                 </span>
               )}
             </h2>
@@ -2655,9 +2510,9 @@ const generatePDF = async () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] pb-2">
               Event List
-              {sidebarEventTotal > 0 && (
+              {eventList.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                  ({sidebarEventTotal})
+                  ({eventList.length})
                 </span>
               )}
             </h2>
