@@ -372,6 +372,7 @@ const Reports = () => {
             setSignatoryData([]);
           }
         }
+        }
       } catch (error) {
         // Fallback to localStorage if API fails
         try {
