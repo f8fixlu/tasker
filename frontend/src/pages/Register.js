@@ -190,6 +190,7 @@ const Register = () => {
         </main>
 
         {/* Success Modal */}
+        {showSuccessModal && (
         <Modal
           isOpen={showSuccessModal}
           onClose={() => {
@@ -224,6 +225,7 @@ const Register = () => {
             </Button>
           </div>
         </Modal>
+        )}
       </div>
     </div>
   );

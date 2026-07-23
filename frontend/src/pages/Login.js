@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
-import ForgotPasswordModal from '../components/ForgotPasswordModal';
+
+const ForgotPasswordModal = lazy(() => import('../components/ForgotPasswordModal'));
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -138,6 +139,8 @@ const Login = () => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={handleChange}
                   className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
                 />
                 <label htmlFor="remember-me" className="text-sm text-[#333333] dark:text-gray-300">Remember Me</label>
@@ -172,9 +175,11 @@ const Login = () => {
       </div>
 
       {showForgotPasswordModal && (
-        <ForgotPasswordModal
-          onClose={() => setShowForgotPasswordModal(false)}
-        />
+        <Suspense fallback={null}>
+          <ForgotPasswordModal
+            onClose={() => setShowForgotPasswordModal(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

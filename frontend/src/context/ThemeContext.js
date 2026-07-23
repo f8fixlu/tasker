@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const ThemeContext = createContext();
 
@@ -11,61 +11,48 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  // Check if there's a temporary theme override (for login/register pages)
   const [tempThemeOverride, setTempThemeOverride] = useState(null);
 
-  // Initialize theme with value from localStorage or system preference
   const getInitialTheme = () => {
     if (typeof window !== 'undefined') {
-      // Use temporary override if set
-      if (tempThemeOverride) {
-        return tempThemeOverride;
-      }
-
+      if (tempThemeOverride) return tempThemeOverride;
       const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        return savedTheme;
-      }
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      return systemPrefersDark ? 'dark' : 'light';
+      if (savedTheme) return savedTheme;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    return 'light'; // Default for SSR
+    return 'light';
   };
 
   const [theme, setTheme] = useState(getInitialTheme);
 
   useEffect(() => {
-    // Apply theme class to document element
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-
-    // Save theme preference to localStorage (but not if it's a temporary override)
     if (!tempThemeOverride) {
       localStorage.setItem('theme', theme);
     }
   }, [theme, tempThemeOverride]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  }, []);
 
-  const setTemporaryTheme = (newTheme) => {
+  const setTemporaryTheme = useCallback((newTheme) => {
     setTempThemeOverride(newTheme);
-    setTheme(newTheme); // Update the theme state to reflect the temporary change
-  };
+    setTheme(newTheme);
+  }, []);
 
-  const clearTemporaryTheme = () => {
+  const clearTemporaryTheme = useCallback(() => {
     setTempThemeOverride(null);
-    // Reset to the proper theme based on localStorage/system preference
     const properTheme = localStorage.getItem('theme') ||
       (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     setTheme(properTheme);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     theme,
     toggleTheme,
     isDark: theme === 'dark',
@@ -73,7 +60,7 @@ export const ThemeProvider = ({ children }) => {
     setTheme,
     setTemporaryTheme,
     clearTemporaryTheme,
-  };
+  }), [theme, toggleTheme, setTemporaryTheme, clearTemporaryTheme]);
 
   return (
     <ThemeContext.Provider value={value}>

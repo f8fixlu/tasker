@@ -1,7 +1,7 @@
 # Tasker Application Performance Optimizations
 
 ## Overview
-Comprehensive performance optimization across the full Tasker application — backend (SQLite + Node.js) and frontend (React 18). The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, enable better code splitting, add database indexes, enable SQLite WAL mode, compress static assets, reduce background service overhead, throttle session writes, batch attachment deletes, stabilize React context re-renders, reduce initial bundle size through lazy-loading, eliminate Report page API call duplication, replace Material Symbols font (~700KB-1MB) with tree-shaken SVG icons (~10KB), and split pdfmake/pdfjs-dist into dedicated chunks.
+Comprehensive performance optimization across the full Tasker application — backend (SQLite + Node.js) and frontend (React 18). The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, enable better code splitting, add database indexes, enable SQLite WAL mode, compress static assets, reduce background service overhead, throttle session writes, batch attachment deletes, stabilize React context re-renders, reduce initial bundle size through lazy-loading, eliminate Report page API call duplication, replace Material Symbols font (~700KB-1MB) with tree-shaken SVG icons (~10KB), split pdfmake/pdfjs-dist into dedicated chunks, fix broken Remember Me checkbox, and stabilize AuthContext/ThemeContext with useCallback/useMemo.
 
 ---
 
@@ -1237,3 +1237,78 @@ Mechanism 1 is sufficient. Mechanisms 2 and 3 caused the Dashboard component to 
 | `frontend/src/pages/admin/AdminStatsPage.js` | AbortController, defer Chart.js registration |
 | `frontend/src/pages/Dashboard.js` | Remove duplicate admin redirect, unused navigate import |
 | `frontend/src/services/userService.js` | Deleted (dead code) |
+
+---
+
+## Phase 14: Login/Register Page + Context Optimizations
+
+### 14.1 Fixed Broken Remember Me Checkbox in Login
+**File:** `frontend/src/pages/Login.js`
+
+**Problem:** The `<input type="checkbox">` for "Remember Me" (line 137) had neither `checked` nor `onChange`. The `handleChange` function contained logic to handle checkboxes (`e.target.type === 'checkbox'`), but the input never called it. The checkbox was purely visual — always unchecked, never toggling `rememberMe` state.
+
+**Solution:** Added `checked={rememberMe}` and `onChange={handleChange}` to the checkbox input.
+
+**Impact:** `rememberMe` now correctly controls token storage (localStorage vs sessionStorage). Users who check the box stay logged in across sessions.
+
+### 14.2 Lazy-Loaded ForgotPasswordModal
+**File:** `frontend/src/pages/Login.js`
+
+**Problem:** `ForgotPasswordModal` was eagerly imported at module level. The modal (125 lines) is only shown when the user clicks "Forgot Password?", yet it was always part of the Login chunk.
+
+**Solution:** Replaced static import with `React.lazy(() => import('../components/ForgotPasswordModal'))`. Wrapped the conditional render in `<Suspense fallback={null}>`.
+
+**Impact:** ForgotPasswordModal is code-split into a separate chunk, loaded on demand only when the user triggers it.
+
+### 14.3 Conditionally Rendered Register Success Modal
+**File:** `frontend/src/pages/Register.js`
+
+**Problem:** The success `<Modal>` was always rendered into the DOM (with `isOpen={showSuccessModal}`), meaning its children (Icon, Button, text nodes) were always mounted even when the modal was invisible.
+
+**Solution:** Wrapped the entire `<Modal>` block in `{showSuccessModal && ...}` so the component tree is only mounted after successful registration.
+
+**Impact:** Avoids mounting ~25 lines of JSX (Icon, Button, text nodes) on every render of the Register page.
+
+### 14.4 Stabilized ThemeContext Callbacks with useCallback
+**File:** `frontend/src/context/ThemeContext.js`
+
+**Problem:** `toggleTheme`, `setTemporaryTheme`, and `clearTemporaryTheme` were plain arrow functions — new references on every render. The `value` object passed to `ThemeProvider` was also recreated every render, causing all consumers to re-render.
+
+**Solution:** Wrapped all three functions in `useCallback`. Wrapped `value` in `useMemo` with the appropriate dependency array.
+
+**Impact:** Context consumers (Login, Register, SettingsModal, etc.) no longer re-render when ThemeProvider's parent re-renders unless the theme or function logic actually changes.
+
+### 14.5 Stabilized AuthContext Callbacks with useCallback
+**File:** `frontend/src/context/AuthContext.js`
+
+**Problem:** `login`, `register`, `logout`, and `refreshUser` were recreated every render, defeating the existing `useMemo` on the `value` object. Every AuthContext consumer re-rendered on every parent render.
+
+**Solution:** Wrapped `login`, `register`, `logout`, `refreshUser`, and `refreshToken` in `useCallback`. Used refs (`userRef`, `navigateRef`) to break circular dependencies — functions read from refs instead of closing over state variables. Added a ref-syncing effect. All functions have stable empty dependency arrays.
+
+**Impact:** Context consumers (Dashboard, Sidebar, Header, etc.) only re-render when `user` or `loading` actually changes, not on every parent render cycle.
+
+---
+
+## Updated Expected Performance Impact
+
+| Metric | Before (Phase 13) | After (Phase 14) |
+|--------|-------------------|-------------------|
+| Login Remember Me checkbox | Broken (no checked/onChange) | Working |
+| ForgotPasswordModal in Login chunk | Always bundled | Lazy-loaded on demand |
+| Register success modal DOM | Always mounted | Mounted only on success |
+| ThemeContext value stability | New reference every render | Stable via useMemo |
+| AuthContext login/register/logout/refreshUser | New reference every render | Stable via useCallback (empty deps) |
+| AuthContext value stability | useMemo defeated by unstable deps | Full stability chain |
+| ThemeContext consumers unnecessary re-renders | Every parent render | Only on theme change |
+| AuthContext consumers unnecessary re-renders | Every parent render | Only on user/loading change |
+
+---
+
+## Files Modified (Phase 14)
+
+| File | Changes |
+|------|---------|
+| `frontend/src/pages/Login.js` | Lazy-load ForgotPasswordModal, fix rememberMe checkbox, add Suspense wrapper |
+| `frontend/src/pages/Register.js` | Conditionally render success Modal |
+| `frontend/src/context/ThemeContext.js` | useCallback on toggleTheme/setTemporaryTheme/clearTemporaryTheme, useMemo on value |
+| `frontend/src/context/AuthContext.js` | useCallback on login/register/logout/refreshUser/refreshToken, refs to break circular deps, useMemo on value |
