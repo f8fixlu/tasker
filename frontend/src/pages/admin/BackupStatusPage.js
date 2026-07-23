@@ -1,8 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
+
+const formatDuration = (seconds) => {
+  if (seconds === null || seconds === undefined) return 'N/A';
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+};
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return 'Never';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  } catch (e) {
+    return dateString;
+  }
+};
+
+const getStatusColor = (status) => {
+  if (!status) return 'bg-gray-500';
+  const s = status.toUpperCase();
+  if (s === 'SUCCESS' || s === 'DB_SUCCESS') return 'bg-green-500';
+  if (s === 'FAILED' || s === 'DB_CORRUPTED' || s === 'DB_BACKUP_FAILED' || s === 'DB_UPLOAD_FAILED') return 'bg-red-500';
+  if (s === 'RUNNING' || s === 'IN_PROGRESS') return 'bg-blue-500';
+  return 'bg-gray-500';
+};
+
+const getStatusBadgeColor = (status) => {
+  if (!status) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+  const s = status.toUpperCase();
+  if (s === 'SUCCESS' || s === 'DB_SUCCESS') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+  if (s === 'FAILED' || s === 'DB_CORRUPTED' || s === 'DB_BACKUP_FAILED' || s === 'DB_UPLOAD_FAILED') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+  if (s === 'RUNNING' || s === 'IN_PROGRESS') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+  return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+};
 
 const BackupStatusPage = () => {
-  const navigate = useNavigate();
   const [backupStatus, setBackupStatus] = useState({
     webapp: { status: 'UNKNOWN', last_run: null, duration_seconds: null },
     database: { status: 'UNKNOWN', last_run: null }
@@ -17,55 +53,22 @@ const BackupStatusPage = () => {
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [activeTab, setActiveTab] = useState('status'); // 'status' or 'logs'
-  const [activeLogType, setActiveLogType] = useState('webapp'); // 'webapp' or 'database'
+  const [activeTab, setActiveTab] = useState('status');
+  const [activeLogType, setActiveLogType] = useState('webapp');
   const [actionInProgress, setActionInProgress] = useState(null);
 
   const webappLogsRef = useRef(null);
   const databaseLogsRef = useRef(null);
+  const statusControllerRef = useRef(null);
+  const logsControllerRef = useRef(null);
 
-  // Format duration from seconds
-  const formatDuration = (seconds) => {
-    if (seconds === null || seconds === undefined) return 'N/A';
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
-  };
-
-  // Format date to local datetime string
-  const formatDateTime = (dateString) => {
-    if (!dateString) return 'Never';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString();
-    } catch (e) {
-      return dateString;
+  const fetchBackupStatus = useCallback(async (showLoading = true) => {
+    if (statusControllerRef.current) {
+      statusControllerRef.current.abort();
     }
-  };
+    const controller = new AbortController();
+    statusControllerRef.current = controller;
 
-  // Get status color
-  const getStatusColor = (status) => {
-    if (!status) return 'bg-gray-500';
-    const s = status.toUpperCase();
-    if (s === 'SUCCESS' || s === 'DB_SUCCESS') return 'bg-green-500';
-    if (s === 'FAILED' || s === 'DB_CORRUPTED' || s === 'DB_BACKUP_FAILED' || s === 'DB_UPLOAD_FAILED') return 'bg-red-500';
-    if (s === 'RUNNING' || s === 'IN_PROGRESS') return 'bg-blue-500';
-    return 'bg-gray-500';
-  };
-
-  // Get status badge color
-  const getStatusBadgeColor = (status) => {
-    if (!status) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    const s = status.toUpperCase();
-    if (s === 'SUCCESS' || s === 'DB_SUCCESS') return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-    if (s === 'FAILED' || s === 'DB_CORRUPTED' || s === 'DB_BACKUP_FAILED' || s === 'DB_UPLOAD_FAILED') return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-    if (s === 'RUNNING' || s === 'IN_PROGRESS') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-  };
-
-  // Fetch backup status
-  const fetchBackupStatus = async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoading(true);
@@ -74,74 +77,63 @@ const BackupStatusPage = () => {
       }
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      console.log('Fetching backup status with token:', token ? 'Present' : 'Missing');
-      console.log('API URL:', process.env.REACT_APP_API_URL || '/api');
+      if (!token) throw new Error('No authentication token found');
 
       const [statusResponse, servicesResponse] = await Promise.all([
-        fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/backups/status`, {
+        fetch(`${API_BASE}/admin/backups/status`, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          signal: controller.signal
         }),
-        fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/backups/services/status`, {
+        fetch(`${API_BASE}/admin/backups/services/status`, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          signal: controller.signal
         })
       ]);
 
-      console.log('Status response status:', statusResponse.status);
-      console.log('Services response status:', servicesResponse.status);
-
       if (!statusResponse.ok) {
         const errorData = await statusResponse.json();
-        console.error('Status error:', errorData);
         throw new Error(errorData.error || 'Failed to fetch backup status');
       }
       if (!servicesResponse.ok) {
         const errorData = await servicesResponse.json();
-        console.error('Services error:', errorData);
         throw new Error(errorData.error || 'Failed to fetch services status');
       }
 
-      const statusData = await statusResponse.json();
-      const servicesData = await servicesResponse.json();
-
-      console.log('Backup status data:', statusData);
-      console.log('Services status data:', servicesData);
+      const [statusData, servicesData] = await Promise.all([
+        statusResponse.json(),
+        servicesResponse.json()
+      ]);
 
       setBackupStatus(statusData);
       setServicesStatus(servicesData);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Error fetching backup status:', err);
       setError('Failed to load backup status. Please try again later.');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
-  // Fetch logs
-  const fetchLogs = async (type, lines = 50) => {
+  const fetchLogs = useCallback(async (type, lines = 50) => {
+    if (logsControllerRef.current) {
+      logsControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    logsControllerRef.current = controller;
+
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) return;
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || '/api'}/admin/backups/logs/${type}?lines=${lines}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
+        `${API_BASE}/admin/backups/logs/${type}?lines=${lines}`,
+        { headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal }
       );
 
       if (!response.ok) return;
@@ -153,23 +145,20 @@ const BackupStatusPage = () => {
         setDatabaseLogs(data.logs || []);
       }
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error(`Error fetching ${type} logs:`, err);
     }
-  };
+  }, []);
 
-  // Handle service start/stop
-  const handleServiceAction = async (service, action) => {
+  const handleServiceAction = useCallback(async (service, action) => {
     setActionInProgress(`${service}-${action}`);
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) throw new Error('No token');
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || '/api'}/admin/backups/services/${service}/${action}`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
+        `${API_BASE}/admin/backups/services/${service}/${action}`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!response.ok) {
@@ -177,7 +166,6 @@ const BackupStatusPage = () => {
         throw new Error(data.error || 'Action failed');
       }
 
-      // Refresh status after action
       await fetchBackupStatus(false);
     } catch (err) {
       console.error(`Error ${action} ${service} service:`, err);
@@ -185,21 +173,17 @@ const BackupStatusPage = () => {
     } finally {
       setActionInProgress(null);
     }
-  };
+  }, [fetchBackupStatus]);
 
-  // Handle manual backup trigger
-  const handleTriggerBackup = async (type) => {
+  const handleTriggerBackup = useCallback(async (type) => {
     setActionInProgress(`trigger-${type}`);
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) throw new Error('No token');
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || '/api'}/admin/backups/${type}/trigger`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
+        `${API_BASE}/admin/backups/${type}/trigger`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!response.ok) {
@@ -207,10 +191,7 @@ const BackupStatusPage = () => {
         throw new Error(data.error || 'Backup trigger failed');
       }
 
-      // Show success message
       alert(`${type === 'webapp' ? 'Webapp' : 'Database'} backup triggered successfully!`);
-      
-      // Refresh status after a delay to allow backup to complete
       setTimeout(() => fetchBackupStatus(false), 3000);
     } catch (err) {
       console.error(`Error triggering ${type} backup:`, err);
@@ -218,21 +199,26 @@ const BackupStatusPage = () => {
     } finally {
       setActionInProgress(null);
     }
-  };
+  }, [fetchBackupStatus]);
 
   useEffect(() => {
     fetchBackupStatus(true);
-    // Refresh status every 30 seconds
     const interval = setInterval(() => fetchBackupStatus(false), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchBackupStatus]);
 
-  // Fetch logs when switching to logs tab
   useEffect(() => {
     if (activeTab === 'logs') {
       fetchLogs(activeLogType);
     }
-  }, [activeTab, activeLogType]);
+  }, [activeTab, activeLogType, fetchLogs]);
+
+  useEffect(() => {
+    return () => {
+      if (statusControllerRef.current) statusControllerRef.current.abort();
+      if (logsControllerRef.current) logsControllerRef.current.abort();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -248,7 +234,7 @@ const BackupStatusPage = () => {
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Backup Management</h1>
         <div className="flex items-center gap-2">
           {isRefreshing && (
-            <span className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">● Updating...</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">&#x25CF; Updating...</span>
           )}
           <span className="text-xs text-gray-400 dark:text-gray-500">
             Last updated: {lastUpdated.toLocaleTimeString()}

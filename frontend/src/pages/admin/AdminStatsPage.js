@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend
-} from 'chart.js';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
+
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
 const Doughnut = React.lazy(() => import('react-chartjs-2').then(mod => ({ default: mod.Doughnut })));
 
@@ -16,21 +13,31 @@ const AdminStatsPage = () => {
   const [taskStats, setTaskStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const controllerRef = useRef(null);
 
   const fetchStats = useCallback(async () => {
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
       const [statsRes, userRes, taskRes] = await Promise.all([
-        fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/stats`, {
+        fetch(`${API_BASE}/admin/stats`, {
           headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal
         }),
-        fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/users`, {
+        fetch(`${API_BASE}/admin/users`, {
           headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal
         }),
-        fetch(`${process.env.REACT_APP_API_URL || '/api'}/admin/tasks`, {
+        fetch(`${API_BASE}/admin/tasks`, {
           headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal
         })
       ]);
 
@@ -50,6 +57,7 @@ const AdminStatsPage = () => {
       setError(null);
       setLoading(false);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Error fetching admin stats:', err);
       setError('Failed to load statistics. Please try again later.');
       setLoading(false);
@@ -59,7 +67,10 @@ const AdminStatsPage = () => {
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (controllerRef.current) controllerRef.current.abort();
+    };
   }, [fetchStats]);
 
   const formatUptime = useCallback((seconds) => {

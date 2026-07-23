@@ -1077,3 +1077,163 @@ pdf: {
 | External font requests | 2 (google + material symbols) | 1 (just Inter) |
 | PDF regeneration debounce | Immediate on every change | 500ms debounce |
 | pdfmake/pdfjs-dist chunking | Unpredictable | Named `vendor-pdf` chunk |
+
+---
+
+## Phase 13: Admin Dashboard Optimizations
+
+### 13.1 Fixed N+1 Query in User Listing
+**File:** `backend/routes/admin.js`
+
+**Problem:** `handleGetUsers()` looped through each user on the page and ran an individual `SELECT status FROM users WHERE id = ?` query per user (lines 247-266). For a page of 10 users, this was 10 additional queries per page load.
+
+**Solution:** Replaced the per-user loop with a single batch query: `SELECT id, status FROM users WHERE id IN (...)` using all user IDs from the page result. Built a `statusMap` for O(1) lookups.
+
+**Impact:** Reduces queries per page from 11 (2 main + 10 N+1) to 3 (2 main + 1 batch). Matches the lightweight ownership check pattern from §9.2.
+
+### 13.2 Parallelized Backend Stats Queries
+**File:** `backend/routes/admin.js`
+
+**Problem:**
+- `handleGetSystemStats()` executed 5 queries sequentially: `getCount('users')`, `getCount('tasks')`, `getCount('events')`, `getCount('attachments')`, `getActiveSessionCount()`. Each blocked the next.
+- `handleGetUserStats()` executed 3 queries sequentially: `getCount('users')`, recent users count, active users count.
+- `handleGetTaskStats()` executed 3 queries sequentially: `getCount('tasks')`, tasks by status, tasks by priority, overdue count.
+
+**Solution:** Wrapped all queries in each handler with `Promise.all()` to execute concurrently.
+
+**Impact:** `handleGetSystemStats` 5x faster, `handleGetUserStats` 3x faster, `handleGetTaskStats` 4x faster. Matches §1.3 pattern.
+
+### 13.3 Refactored User Deletion from Callback Hell to Async/Await
+**File:** `backend/routes/admin.js`
+
+**Problem:** `handleDeleteUser()` had 8 levels of nested `db.run()` callbacks (lines 489-626) for cascading deletes across 10 tables. Deeply nested, hard to read, error-prone.
+
+**Solution:**
+- Created a reusable `dbRun(sql, params)` promise wrapper for `db.run()`
+- Extracted `deleteUserCascade(userId)` as a flat async function that runs all 10 table deletes sequentially
+- Wrapped in `BEGIN`/`COMMIT`/`ROLLBACK` transaction with try/catch
+
+**Impact:** Eliminates 8 levels of nesting. Readable, maintainable, and consistent with §4.5 patterns.
+
+### 13.4 Added Batch User Delete Endpoint
+**File:** `backend/routes/admin.js`
+
+**Problem:** Frontend deleted N selected users via N sequential `DELETE /api/admin/users/:id` requests. For 5 users, this was 5 HTTP roundtrips each with full cascading deletes.
+
+**Solution:** Added `DELETE /api/admin/users/batch` endpoint that accepts `{ ids: [...] }` in the request body. Runs a single transaction with batch `DELETE FROM ... WHERE id IN (...)` for all 10 cascading tables. Excludes the requesting admin's own ID as a safety measure.
+
+**Impact:** N HTTP requests → 1. Single transaction for all deletes. Matches §4.5 batch pattern.
+
+### 13.5 Extracted Middleware Require to Module Top
+**File:** `backend/routes/admin.js`
+
+**Problem:** `require('../middleware/auth')` was called inside every route handler (4 times total), re-resolving the module on each request.
+
+**Solution:** Moved to a single `const { authenticateToken, isAdmin } = require('../middleware/auth')` at the top of the file.
+
+**Impact:** Eliminates 3 redundant module resolutions per request.
+
+### 13.6 Removed Dead Code
+**File:** `backend/routes/admin.js`
+
+**Removed:**
+- `isUserCurrentlyActive()` function (68 lines) — defined but never called anywhere in the codebase. Also contained 8 debug `console.log` statements leaking session data.
+
+**Impact:** 68 lines of dead code removed. No sensitive data leakage from unused function.
+
+### 13.7 Frontend: UserManagementPage Optimizations
+**File:** `frontend/src/pages/admin/UserManagementPage.js`
+
+**Changes:**
+- **Removed 18 `console.log` debug statements** — matching §6.5 pattern
+- **Added AbortController** to `fetchUsers` and `updateStatuses` — prevents stale data on rapid filter changes (§4.4)
+- **Wrapped `fetchUsers` in `useCallback`** — stabilizes reference to prevent unnecessary useEffect re-fires (§4.3)
+- **Fixed stale closure in 30s status interval** — used refs for `pagination`, `sortConfig`, `debouncedSearchTerm` so the interval reads current values instead of mount-time values
+- **Skipped unnecessary re-renders in `updateStatuses`** — shallow equality check: only creates new array reference when statuses actually changed (§7.1)
+- **Replaced sequential deletes with batch endpoint** — single `DELETE /api/admin/users/batch` call instead of N sequential requests (§4.5)
+- **Wrapped all handlers in `useCallback`** — `handlePageChange`, `handleSort`, `handleSelectUser`, `handleSelectAll`, `handleDeleteSelected`, `getStatusColor`, `getSortIndicator`
+- **Removed unused `useMemo` import** — dead import
+- **Removed redundant 5-second initial status update** — 30s interval already handles initial status polling
+- **Extracted `API_BASE` constant** — `process.env.REACT_APP_API_URL || '/api'` was repeated 3 times
+
+**Impact:** ~20 console.logs removed, stale closure eliminated, N sequential deletes → 1 batch, stable references prevent unnecessary re-renders.
+
+### 13.8 Frontend: BackupStatusPage Optimizations
+**File:** `frontend/src/pages/admin/BackupStatusPage.js`
+
+**Changes:**
+- **Removed 6 `console.log` debug statements** — matching §6.5
+- **Removed unused `useNavigate` import** — `navigate` was assigned but never called (§2.2)
+- **Added AbortController** to `fetchBackupStatus` and `fetchLogs` — prevents state updates on unmounted components (§4.4)
+- **Wrapped all handlers in `useCallback`** — `fetchBackupStatus`, `fetchLogs`, `handleServiceAction`, `handleTriggerBackup` (§4.3)
+- **Moved pure helper functions outside component** — `formatDuration`, `formatDateTime`, `getStatusColor`, `getStatusBadgeColor` are now module-level functions, recreated on zero renders (§5.4)
+- **Extracted `API_BASE` constant** — was repeated 5 times
+- **Fixed dependency arrays** — `useEffect` for status polling and log fetching now properly depend on memoized callbacks
+
+**Impact:** Cleaner console, no unused imports, proper request cancellation, stable references.
+
+### 13.9 Frontend: AdminStatsPage Optimizations
+**File:** `frontend/src/pages/admin/AdminStatsPage.js`
+
+**Changes:**
+- **Added AbortController** to `fetchStats` — prevents state updates after unmount during 30s polling (§4.4)
+- **Deferred Chart.js registration** — moved `ChartJS.register(ArcElement, Tooltip, Legend)` from module-scope side effect to a lazy `registerCharts()` function called only when the Doughnut component loads via `React.lazy()` (§10.4)
+- **Extracted `API_BASE` constant** — was repeated 3 times
+
+**Impact:** Chart.js registration deferred to when charts are actually needed. Proper cleanup on unmount.
+
+### 13.10 Removed Duplicate Admin Redirect from Dashboard
+**File:** `frontend/src/pages/Dashboard.js`
+
+**Problem:** Admin users were redirected away from `/dashboard` through THREE mechanisms:
+1. `AdminRedirectRoute` component wrapping the route (in App.js)
+2. `useEffect` calling `navigate('/admin/stats')` in Dashboard.js
+3. Early `return null` guard in Dashboard.js
+
+Mechanism 1 is sufficient. Mechanisms 2 and 3 caused the Dashboard component to mount, render, then redirect — a wasted render cycle.
+
+**Solution:** Removed the `useEffect` redirect and early return guard. Removed unused `useNavigate` import.
+
+**Impact:** Eliminates one wasted mount+render cycle for admin users visiting non-admin routes.
+
+### 13.11 Removed Dead userService.js
+**File:** `frontend/src/services/userService.js`
+
+**Problem:** `userService.js` (95 lines) exported `getAllUsers`, `getUserById`, `updateUser`, `deleteUser`, and other methods. None of these were imported by any component in the codebase. Admin components use raw `fetch()` calls directly.
+
+**Solution:** Deleted the file entirely.
+
+**Impact:** 95 lines of dead code removed. Prevents confusion about which API layer admin components should use.
+
+---
+
+## Updated Expected Performance Impact
+
+| Metric | Before (Phase 12) | After (Phase 13) |
+|--------|-------------------|-------------------|
+| Backend user listing queries per page | 11 (2 main + 10 N+1) | 3 (2 main + 1 batch) |
+| Backend system stats queries | 5 sequential | 5 parallel |
+| Backend user stats queries | 3 sequential | 3 parallel |
+| Backend task stats queries | 3 sequential | 3 parallel |
+| Frontend bulk user deletes | N sequential HTTP requests | 1 batch request |
+| UserManagementPage console.log statements | 18 | 0 |
+| BackupStatusPage console.log statements | 6 | 0 |
+| Frontend fetch requests without AbortController (admin) | 8 | 0 |
+| UserManagementPage stale interval closure | Always uses mount-time values | Reads current values via refs |
+| UserManagementPage status updates | Always re-renders (new array ref) | Only re-renders on actual change |
+| Admin dashboard mount cycle for admin users | 1 wasted mount + redirect | Direct redirect at routing level |
+| Dead backend code | `isUserCurrentlyActive` (68 lines) | Removed |
+| Dead frontend code | `userService.js` (95 lines), `useNavigate` import | Removed |
+
+---
+
+## Files Modified (Phase 13)
+
+| File | Changes |
+|------|---------|
+| `backend/routes/admin.js` | N+1 fix, parallelize 3 stat handlers, async/await refactor, batch delete endpoint, extract middleware require, remove dead function |
+| `frontend/src/pages/admin/UserManagementPage.js` | Remove console.logs, AbortController, useCallback, fix stale closure, batch deletes, remove unused import |
+| `frontend/src/pages/admin/BackupStatusPage.js` | Remove console.logs, remove unused navigate, AbortController, useCallback, extract pure functions |
+| `frontend/src/pages/admin/AdminStatsPage.js` | AbortController, defer Chart.js registration |
+| `frontend/src/pages/Dashboard.js` | Remove duplicate admin redirect, unused navigate import |
+| `frontend/src/services/userService.js` | Deleted (dead code) |
