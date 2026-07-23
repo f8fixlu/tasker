@@ -18,6 +18,8 @@ const truncateText = (text, maxLength = 50) => {
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { openViewTaskModal } = useModal();
+  const { updateTrigger } = useTaskUpdate(); // Get the task update trigger state
 
   // If user is admin, redirect to system stats page
   useEffect(() => {
@@ -30,8 +32,6 @@ const Dashboard = () => {
   if (user?.role === 'admin') {
     return null; // The redirect will happen in useEffect
   }
-  const { openViewTaskModal } = useModal();
-  const { updateTrigger } = useTaskUpdate(); // Get the task update trigger state
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 0,

@@ -3,7 +3,7 @@
 const { deleteExpiredSessions } = require('../models/Session');
 
 // Cleanup function to remove sessions that have been inactive for more than the specified time
-async function deleteInactiveSessions(maxInactiveMinutes = 15) {
+async function deleteInactiveSessions(maxInactiveMinutes = 60) {
   const sql = `
     DELETE FROM sessions 
     WHERE last_activity_at < datetime('now', '-${maxInactiveMinutes} minutes')

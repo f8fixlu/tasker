@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { attachmentService } from '../services/attachmentService';
+import { attachmentService } from '../../services/attachmentService';
 
 const getFileIcon = (type) => {
   if (type.includes('image')) return 'image';

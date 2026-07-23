@@ -590,9 +590,11 @@ async function getTasksByUserId(user_id, options = {}) {
 }
 
 // Update task
-async function updateTask(id, taskData) {
-  // Get the current task to compare dates if needed
-  const currentTask = await getTaskById(id);
+async function updateTask(id, taskData, currentTask = null) {
+  // Use provided currentTask or fetch it
+  if (!currentTask) {
+    currentTask = await getTaskById(id);
+  }
 
   // Prevent changing status to 'Overdue' if the task is already 'Archived'
   if (currentTask && currentTask.status === 'Archived' && taskData.status === 'Overdue') {
@@ -688,18 +690,17 @@ async function updateTask(id, taskData) {
 
 // Delete task
 async function deleteTask(id) {
-  // First, get any attachments associated with this task to delete the files
+  // Batch delete attachments for this task
   const { getAttachmentsByTaskId, deleteAttachment } = require('./Attachment');
   
   try {
     const attachments = await getAttachmentsByTaskId(id);
     
-    // Delete each attachment file and record
-    for (const attachment of attachments) {
-      await deleteAttachment(attachment.id);
+    if (attachments.length > 0) {
+      // Delete all attachment files concurrently
+      await Promise.all(attachments.map(a => deleteAttachment(a.id).catch(() => {})));
     }
   } catch (attachmentError) {
-    console.error('Error deleting task attachments:', attachmentError);
     // Continue with task deletion even if attachment deletion fails
   }
 

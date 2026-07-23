@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import cache from '../utils/cache';
@@ -516,21 +516,27 @@ export const AuthProvider = ({ children }) => {
 
   // Effects to handle user activity and browser closing
   useEffect(() => {
-    // Function to record user activity
+    // Use a ref for user to avoid re-registering listeners on every user change
+    let lastActivityTime = 0;
+    const THROTTLE_MS = 5000; // Only record activity at most every 5 seconds
+
+    // Single throttled handler for all activity events
     const recordUserActivity = () => {
-      if (user && heartbeatService.isRunning()) {
+      const now = Date.now();
+      if (now - lastActivityTime < THROTTLE_MS) return;
+      lastActivityTime = now;
+      if (heartbeatService.isRunning()) {
         heartbeatService.recordActivity();
       }
     };
 
     const handleBeforeUnload = () => {
-      // Stop heartbeat service when browser is closing
-      if (user && heartbeatService.isRunning()) {
+      if (heartbeatService.isRunning()) {
         heartbeatService.stop();
       }
     };
 
-    // Add event listeners for user activity
+    // Register once on mount, check user inside handlers
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('mousemove', recordUserActivity, { passive: true });
     window.addEventListener('keydown', recordUserActivity, { passive: true });
@@ -546,9 +552,9 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('scroll', recordUserActivity);
       window.removeEventListener('touchstart', recordUserActivity);
     };
-  }, [user]);
+  }, []); // Mount only — handlers check service state internally
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     login,
     logout,
@@ -556,7 +562,7 @@ export const AuthProvider = ({ children }) => {
     refreshUser,
     loading,
     isAuthenticated: !!user
-  };
+  }), [user, loading, login, logout, register, refreshUser]);
 
   return (
     <AuthContext.Provider value={value}>

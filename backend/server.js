@@ -15,6 +15,11 @@ if (fs.existsSync(rootEnvPath)) {
 
 const http = require('http');
 const url = require('url');
+const zlib = require('zlib');
+
+// Gzip cache: store compressed buffers keyed by "filePath:mtime" to avoid recompressing
+const gzipCache = new Map();
+const GZIP_CACHE_MAX = 200; // max entries
 
 // Import configuration and utilities
 const { setupDatabase } = require('./config/database');
@@ -63,9 +68,6 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer((req, res) => {
   // Log all requests
   requestLogger(req, res, () => {});
-  
-  console.log(`Raw URL: ${req.url}`);
-  console.log(`Raw request URL: ${req.url}, method: ${req.method}`);
   
   let method = req.method;
   let parsedUrl;
@@ -130,30 +132,17 @@ const server = http.createServer((req, res) => {
   try {
     parsedUrl = url.parse(req.url, true);
     pathname = parsedUrl.pathname;
-    console.log(`Raw URL: ${req.url}, Parsed pathname: ${pathname}, method: ${method}`);
-    console.log(`Headers:`, req.headers);
 
-    // Debug: Check if pathname is valid
     if (!pathname) {
-      console.error('ERROR: pathname is null or undefined!');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server error: pathname could not be parsed' }));
       return;
     }
-
-    console.log(`pathname typeof: ${typeof pathname}, length: ${pathname.length}`);
-    console.log(`First few characters of pathname: "${pathname.substring(0, 10)}"`);
   } catch (error) {
-    console.error(`Error parsing URL: ${req.url}`, error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Error parsing request URL' }));
     return;
   }
-
-  // Check if this is an API request
-  console.log(`Checking if pathname starts with '/api/': ${pathname.startsWith('/api/')}`);
-  console.log(`Full pathname: '${pathname}' (length: ${pathname.length})`);
-  console.log(`First char code: ${pathname.charCodeAt(0)}, Second char code: ${pathname.charCodeAt(1)}`);
 
   if (pathname.startsWith('/api/')) {
     // For auth routes that don't require authentication, apply sanitization inside authRoutes
@@ -335,22 +324,52 @@ function handleStaticFile(req, res, pathname) {
 
       // Add caching headers for static assets
       if (isStaticAsset) {
-        // For images, use a long cache time (1 year) with immutable directive
         if (/\.(png|jpg|jpeg|gif|ico|svg)$/i.test(filePath)) {
-          headers['Cache-Control'] = 'public, max-age=31536000, immutable'; // Cache images for 1 year
+          headers['Cache-Control'] = 'public, max-age=31536000, immutable';
         } else if (/\.(css|js)$/i.test(filePath)) {
-          headers['Cache-Control'] = 'public, max-age=31536000, immutable'; // Cache CSS/JS for 1 year
+          headers['Cache-Control'] = 'public, max-age=31536000, immutable';
         } else if (/\.(woff|woff2|ttf|eot)$/i.test(filePath)) {
-          headers['Cache-Control'] = 'public, max-age=31536000, immutable'; // Cache fonts for 1 year
+          headers['Cache-Control'] = 'public, max-age=31536000, immutable';
         } else {
-          headers['Cache-Control'] = 'public, max-age=31536000, immutable'; // Cache other assets for 1 year
+          headers['Cache-Control'] = 'public, max-age=31536000, immutable';
         }
       } else if (pathname === '/' || extname === '.html') {
-        headers['Cache-Control'] = 'no-cache'; // Don't cache HTML files
+        headers['Cache-Control'] = 'no-cache';
       }
 
-      res.writeHead(200, headers);
-      res.end(content, 'utf-8');
+      // Apply gzip compression for text-based responses with caching
+      const acceptEncoding = req.headers['accept-encoding'] || '';
+      if (isStaticAsset && acceptEncoding.includes('gzip') && /\.(js|css|html|svg|json|text)$/i.test(filePath)) {
+        const cacheKey = filePath + ':' + (content.mtime || '');
+        const cached = gzipCache.get(cacheKey);
+        if (cached) {
+          headers['Content-Encoding'] = 'gzip';
+          headers['Content-Length'] = cached.length;
+          res.writeHead(200, headers);
+          res.end(cached);
+        } else {
+          zlib.gzip(content, (err, compressed) => {
+            if (err) {
+              res.writeHead(200, headers);
+              res.end(content, 'utf-8');
+            } else {
+              // Evict oldest entry if cache is full
+              if (gzipCache.size >= GZIP_CACHE_MAX) {
+                const firstKey = gzipCache.keys().next().value;
+                gzipCache.delete(firstKey);
+              }
+              gzipCache.set(cacheKey, compressed);
+              headers['Content-Encoding'] = 'gzip';
+              headers['Content-Length'] = compressed.length;
+              res.writeHead(200, headers);
+              res.end(compressed);
+            }
+          });
+        }
+      } else {
+        res.writeHead(200, headers);
+        res.end(content, 'utf-8');
+      }
     }
   });
 }
@@ -395,7 +414,7 @@ server.listen(PORT, () => {
   console.log(`Database initialized and ready`);
 
   // Start the session cleanup job (check every 5 minutes for sessions inactive for 15 minutes)
-  startSessionCleanupJob(5, 15);
+  startSessionCleanupJob(5, 60);
 
   // Start the notification jobs (check every 5 minutes for overdue tasks and upcoming events)
   startNotificationJobs(5);

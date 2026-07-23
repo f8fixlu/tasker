@@ -1,20 +1,21 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useModal } from '../../hooks/useModal';  // Import from the custom hook, not directly from context
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
 import { taskService } from '../../services/taskService';
 import { categoryService } from '../../services/categoryService';
 import { taskTypeService } from '../../services/taskTypeService';
 import { subTypeService } from '../../services/subTypeService';
-import NewTaskModal from './NewTaskModal';
-import EditTaskModal from './EditTaskModal';
-import ViewTaskModal from './ViewTaskModal';
-import NewEventModal from './NewEventModal';
-import EditEventModal from './EditEventModal';
-import ViewEventModal from './ViewEventModal';
-import NewCategoryModal from './NewCategoryModal';
-import NewTaskTypeModal from './NewTaskTypeModal';
-import NewSubTypeModal from './NewSubTypeModal';
-import AboutModal from './AboutModal';
+
+const NewTaskModal = React.lazy(() => import('./NewTaskModal'));
+const EditTaskModal = React.lazy(() => import('./EditTaskModal'));
+const ViewTaskModal = React.lazy(() => import('./ViewTaskModal'));
+const NewEventModal = React.lazy(() => import('./NewEventModal'));
+const EditEventModal = React.lazy(() => import('./EditEventModal'));
+const ViewEventModal = React.lazy(() => import('./ViewEventModal'));
+const NewCategoryModal = React.lazy(() => import('./NewCategoryModal'));
+const NewTaskTypeModal = React.lazy(() => import('./NewTaskTypeModal'));
+const NewSubTypeModal = React.lazy(() => import('./NewSubTypeModal'));
+const AboutModal = React.lazy(() => import('./AboutModal'));
 
 const ModalRenderer = () => {
   const { 
@@ -27,7 +28,7 @@ const ModalRenderer = () => {
   const { triggerTaskUpdate } = useTaskUpdate();
 
   return (
-    <>
+    <Suspense fallback={null}>
       {/* Task Modals */}
       <NewTaskModal
         isOpen={modals.showNewTask}
@@ -109,7 +110,7 @@ const ModalRenderer = () => {
         isOpen={modals.showAbout}
         onClose={() => closeAllModals()}
       />
-    </>
+    </Suspense>
   );
 };
 

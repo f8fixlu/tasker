@@ -2,6 +2,7 @@ const url = require('url');
 const { jsonParser, authenticateToken } = require('../middleware/auth');
 const { validateFileUpload } = require('../utils/fileValidation');
 const { storeFile } = require('../utils/secureFileStorage');
+const { getRow } = require('../utils/database');
 const { 
   createAttachment,
   getAttachmentById,
@@ -78,18 +79,16 @@ async function handleUploadAttachment(req, res, userId) {
       return res.end(JSON.stringify({ error: fileValidation.errors.join(', ') }));
     }
 
-    // Verify that the task or event belongs to the user
+    // Verify that the task or event belongs to the user (lightweight check)
     if (task_id) {
-      const { getTaskById } = require('../models/Task');
-      const task = await getTaskById(task_id);
-      if (!task || task.user_id !== userId) {
+      const taskOwner = await getRow('SELECT user_id FROM tasks WHERE id = ?', [task_id]);
+      if (!taskOwner || taskOwner.user_id !== userId) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'Access denied or task not found' }));
       }
     } else if (event_id) {
-      const { getEventById } = require('../models/Event');
-      const event = await getEventById(event_id);
-      if (!event || event.user_id !== userId) {
+      const eventOwner = await getRow('SELECT user_id FROM events WHERE id = ?', [event_id]);
+      if (!eventOwner || eventOwner.user_id !== userId) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'Access denied or event not found' }));
       }
@@ -175,10 +174,8 @@ async function handleGetAttachments(req, res, userId, query) {
 // Handle getting attachments by task ID
 async function handleGetAttachmentsByTaskId(req, res, taskId, userId) {
   try {
-    // First verify the task belongs to the user
-    const { getTaskById } = require('../models/Task');
-    const task = await getTaskById(taskId);
-    if (!task || task.user_id !== userId) {
+    const taskOwner = await getRow('SELECT user_id FROM tasks WHERE id = ?', [taskId]);
+    if (!taskOwner || taskOwner.user_id !== userId) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'Access denied or task not found' }));
     }
@@ -197,10 +194,8 @@ async function handleGetAttachmentsByTaskId(req, res, taskId, userId) {
 // Handle getting attachments by event ID
 async function handleGetAttachmentsByEventId(req, res, eventId, userId) {
   try {
-    // First verify the event belongs to the user
-    const { getEventById } = require('../models/Event');
-    const event = await getEventById(eventId);
-    if (!event || event.user_id !== userId) {
+    const eventOwner = await getRow('SELECT user_id FROM events WHERE id = ?', [eventId]);
+    if (!eventOwner || eventOwner.user_id !== userId) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'Access denied or event not found' }));
     }
@@ -318,18 +313,16 @@ function attachmentRoutes(req, res, parsedUrl) {
         return res.end(JSON.stringify({ error: fileValidation.errors.join(', ') }));
       }
 
-      // Verify that the task or event belongs to the user
+      // Verify that the task or event belongs to the user (lightweight check)
       if (task_id) {
-        const { getTaskById } = require('../models/Task');
-        const task = await getTaskById(task_id);
-        if (!task || task.user_id !== req.user.id) {
+        const taskOwner = await getRow('SELECT user_id FROM tasks WHERE id = ?', [task_id]);
+        if (!taskOwner || taskOwner.user_id !== req.user.id) {
           res.writeHead(403, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ error: 'Access denied or task not found' }));
         }
       } else if (event_id) {
-        const { getEventById } = require('../models/Event');
-        const event = await getEventById(event_id);
-        if (!event || event.user_id !== req.user.id) {
+        const eventOwner = await getRow('SELECT user_id FROM events WHERE id = ?', [event_id]);
+        if (!eventOwner || eventOwner.user_id !== req.user.id) {
           res.writeHead(403, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ error: 'Access denied or event not found' }));
         }

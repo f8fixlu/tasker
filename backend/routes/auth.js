@@ -225,6 +225,10 @@ async function handleLogin(req, res) {
       ip_address: ipAddress,
       user_agent: userAgent
     });
+
+    // Persist last login timestamp on the user record (survives session deletion)
+    const { runQuery } = require('../utils/database');
+    runQuery('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]).catch(() => {});
     
     // Return user info and tokens (excluding password hash)
     const { password_hash: _, ...userResponse } = user;
