@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import MarginSettingsModal from '../components/common/MarginSettingsModal';
 import { reportsService } from '../services/reportsService';
@@ -999,25 +998,21 @@ const Reports = () => {
   // State for grouped event data by date
   const [groupedEvents, setGroupedEvents] = useState([]);
 
-  // State for sidebar event list
-  const [sidebarEventList, setSidebarEventList] = useState([]);
-  const [sidebarEventListLoading, setSidebarEventListLoading] = useState(false);
-  const [sidebarEventListLoaded, setSidebarEventListLoaded] = useState(false);
-  const [sidebarEventListPage, setSidebarEventListPage] = useState(1);
-  const [sidebarEventListHasMore, setSidebarEventListHasMore] = useState(true);
-  const [sidebarEventListLoadingMore, setSidebarEventListLoadingMore] = useState(false);
-  const eventListContainerRef = useRef(null);
-
-  // State for sidebar task list
-  const [sidebarTaskList, setSidebarTaskList] = useState([]);
-  const [sidebarTaskListLoading, setSidebarTaskListLoading] = useState(false);
-  const [sidebarTaskListLoaded, setSidebarTaskListLoaded] = useState(false);
+  // Sidebar task list — derived from full taskList to avoid duplicate API calls
   const [sidebarTaskListPage, setSidebarTaskListPage] = useState(1);
-  const [sidebarTaskListHasMore, setSidebarTaskListHasMore] = useState(true);
-  const [sidebarTaskListLoadingMore, setSidebarTaskListLoadingMore] = useState(false);
+  const SIDEBAR_TASK_PAGE_SIZE = 14;
+  const sidebarTaskList = useMemo(() => taskList.slice(0, sidebarTaskListPage * SIDEBAR_TASK_PAGE_SIZE), [taskList, sidebarTaskListPage]);
+  const sidebarTaskListHasMore = sidebarTaskList.length < taskList.length;
   const taskListContainerRef = useRef(null);
   const [sidebarTaskPopup, setSidebarTaskPopup] = useState(null);
   const sidebarTaskPopupTimeoutRef = useRef(null);
+
+  // Sidebar event list — derived from full eventList to avoid duplicate API calls
+  const [sidebarEventListPage, setSidebarEventListPage] = useState(1);
+  const SIDEBAR_EVENT_PAGE_SIZE = 10;
+  const sidebarEventList = useMemo(() => eventList.slice(0, sidebarEventListPage * SIDEBAR_EVENT_PAGE_SIZE), [eventList, sidebarEventListPage]);
+  const sidebarEventListHasMore = sidebarEventList.length < eventList.length;
+  const eventListContainerRef = useRef(null);
   const [sidebarEventPopup, setSidebarEventPopup] = useState(null);
   const sidebarEventPopupTimeoutRef = useRef(null);
   const [consolidatedEventPopup, setConsolidatedEventPopup] = useState(null);
@@ -1073,13 +1068,6 @@ const Reports = () => {
       });
     }
   }, [dateRange, categoryFilters]);
-
-  // Load task completion trend when component mounts or report stats change
-  useEffect(() => {
-    if (!loading) {
-      fetchTaskCompletionTrend();
-    }
-  }, [loading, dateRange, categoryFilters]);
 
   // Fetch task list for report
   const fetchTaskList = useCallback(async () => {
@@ -1203,148 +1191,56 @@ const Reports = () => {
     }
   }, [dateRange, categoryFilters]);
 
-  // Fetch sidebar task list
-  const fetchSidebarTaskList = async (page = 1, append = false) => {
-    if (page === 1) {
-      setSidebarTaskListLoading(true);
-    } else {
-      setSidebarTaskListLoadingMore(true);
-    }
-
-    try {
-      // Fetch the actual paginated data
-      const data = await reportsService.getTaskListForReport({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-        category_filters: JSON.stringify(formatCategoryFiltersForAPI()),
-        limit: 14,  // Load 14 items at a time
-        offset: (page - 1) * 14
-      });
-
-      const newTasks = data.tasks || [];
-
-      if (page === 1) {
-        setSidebarTaskList(newTasks);
-        setSidebarTaskListLoaded(true);
-      } else {
-        setSidebarTaskList(prev => [...prev, ...newTasks]);
-      }
-
-      setSidebarTaskListHasMore(newTasks.length === 14); // If we got 14 items, there might be more
-      setSidebarTaskListPage(page);
-    } catch (error) {
-      console.error('Error fetching sidebar task list:', error);
-      if (page === 1) {
-        setSidebarTaskList([]); // Set to empty array on error
-        setSidebarTaskListLoaded(true);
-      }
-    } finally {
-      setSidebarTaskListLoading(page === 1 ? false : false);
-      setSidebarTaskListLoadingMore(false);
-    }
-  };
-
-  // Fetch sidebar event list
-  const fetchSidebarEventList = async (page = 1, append = false) => {
-    if (page === 1) {
-      setSidebarEventListLoading(true);
-    } else {
-      setSidebarEventListLoadingMore(true);
-    }
-
-    try {
-      // Fetch the actual paginated data
-      const data = await reportsService.getEventListForReport({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-        category_filters: JSON.stringify(formatCategoryFiltersForAPI()), // Include category filters
-        limit: 10,  // Load 10 items at a time
-        offset: (page - 1) * 10
-      });
-
-      const newEvents = data.events || [];
-
-      if (page === 1) {
-        setSidebarEventList(newEvents);
-        setSidebarEventListLoaded(true);
-      } else {
-        setSidebarEventList(prev => [...prev, ...newEvents]);
-      }
-
-      setSidebarEventListHasMore(newEvents.length === 10); // If we got 10 items, there might be more
-      setSidebarEventListPage(page);
-    } catch (error) {
-      console.error('Error fetching sidebar event list:', error);
-      if (page === 1) {
-        setSidebarEventList([]); // Set to empty array on error
-        setSidebarEventListLoaded(true);
-      }
-    } finally {
-      setSidebarEventListLoading(page === 1 ? false : false);
-      setSidebarEventListLoadingMore(false);
-    }
-  };
-
-  // Load task list when component mounts or date range/ category filters change
+  // Load data when filters change or when tasks are updated elsewhere
   useEffect(() => {
-    if (!loading) {
-      // Reset loaded state when filters change to show skeleton during refresh
-      setSidebarTaskListLoaded(false);
-      setSidebarEventListLoaded(false);
-      setTaskTypeSummaryLoaded(false);
-      setEventSummaryLoaded(false);
+    if (loading) return;
 
-      fetchTaskList();
-      fetchEventList();
-      fetchSidebarTaskList(1, false);
-      fetchSidebarEventList(1, false);
-      fetchTaskTypeSummary();
-      fetchEventSummary();
-    }
-  }, [loading, dateRange, categoryFilters]);
+    // Reset loaded state when filters change to show skeleton during refresh
+    setSidebarTaskListPage(1);
+    setSidebarEventListPage(1);
+    setTaskTypeSummaryLoaded(false);
+    setEventSummaryLoaded(false);
 
-  // Load more when scrolling
+    // Fetch all report data in parallel
+    fetchReportData();
+    fetchTaskList();
+    fetchEventList();
+    fetchTaskCompletionTrend();
+    fetchTaskTypeSummary();
+    fetchEventSummary();
+  }, [dateRange, categoryFilters, updateTrigger, loading]);
+
+  // Load more tasks when scrolling in task container
   useEffect(() => {
     const container = taskListContainerRef.current;
     if (!container) return;
 
-    let timeoutId = null; // To debounce scroll events
+    let timeoutId = null;
 
     const handleScroll = () => {
-      // Debounce the scroll event to avoid excessive calls
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
       
       timeoutId = setTimeout(() => {
-        if (!sidebarTaskListHasMore || sidebarTaskListLoadingMore) return;
+        if (!sidebarTaskListHasMore) return;
         
-        // Check if we're near the bottom of the container
-        const threshold = 20; // pixels from bottom to trigger load
+        const threshold = 20;
         const position = container.scrollTop + container.clientHeight;
         const height = container.scrollHeight;
         
         if (position >= height - threshold) {
-          // Load next page if not already loading
-          fetchSidebarTaskList(sidebarTaskListPage + 1, true);
+          setSidebarTaskListPage(prev => prev + 1);
         }
-      }, 100); // Debounce for 100ms
+      }, 100);
     };
 
-    // Add scroll listener
     container.addEventListener('scroll', handleScroll);
-    
-    // Initial check in case the content is smaller than container
     handleScroll();
     
-    // Clean up
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sidebarTaskListHasMore, sidebarTaskListLoadingMore, sidebarTaskListPage, fetchSidebarTaskList]);
+  }, [sidebarTaskListHasMore]);
 
   // Fetch task type summary data
   const fetchTaskTypeSummary = useCallback(async () => {
@@ -1392,69 +1288,42 @@ const Reports = () => {
     const container = eventListContainerRef.current;
     if (!container) return;
 
-    let timeoutId = null; // To debounce scroll events
+    let timeoutId = null;
 
     const handleEventScroll = () => {
-      // Debounce the scroll event to avoid excessive calls
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
 
       timeoutId = setTimeout(() => {
-        if (!sidebarEventListHasMore || sidebarEventListLoadingMore) return;
+        if (!sidebarEventListHasMore) return;
 
-        // Check if we're near the bottom of the container
-        const threshold = 20; // pixels from bottom to trigger load
+        const threshold = 20;
         const position = container.scrollTop + container.clientHeight;
         const height = container.scrollHeight;
 
         if (position >= height - threshold) {
-          // Load next page if not already loading
-          fetchSidebarEventList(sidebarEventListPage + 1, true);
+          setSidebarEventListPage(prev => prev + 1);
         }
-      }, 100); // Debounce for 100ms
+      }, 100);
     };
 
-    // Add scroll listener
     container.addEventListener('scroll', handleEventScroll);
-
-    // Initial check in case the content is smaller than container
     handleEventScroll();
 
-    // Clean up
     return () => {
       container.removeEventListener('scroll', handleEventScroll);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sidebarEventListHasMore, sidebarEventListLoadingMore, sidebarEventListPage, fetchSidebarEventList]);
-
-  // Refresh data when tasks are updated elsewhere
-  useEffect(() => {
-    if (!loading) {
-      fetchReportData();
-      fetchTaskList();
-      fetchEventList();
-      fetchSidebarTaskList(1, false);
-      fetchSidebarEventList(1, false);
-      fetchTaskCompletionTrend();
-      fetchTaskTypeSummary();
-      fetchEventSummary();
-    }
-  }, [updateTrigger, dateRange]);
+  }, [sidebarEventListHasMore]);
 
   // Refresh print preview data when category filters change while print modal is open
   useEffect(() => {
     if (isPrintModalOpen && !loading) {
       fetchTaskList();
-      fetchEventList();  // Also refresh events for preview
-      fetchSidebarTaskList(1, false); // Fetch first page, don't append
-      fetchSidebarEventList(1, false); // Fetch first page, don't append
-      fetchTaskTypeSummary(); // Also refresh task type summary for preview
-      fetchEventSummary(); // Also refresh event summary for preview
+      fetchEventList();
+      fetchTaskTypeSummary();
+      fetchEventSummary();
     }
-  }, [categoryFilters, isPrintModalOpen, loading]);
+  }, [categoryFilters, isPrintModalOpen]);
 
   // Add CSS for zoom that doesn't affect printing 
   useEffect(() => {
@@ -1964,172 +1833,13 @@ const generatePDF = async () => {
   const showPdfPreview = async () => {
     setIsPreviewLoading(true);
     try {
-      // Fetch fresh signatory data and header image from API first, then localStorage when opening preview
-      // Use local variables to avoid React async state closure issues
-      let freshHeaderImage = headerImage;
-      let freshFooterImage = footerImage;
-
-      if (user) {
-        try {
-          const userData = await api.get('/users/profile');
-
-          if (userData.user?.signatories) {
-            let freshSignatoryData = [];
-
-            if (Array.isArray(userData.user.signatories)) {
-              freshSignatoryData = userData.user.signatories;
-            } else if (typeof userData.user.signatories === 'object') {
-              const signatoryArray = [];
-
-              let signatoryIndex = 1;
-              while (userData.user.signatories[`signatory${signatoryIndex}`]) {
-                const signatoryField = userData.user.signatories[`signatory${signatoryIndex}`];
-                if (signatoryField && (signatoryField.name || signatoryField.position)) {
-                  signatoryArray.push({
-                    title: signatoryField.title || `Signatory ${signatoryArray.length + 1}`,
-                    name: signatoryField.name || '',
-                    position: signatoryField.position || ''
-                  });
-                }
-                signatoryIndex++;
-              }
-
-              if (userData.user.signatories.preparedBy && (userData.user.signatories.preparedBy.name || userData.user.signatories.preparedBy.position)) {
-                signatoryArray.push({
-                  title: userData.user.signatories.preparedBy.title || `Signatory ${signatoryArray.length + 1}`,
-                  name: userData.user.signatories.preparedBy.name || '',
-                  position: userData.user.signatories.preparedBy.position || ''
-                });
-              }
-
-              if (userData.user.signatories.reviewedBy && (userData.user.signatories.reviewedBy.name || userData.user.signatories.reviewedBy.position)) {
-                signatoryArray.push({
-                  title: userData.user.signatories.reviewedBy.title || `Signatory ${signatoryArray.length + 1}`,
-                  name: userData.user.signatories.reviewedBy.name || '',
-                  position: userData.user.signatories.reviewedBy.position || ''
-                });
-              }
-
-              if (userData.user.signatories.notedBy && (userData.user.signatories.notedBy.name || userData.user.signatories.notedBy.position)) {
-                signatoryArray.push({
-                  title: userData.user.signatories.notedBy.title || `Signatory ${signatoryArray.length + 1}`,
-                  name: userData.user.signatories.notedBy.name || '',
-                  position: userData.user.signatories.notedBy.position || ''
-                });
-              }
-
-              freshSignatoryData = signatoryArray;
-            }
-
-            if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
-              setSignatoryData(freshSignatoryData);
-            }
-          } else {
-            const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
-            if (savedSignatories) {
-              const freshSignatoryData = JSON.parse(savedSignatories);
-              if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
-                setSignatoryData(freshSignatoryData);
-              }
-            }
-          }
-
-          // Load header image from API (use local variable to avoid closure issue)
-          if (userData.user?.header_image) {
-            freshHeaderImage = userData.user.header_image;
-            setHeaderImage(freshHeaderImage);
-          } else {
-            const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
-            if (savedHeaderImage) {
-              freshHeaderImage = savedHeaderImage;
-              setHeaderImage(freshHeaderImage);
-            }
-          }
-
-          // Load footer image from API (use local variable to avoid closure issue)
-          if (userData.user?.footer_image) {
-            freshFooterImage = userData.user.footer_image;
-            setFooterImage(freshFooterImage);
-          } else {
-            const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
-            if (savedFooterImage) {
-              freshFooterImage = savedFooterImage;
-              setFooterImage(freshFooterImage);
-            }
-          }
-
-          // Load show default header setting
-          if (userData.user?.show_default_header !== undefined) {
-            setShowDefaultHeader(!!userData.user.show_default_header);
-          } else {
-            const saved = localStorage.getItem(`showDefaultHeader_${user?.id}`);
-            if (saved !== null) {
-              setShowDefaultHeader(saved === 'true');
-            }
-          }
-
-          // Load header on all pages setting
-          if (userData.user?.header_on_all_pages !== undefined) {
-            setHeaderOnAllPages(!!userData.user.header_on_all_pages);
-          } else {
-            const saved = localStorage.getItem(`headerOnAllPages_${user?.id}`);
-            if (saved !== null) {
-              setHeaderOnAllPages(saved === 'true');
-            }
-          }
-
-          // Load report title
-          if (userData.user?.report_title) {
-            setReportTitleText(userData.user.report_title);
-          } else {
-            const saved = localStorage.getItem(`reportTitleText_${user?.id}`);
-            if (saved) {
-              setReportTitleText(saved);
-            }
-          }
-        } catch (apiError) {
-          const savedSignatories = localStorage.getItem(`signatories_${user?.id}`);
-          if (savedSignatories) {
-            try {
-              const freshSignatoryData = JSON.parse(savedSignatories);
-              if (JSON.stringify(freshSignatoryData) !== JSON.stringify(signatoryData)) {
-                setSignatoryData(freshSignatoryData);
-              }
-            } catch (parseError) {
-              // Ignore parse errors
-            }
-          }
-
-          // Try loading header image from localStorage as fallback
-          const savedHeaderImage = localStorage.getItem(`headerImage_${user?.id}`);
-          if (savedHeaderImage) {
-            freshHeaderImage = savedHeaderImage;
-            setHeaderImage(freshHeaderImage);
-          }
-
-          // Try loading footer image from localStorage as fallback
-          const savedFooterImage = localStorage.getItem(`footerImage_${user?.id}`);
-          if (savedFooterImage) {
-            freshFooterImage = savedFooterImage;
-            setFooterImage(freshFooterImage);
-          }
-
-          // Try loading show default header from localStorage as fallback
-          const savedDefaultHeader = localStorage.getItem(`showDefaultHeader_${user?.id}`);
-          if (savedDefaultHeader !== null) {
-            setShowDefaultHeader(savedDefaultHeader === 'true');
-          }
-
-          // Try loading header on all pages from localStorage as fallback
-          const savedHeaderOnAllPages = localStorage.getItem(`headerOnAllPages_${user?.id}`);
-          if (savedHeaderOnAllPages !== null) {
-            setHeaderOnAllPages(savedHeaderOnAllPages === 'true');
-          }
-        }
+      // Use cached signatory data from state (already loaded by loadSignatoryData)
+      // Refresh from API only if signatory data is empty
+      if (signatoryData.length === 0 && user) {
+        await loadSignatoryData();
       }
 
-      // Pass local variables directly to avoid React async state closure issue
-      const blob = await generatePDFBlob(freshHeaderImage, freshFooterImage);
+      const blob = await generatePDFBlob(headerImage, footerImage);
       const url = URL.createObjectURL(blob);
       setPdfPreviewUrl(url);
       setShowPdfPreviewModal(true);
@@ -2141,11 +1851,12 @@ const generatePDF = async () => {
     }
   };
 
-  // Update PDF preview when page size or signatory data changes
+  // Update PDF preview when page size or signatory data changes (debounced to avoid regenerating on every keystroke)
+  const pdfRegenTimeoutRef = useRef(null);
   useEffect(() => {
     if (showPdfPreviewModal) {
-      // Regenerate the PDF when page size or signatory data changes while modal is open
-      const regeneratePreview = async () => {
+      if (pdfRegenTimeoutRef.current) clearTimeout(pdfRegenTimeoutRef.current);
+      pdfRegenTimeoutRef.current = setTimeout(async () => {
         try {
           const blob = await generatePDFBlob();
           const url = URL.createObjectURL(blob);
@@ -2153,9 +1864,11 @@ const generatePDF = async () => {
         } catch (error) {
           console.error('Error regenerating PDF preview:', error);
         }
-      };
-      regeneratePreview();
+      }, 500); // Debounce 500ms
     }
+    return () => {
+      if (pdfRegenTimeoutRef.current) clearTimeout(pdfRegenTimeoutRef.current);
+    };
   }, [pageSize, signatoryData, headerImage, footerImage, showDefaultHeader, headerOnAllPages, reportTitleText, showPdfPreviewModal, pdfMargins]);
 
   // Function to handle PDF printing from preview
@@ -2440,7 +2153,7 @@ const generatePDF = async () => {
               className="custom-list-height overflow-y-auto scrollbar-hide pb-1"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              {sidebarTaskListLoading || !sidebarTaskListLoaded ? (
+              {taskListLoading ? (
                 <div className="p-4 space-y-3">
                   {[...Array(8)].map((_, i) => (
                     <div key={i} className="flex gap-3 items-center">
@@ -2496,16 +2209,6 @@ const generatePDF = async () => {
                       ))}
                     </tbody>
                   </table>
-                  {sidebarTaskListLoadingMore && sidebarTaskListHasMore && sidebarTaskList.length > 0 && (
-                    <div className="p-4 space-y-3 border-t border-gray-200 dark:border-gray-700">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex gap-3 items-center">
-                          <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                          <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -2530,7 +2233,7 @@ const generatePDF = async () => {
               className="custom-list-height overflow-y-auto scrollbar-hide pb-1"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              {sidebarEventListLoading || !sidebarEventListLoaded ? (
+              {eventListLoading ? (
                 <div className="p-4 space-y-3">
                   {[...Array(8)].map((_, i) => (
                     <div key={i} className="flex gap-3 items-center">
@@ -2585,17 +2288,7 @@ const generatePDF = async () => {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                  {sidebarEventListLoadingMore && sidebarEventListHasMore && sidebarEventList.length > 0 && (
-                    <div className="p-4 space-y-3 border-t border-gray-200 dark:border-gray-700">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex gap-3 items-center">
-                          <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                          <div className="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                   </table>
                 </>
               ) : (
                 <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">

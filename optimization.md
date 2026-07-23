@@ -1,7 +1,7 @@
 # Tasker Application Performance Optimizations
 
 ## Overview
-Comprehensive performance optimization across the full Tasker application — backend (SQLite + Node.js) and frontend (React 18). The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, enable better code splitting, add database indexes, enable SQLite WAL mode, compress static assets, reduce background service overhead, throttle session writes, batch attachment deletes, stabilize React context re-renders, and reduce initial bundle size by ~104 KB through lazy-loading heavy components.
+Comprehensive performance optimization across the full Tasker application — backend (SQLite + Node.js) and frontend (React 18). The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, enable better code splitting, add database indexes, enable SQLite WAL mode, compress static assets, reduce background service overhead, throttle session writes, batch attachment deletes, stabilize React context re-renders, reduce initial bundle size through lazy-loading, eliminate Report page API call duplication, replace Material Symbols font (~700KB-1MB) with tree-shaken SVG icons (~10KB), and split pdfmake/pdfjs-dist into dedicated chunks.
 
 ---
 
@@ -623,16 +623,21 @@ PRAGMA cache_size=-64000;      -- 64MB in-memory page cache
 | `frontend/src/pages/Dashboard.js` | Fixed double fetch, removed ~300 lines dead code, removed 7 unused imports, memoized new Date() |
 | `frontend/src/pages/Tasks.js` | Parallel dropdowns, useCallback handlers, AbortController, dead code removal |
 | `frontend/src/pages/Calendar.js` | Date-range fetch, memoization, lazy modals |
-| `frontend/src/pages/Reports.js` | Removed duplicate fetches, useCallback/useMemo, lazy charts, debug logs, dead code, fixed missing brace, deferred Chart.js registration |
+| `frontend/src/pages/Reports.js` | Removed duplicate fetches, useCallback/useMemo, lazy charts, debug logs, dead code, fixed missing brace, deferred Chart.js registration, merged data effects, removed duplicate sidebar fetches, cached profile data, debounced PDF regen, removed unused Input import, replaced material-symbols with Icon component |
 | `frontend/src/context/TaskUpdateContext.js` | Memoized value with useCallback/useMemo |
 | `frontend/src/context/ModalContext.js` | Memoized value with useCallback/useMemo |
 | `frontend/src/context/AuthContext.js` | Memoized value with useCallback/useMemo, removed debug logs |
-| `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js, fixed import path |
+| `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js, fixed import path, added Icon import, fixed innerHTML SVG fallback |
 | `frontend/src/components/common/CategoryFiltersDropdown.js` | New component extracted from Reports.js |
+| `frontend/src/components/common/Icon.js` | New component — maps Material Symbol names to lucide-react SVG icons (Phase 12) |
 | `frontend/src/services/eventService.js` | Added `getCalendarEvents()` method |
 | `frontend/src/App.js` | Lazy-loaded ModalRenderer, removed preloading logic |
-| `frontend/config-overrides.js` | Added splitChunks configuration |
-| `frontend/package.json` | Removed 6 backend-only dependencies |
+| `frontend/config-overrides.js` | Added splitChunks configuration (vendor-pdf chunk added Phase 11) |
+| `frontend/package.json` | Removed 6 backend-only dependencies, removed axios, added lucide-react |
+| `frontend/public/index.html` | Removed Material Symbols CSS link, removed cdnjs preconnect |
+| `frontend/public/css/material-symbols.css` | Deleted (Phase 12) |
+| `frontend/public/sw.js` | Removed material-symbols from cache list and fetch handler |
+| `frontend/src/styles/index.css` | Removed .material-symbols-outlined CSS rules |
 
 ---
 
@@ -943,4 +948,132 @@ These were all bundled into the Header, which is rendered on every page via Layo
 
 **tasker_logo.png (69KB for 24x24px display):** The logo is rendered at 24x24px in the Header but the PNG is 69KB. Recommend replacing with an optimized version (~2-5KB) or an SVG.
 
-**Material Symbols icon font (~700KB-1MB woff2):** The full Material Symbols Outlined font loads on every page despite only ~35 icons being used. Recommend subsetting the font to only include used icons, or switching to inline SVG icons.
+---
+
+## Phase 11: Reports Page Request & Bundle Optimization
+
+### 11.1 Merged 3 Overlapping Data Effects into 1
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** Three `useEffect` hooks all fired when `dateRange` or `categoryFilters` changed, causing massive API call redundancy:
+1. Line 911: `useEffect([dateRange, categoryFilters, user])` → fetched signatory data + report stats
+2. Line 1078: `useEffect([loading, dateRange, categoryFilters])` → fetched task completion trend
+3. Line 1289: `useEffect([loading, dateRange, categoryFilters])` → fetched 6 data sources (task list, event list, sidebar task list, sidebar event list, task type summary, event summary)
+
+Additionally, a fourth effect at line 1434 `useEffect([updateTrigger, dateRange])` duplicated all 8 fetches from effects #2 and #3, and a fifth effect at line 1448 `useEffect([categoryFilters, isPrintModalOpen, loading])` duplicated 6 of them.
+
+A single filter change could trigger up to 20+ API calls with heavy redundancy.
+
+**Solution:**
+- Merged effects #2, #3, and #4 into a single unified effect: `useEffect([dateRange, categoryFilters, updateTrigger, loading])` that fires all 8 fetch functions exactly once
+- Simplified the print modal effect to only fetch the 4 data sources needed for PDF (removed 2 redundant sidebar fetches)
+- Removed the standalone `fetchTaskCompletionTrend` effect (now in the unified effect)
+
+**Impact:** Reduces API calls per filter change from ~20 to ~8 (one per data source). Eliminates all duplicate fetches.
+
+### 11.2 Removed Duplicate Sidebar Fetches — Derived from Full Lists
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** `fetchSidebarTaskList()` and `fetchSidebarEventList()` made separate API calls to the same endpoints as `fetchTaskList()` and `fetchEventList()`, just with different `limit`/`offset` parameters. The full lists already fetched all data (`limit: 9999`), making the sidebar fetches completely redundant — 2 extra API calls per filter change.
+
+**Solution:**
+- Removed `fetchSidebarTaskList()` and `fetchSidebarEventList()` functions entirely
+- Removed 12 sidebar-related state variables (`sidebarTaskList`, `sidebarTaskListLoading`, `sidebarTaskListLoaded`, `sidebarEventList`, etc.)
+- Derived sidebar data from full lists via `useMemo`: `sidebarTaskList = taskList.slice(0, page * 14)`, `sidebarEventList = eventList.slice(0, page * 10)`
+- Simplified scroll handlers to just increment page counters (no more API calls)
+- Removed "loading more" skeleton spinners (data is synchronous from already-fetched lists)
+- Updated sidebar loading states to use parent `taskListLoading`/`eventListLoading`
+
+**Impact:** 2 fewer API calls per filter change. 12 fewer state variables. Sidebar infinite scroll is now free (no network requests).
+
+### 11.3 Cached User Profile Data for PDF Preview
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** `showPdfPreview()` made a full `GET /users/profile` API call to re-fetch signatory data, header image, and footer image — the exact same data already loaded by `loadSignatoryData()` on mount. This was ~100 lines of duplicated signatory parsing logic.
+
+**Solution:**
+- Replaced the 100-line `showPdfPreview()` signatory re-fetch with a simple check: if `signatoryData` is empty, call `loadSignatoryData()`; otherwise use cached state
+- Removed all duplicated signatory parsing, localStorage fallback, and header/footer image loading code
+
+**Impact:** Eliminates 1 redundant API call per PDF preview. Removes ~100 lines of duplicated code.
+
+### 11.4 Added pdfmake/pdfjs-dist to Named Webpack Chunk
+**File:** `frontend/config-overrides.js`
+
+**Problem:** `pdfmake` and `pdfjs-dist` (~1.5MB+ combined) had no named chunk group in the webpack splitChunks configuration. They were bundled into whatever chunk imported them, or split unpredictably.
+
+**Solution:** Added a `vendor-pdf` cache group:
+```javascript
+pdf: {
+  test: /[\\/]node_modules[\\/](pdfmake|pdfjs-dist)[\\/]/,
+  name: 'vendor-pdf',
+  chunks: 'all',
+  priority: 10,
+}
+```
+
+**Impact:** pdfmake/pdfjs-dist are split into a dedicated cacheable chunk. Only loaded when PDF features are used (already lazy via dynamic `import()`).
+
+### 11.5 Debounced PDF Regeneration on Margin/Display Changes
+**File:** `frontend/src/pages/Reports.js`
+
+**Problem:** The PDF preview regeneration effect had 9 dependencies (`pageSize`, `signatoryData`, `headerImage`, `footerImage`, `showDefaultHeader`, `headerOnAllPages`, `reportTitleText`, `showPdfPreviewModal`, `pdfMargins`). Any single margin value change triggered immediate full PDF blob regeneration — expensive for a complex document.
+
+**Solution:** Added a 500ms debounce via `useRef` timeout. Rapid changes (e.g., dragging a margin slider) only regenerate once after the user stops adjusting.
+
+**Impact:** Prevents redundant PDF generation during rapid adjustments. Each regeneration is ~1-3 seconds.
+
+### 11.6 Removed Unused Input Import
+**File:** `frontend/src/pages/Reports.js`
+
+**Removed:** `import Input from '../components/common/Input'` — imported but never used in the 3000+ line file.
+
+**Impact:** Minor cleanup, prevents accidental bundling.
+
+---
+
+## Phase 12: Material Symbols Font → lucide-react SVG Icons
+
+### 12.1 Replaced Material Symbols Font with Inline SVG Icons
+**Files:** 20+ files across `frontend/src/`
+
+**Problem:** The Material Symbols Outlined font (~700KB-1MB woff2) loaded on every page via `<link>` in `index.html` and a CSS file. The app only used ~41 unique icons across ~100+ `<span>` elements. The full font containing thousands of icons was downloaded regardless.
+
+**Solution:**
+- Installed `lucide-react` (tree-shakeable SVG icon library, ~10KB for 41 icons)
+- Created `frontend/src/components/common/Icon.js` — a thin wrapper mapping Material Symbol names to lucide-react components
+- Replaced all `<span className="material-symbols-outlined">icon_name</span>` with `<Icon name="icon_name" className="..." />` across 20 files
+- Fixed 3 JSX bugs where `<span class=` was used instead of `<span className=` (ViewTaskModal, ViewEventModal)
+- Fixed dynamic icon usage in `getFileIcon()` functions (AttachmentPreview, ViewTaskModal, ViewEventModal) — converted string literals to JSX expressions
+- Replaced innerHTML `<span>` in AttachmentPreview video fallback with inline SVG
+
+**Impact:** ~690KB-990KB less data transferred per page load. Single external font request removed. Icons are now inline SVGs (no FOUT/FOIT).
+
+### 12.2 Removed Material Symbols Font Loading
+**Files:** `frontend/public/index.html`, `frontend/public/css/material-symbols.css`, `frontend/src/styles/index.css`, `frontend/public/sw.js`
+
+**Removed:**
+- `<link href="%PUBLIC_URL%/css/material-symbols.css" rel="stylesheet">` from `index.html`
+- Deleted `frontend/public/css/material-symbols.css` (font-face + class definitions)
+- Removed `.material-symbols-outlined` CSS rules from `index.css`
+- Removed `material-symbols.css` from service worker cache list and fetch handler
+
+**Impact:** Eliminates the external font CSS request and all associated font file requests (woff2).
+
+---
+
+## Updated Expected Performance Impact
+
+| Metric | Before | After |
+|--------|--------|-------|
+| SQL queries per dashboard load | ~34 | ~4-8 |
+| API calls on task update | 8 (4 duplicate) | 4 |
+| Reports API calls per filter change | ~20 (heavy duplication) | ~8 (one per data source) |
+| Reports sidebar API calls | 2 extra per filter change | 0 (derived from full lists) |
+| Reports PDF preview profile fetch | 1 redundant API call | 0 (cached) |
+| Reports state variables | ~45 | ~33 (12 sidebar vars removed) |
+| Material Symbols font transferred | ~700KB-1MB woff2 | 0 |
+| lucide-react icons in bundle | 0 | ~10KB (tree-shaken) |
+| External font requests | 2 (google + material symbols) | 1 (just Inter) |
+| PDF regeneration debounce | Immediate on every change | 500ms debounce |
+| pdfmake/pdfjs-dist chunking | Unpredictable | Named `vendor-pdf` chunk |

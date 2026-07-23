@@ -50,6 +50,12 @@ module.exports = {
               chunks: 'all',
               priority: 10,
             },
+            pdf: {
+              test: /[\\/]node_modules[\\/](pdfmake|pdfjs-dist)[\\/]/,
+              name: 'vendor-pdf',
+              chunks: 'all',
+              priority: 10,
+            },
             common: {
               minChunks: 2,
               priority: -20,
