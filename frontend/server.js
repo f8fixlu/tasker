@@ -21,7 +21,7 @@ app.use(helmet({
       fontSrc: ["'self'", "fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://backend.f8fixlu.biz", "https://api.open-meteo.com", "https://random-word-api.vercel.app", "https://api.dictionaryapi.dev"],
+      connectSrc: ["'self'", "https://backend.f8fixlu.biz", "https://api.open-meteo.com", "https://random-word-api.herokuapp.com", "https://api.dictionaryapi.dev"],
       frameSrc: ["'self'", "blob:", "data:"], // Allow framing of blobs and data URLs
       childSrc: ["'self'", "blob:", "data:"], // Allow child frames with blobs and data URLs
       objectSrc: ["'self'", "blob:", "data:"] // Allow objects with blob and data URLs

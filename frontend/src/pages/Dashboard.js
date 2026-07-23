@@ -377,7 +377,7 @@ const Dashboard = () => {
       // Fetch random word, retry up to 3 times if no definition found
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const wordRes = await fetch('https://random-word-api.vercel.app/word');
+          const wordRes = await fetch('https://random-word-api.herokuapp.com/word');
           if (!wordRes.ok) continue;
           const [word] = await wordRes.json();
 
