@@ -14,6 +14,7 @@ import { subTypeService } from '../services/subTypeService';
 import { attachmentService } from '../services/attachmentService';
 import { formatToLocalDateTime, formatDateOnly } from '../utils/date';
 import Skeleton from '../components/common/Skeleton';
+import { Icon } from '../components/common/Icon';
 
 /**
  * Option 2 - Modularized/cleaned version
@@ -72,7 +73,7 @@ const LoadingTableSkeleton = ({ columns, tableDimensions }) => {
                 <div className={`flex items-center ${col.key === 'actions' ? 'justify-end gap-1' : 'justify-start'}`}>
                   <span>{col.header}</span>
                   {col.key === 'actions' && (
-                    <span className="material-symbols-outlined text-base text-gray-400 pr-2">filter_list</span>
+                    <Icon name="filter_list" className="text-base text-gray-400 pr-2" />
                   )}
                 </div>
               </th>
@@ -364,7 +365,7 @@ const ActionsDropdown = ({
           onClose();
         }}
       >
-        <span className="material-symbols-outlined text-base">visibility</span>
+        <Icon name="visibility" className="text-base" />
         <span>View Task</span>
       </button>
 
@@ -376,7 +377,7 @@ const ActionsDropdown = ({
           onClose();
         }}
       >
-        <span className="material-symbols-outlined text-base">edit</span>
+        <Icon name="edit" className="text-base" />
         <span>Edit Task</span>
       </button>
 
@@ -388,7 +389,7 @@ const ActionsDropdown = ({
           onClose();
         }}
       >
-        <span className="material-symbols-outlined text-base">delete</span>
+        <Icon name="delete" className="text-base" />
         <span>Delete Task</span>
       </button>
 
@@ -407,7 +408,7 @@ const ActionsDropdown = ({
         }}
         disabled={task.status === 'Archived'}
       >
-        <span className="material-symbols-outlined text-base">archive</span>
+        <Icon name="archive" className="text-base" />
         <span>{task.status === 'Archived' ? 'Already Archived' : 'Archive Task'}</span>
       </button>
     </div>
@@ -835,9 +836,9 @@ const Option2Tasks = () => {
               disabled={task.attachment_count === 0 || loadingAttachmentTaskId === task.id}
             >
               {loadingAttachmentTaskId === task.id ? (
-                <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                <Icon name="progress_activity" className="text-base animate-spin" />
               ) : (
-                <span className="material-symbols-outlined text-base">attach_file</span>
+                <Icon name="attach_file" className="text-base" />
               )}
             </button>
             <div className="relative inline-block">
@@ -855,7 +856,7 @@ const Option2Tasks = () => {
                   }
                 }}
               >
-                <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+                <Icon name="more_vert" className="text-gray-500 dark:text-gray-400" />
               </button>
 
               {showActionsDropdown && activeTaskId === task.id && (
@@ -1221,7 +1222,7 @@ const Option2Tasks = () => {
         <h1 className="text-[#111418] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em]">Tasks</h1>
         <div className="flex items-center gap-2">
           <Button onClick={openNewTaskModal} className="flex items-center gap-2 h-[34px]">
-            <span className="material-symbols-outlined">add</span>
+            <Icon name="add" className="" />
             Add Task
           </Button>
 
@@ -1232,7 +1233,7 @@ const Option2Tasks = () => {
               disabled={selectedTasks.length === 0}
               title="Actions"
             >
-              <span className="material-symbols-outlined text-gray-500 dark:text-gray-400">more_vert</span>
+              <Icon name="more_vert" className="text-gray-500 dark:text-gray-400" />
             </button>
             {showTitleActionsDropdown && selectedTasks.length > 0 && (
               <div
@@ -1248,7 +1249,7 @@ const Option2Tasks = () => {
                     setShowTitleActionsDropdown(false);
                   }}
                 >
-                  <span className="material-symbols-outlined text-base">delete</span>
+                  <Icon name="delete" className="text-base" />
                   <span>Delete {selectedTasks.length > 0 ? `(${selectedTasks.length})` : ''}</span>
                 </button>
 
@@ -1260,7 +1261,7 @@ const Option2Tasks = () => {
                     setShowTitleActionsDropdown(false);
                   }}
                 >
-                  <span className="material-symbols-outlined text-base">archive</span>
+                  <Icon name="archive" className="text-base" />
                   <span>Archive{selectedTasks.length > 0 ? ` (${selectedTasks.filter(taskId => {
                     const task = tasks.find(t => t.id === taskId);
                     return task && task.status !== 'Archived';
@@ -1282,7 +1283,7 @@ const Option2Tasks = () => {
               onChange={handleSearchChange}
               className="pl-10 pr-10 h-[34px] w-full min-[768px]:w-80"
             />
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 material-symbols-outlined text-sm">search</span>
+            <Icon name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400  text-sm" />
             {searchTerm && searchTerm.length > 0 && (
               <button
                 type="button"
@@ -1293,7 +1294,7 @@ const Option2Tasks = () => {
                 }}
                 aria-label="Clear search"
               >
-                <span className="material-symbols-outlined text-sm">close</span>
+                <Icon name="close" className="text-sm" />
               </button>
             )}
           </div>
@@ -1309,7 +1310,7 @@ const Option2Tasks = () => {
                 onClick={() => setShowSearchOptionsDropdown(s => !s)}
                 onMouseEnter={() => setIsSearchOptionsHovered(true)}
               >
-                <span className="material-symbols-outlined text-sm">tune</span>
+                <Icon name="tune" className="text-sm" />
                 <span className="text-sm max-[1231px]:hidden">View</span>
               </Button>
               {showSearchOptionsDropdown && (
@@ -1337,7 +1338,7 @@ const Option2Tasks = () => {
               }}
               title="Today"
             >
-              <span className="material-symbols-outlined text-sm">today</span>
+              <Icon name="today" className="text-sm" />
               <span className="text-sm max-[1231px]:hidden">Today</span>
             </Button>
 
@@ -1369,7 +1370,7 @@ const Option2Tasks = () => {
                 onClick={() => setShowFilterDropdown(s => !s)}
                 onMouseEnter={() => setIsFilterHovered(true)}
               >
-                <span className="material-symbols-outlined text-sm">filter_list</span>
+                <Icon name="filter_list" className="text-sm" />
                 <span className="text-sm max-[1231px]:hidden">Filter</span>
               </Button>
               {showFilterDropdown && (
@@ -1401,7 +1402,7 @@ const Option2Tasks = () => {
                 onClick={() => setShowSortDropdown(s => !s)}
                 onMouseEnter={() => setIsSortHovered(true)}
               >
-                <span className="material-symbols-outlined text-sm">sort</span>
+                <Icon name="sort" className="text-sm" />
                 <span className="text-sm max-[1231px]:hidden">Sort</span>
               </Button>
               {showSortDropdown && (

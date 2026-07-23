@@ -9,6 +9,7 @@ import { eventCategoryService } from '../../services/eventCategoryService';
 import { eventTypeService } from '../../services/eventTypeService';
 import { attachmentService } from '../../services/attachmentService';
 import { eventService } from '../../services/eventService';
+import { Icon } from '../common/Icon';
 
 const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
   const [formData, setFormData] = useState({
@@ -598,7 +599,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
               type="button"
               onClick={handleAddCategory}
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon name="add" className="" />
             </Button>
           </div>
         </div>
@@ -621,7 +622,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
               onClick={handleAddEventType}
               disabled={!formData.category_id} // Disable if no category is selected
             >
-              <span className="material-symbols-outlined">add</span>
+              <Icon name="add" className="" />
             </Button>
           </div>
         </div>
@@ -664,7 +665,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-2"
               onClick={() => document.getElementById('event-file-upload').click()}
             >
-              <span className="material-symbols-outlined">attach_file</span>
+              <Icon name="attach_file" className="" />
             </button>
             <input
               id="event-file-upload"
@@ -684,7 +685,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
               {attachments.map(attachment => (
                 <div key={attachment.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                   <div className="flex items-center gap-2 min-w-0"> {/* Added min-w-0 to enable text truncation */}
-                    <span className="material-symbols-outlined text-gray-500 flex-shrink-0">description</span>
+                    <Icon name="description" className="text-gray-500 flex-shrink-0" />
                     <div className="min-w-0"> {/* Added min-w-0 to enable text truncation */}
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={attachment.name}>{attachment.name}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{(attachment.size / 1024).toFixed(1)} KB</p>
@@ -695,7 +696,7 @@ const NewEventModal = ({ isOpen, onClose, prefillData = {}, onSave }) => {
                     onClick={() => removeAttachment(attachment.id)}
                     className="text-gray-500 hover:text-red-500 flex-shrink-0 ml-2" // Added flex-shrink-0 and ml-2 for spacing
                   >
-                    <span className="material-symbols-outlined">close</span>
+                    <Icon name="close" className="" />
                   </button>
                 </div>
               ))}

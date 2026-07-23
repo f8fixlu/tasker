@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import { attachmentService } from '../../services/attachmentService';
+import { Icon } from '../common/Icon';
 
 const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
   const [attachments, setAttachments] = useState([]);
@@ -180,7 +181,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
               className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
               aria-label="Zoom out"
             >
-              <span className="material-symbols-outlined">zoom_out</span>
+              <Icon name="zoom_out" className="" />
             </button>
             <button 
               onClick={handleResetZoom}
@@ -194,7 +195,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
               className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
               aria-label="Zoom in"
             >
-              <span className="material-symbols-outlined">zoom_in</span>
+              <Icon name="zoom_in" className="" />
             </button>
           </div>
           
@@ -307,7 +308,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                 const fallbackDiv = document.createElement('div');
                 fallbackDiv.className = 'flex flex-col items-center justify-center h-full p-8 text-center';
                 fallbackDiv.innerHTML = `
-                  <span class="material-symbols-outlined text-6xl text-gray-400 mb-4">movie</span>
+                  <Icon name="movie" className="text-6xl text-gray-400 mb-4" />
                   <p class="text-lg font-medium text-gray-800 dark:text-white mb-2">Unable to play video</p>
                   <p class="text-gray-600 dark:text-gray-300 mb-4">This video cannot be played in your browser.</p>
                 `;
@@ -323,13 +324,11 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
       // For other file types, provide download button
       return (
         <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">
-            {getFileIcon(fileType)}
-          </span>
+          <Icon name={getFileIcon(fileType)} className="text-6xl text-gray-400 mb-4" />
           <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">Preview not available</p>
           <p className="text-gray-600 dark:text-gray-300 mb-4">This file type cannot be previewed directly in the browser.</p>
           <Button variant="primary" onClick={() => downloadAttachment(attachment)}>
-            <span className="material-symbols-outlined mr-1">download</span>
+            <Icon name="download" className="mr-1" />
             Download File
           </Button>
         </div>
@@ -436,9 +435,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                         <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
                       </div>
                     ) : (
-                      <span className="material-symbols-outlined text-gray-500 text-2xl flex-shrink-0">
-                        {getFileIcon(attachment.file_type)}
-                      </span>
+                      <Icon name={getFileIcon(attachment.file_type)} className="text-gray-500 text-2xl flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title={attachment.filename}>{attachment.filename}</p>
@@ -473,7 +470,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
               }
             }}
           >
-            <span className="material-symbols-outlined text-base">edit</span>
+            <Icon name="edit" className="text-base" />
             Edit Task
           </Button>
         </div>
@@ -490,7 +487,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                 className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
                 aria-label="Save"
               >
-                <span className="material-symbols-outlined">download</span>
+                <Icon name="download" className="" />
               </button>
               {!previewAttachment.file_type.includes('pdf') && 
                (previewAttachment.file_type.includes('image') || 
@@ -568,7 +565,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                   className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
                   aria-label="Print"
                 >
-                  <span className="material-symbols-outlined">print</span>
+                  <Icon name="print" className="" />
                 </button>
               )}
               <button
@@ -576,7 +573,7 @@ const ViewTaskModal = ({ isOpen, onClose, task, onEdit, onTaskUpdate }) => {
                 className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
                 aria-label="Close preview"
               >
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" className="" />
               </button>
             </div>
           </div>

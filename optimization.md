@@ -871,3 +871,76 @@ These were all bundled into the Header, which is rendered on every page via Layo
 **Solution:** Added `includeTotalCount` option to `getTasksByUserId()`. When enabled, adds `COUNT(*) OVER() as total_count` window function to the SELECT clause, returning both the paged results and total count in a single query. Removed the now-unused `getTasksCountByUserId` import from routes.
 
 **Impact:** 2 SQL queries → 1 for paginated task listing. The window function computes the total count across all matching rows without a separate scan.
+
+---
+
+## Phase 10: Calendar Page & General Frontend Optimizations
+
+### 10.1 Reduced Webpack maxInitialRequests
+**File:** `frontend/config-overrides.js`
+
+**Problem:** `maxInitialRequests: 25` caused webpack to split the initial load into 20+ small chunks, each requiring its own HTTP request. This was the primary driver of the 59-request count.
+
+**Solution:** Reduced `maxInitialRequests` from 25 to 8. Small modules are still split for caching but consolidated into fewer, more meaningful chunks.
+
+**Impact:** ~15-20 fewer HTTP requests on initial page load.
+
+### 10.2 Removed Unused cdnjs.cloudflare.com Preconnect
+**File:** `frontend/public/index.html`
+
+**Problem:** `<link rel="preconnect" href="https://cdnjs.cloudflare.com">` was present but nothing loaded from this origin. It wasted a DNS + TLS roundtrip on every page load.
+
+**Solution:** Removed the unused preconnect link.
+
+**Impact:** 1 fewer wasted DNS+TLS connection per page load.
+
+### 10.3 Fixed Duplicate useEffect in ThemeContext
+**File:** `frontend/src/context/ThemeContext.js`
+
+**Problem:** Two identical `useEffect` blocks (lines 37-49 and 51-63) both applied the dark class to `document.documentElement` and saved to `localStorage`. Every theme change executed the same DOM manipulation twice.
+
+**Solution:** Removed the duplicate `useEffect`.
+
+**Impact:** Eliminates redundant DOM manipulation on every theme change.
+
+### 10.4 Eliminated Duplicate useNotifications Hook Calls
+**Files:** `frontend/src/pages/Calendar.js`, `frontend/src/hooks/useNotifications.js`
+
+**Problem:** Both `Header.js` and `Calendar.js` independently called `useNotifications()`. Since this is a standalone hook (not a context), each call created its own state and fired `fetchNotifications()` on mount — resulting in 4 duplicate notification API calls (2 from Header, 2 from Calendar).
+
+**Solution:** Replaced `useNotifications()` in Calendar.js with `useNotificationUpdate()` from `NotificationUpdateContext`. Calendar now calls `triggerNotificationUpdate()` after mutations, and Header (which already listens for that trigger) handles the re-fetch.
+
+**Impact:** 2 fewer API calls per page load. Calendar no longer creates a redundant notification state instance.
+
+### 10.5 Deferred ModalRenderer Loading
+**File:** `frontend/src/App.js`
+
+**Problem:** `ModalRenderer` was rendered outside `<Routes>` with `<Suspense fallback={null}>`, causing its lazy chunk (~50-80KB) to be fetched immediately on every page load, even though modals are rarely opened.
+
+**Solution:** Added a deferred mount with a 2-second delay or first user interaction (click/scroll/touch). ModalRenderer's chunk loads in the background after the page is interactive.
+
+**Impact:** ~50-80KB deferred from initial page load. Modal chunks load in background after first paint.
+
+### 10.6 Lazy-loaded EditEventModal from ViewEventModal
+**File:** `frontend/src/components/modals/ViewEventModal.js`
+
+**Problem:** `ViewEventModal` eagerly imported `EditEventModal` (962 lines + sub-modals). Since `ViewEventModal` is already lazy, this meant the entire edit modal tree was bundled into the view modal chunk.
+
+**Solution:** Changed `EditEventModal` to a lazy import with a `Suspense` boundary.
+
+**Impact:** ~40-60KB moved from the ViewEventModal chunk to a separate on-demand chunk.
+
+### 10.7 Removed Unused axios Dependency
+**File:** `frontend/package.json`
+
+**Problem:** `axios` (^1.12.2, ~30KB minified) was listed as a dependency but never imported. The app uses a custom `api.js` wrapper around native `fetch()`.
+
+**Solution:** Removed `axios` from `package.json`.
+
+**Impact:** ~30KB removed from node_modules. Prevents accidental bundling.
+
+### Remaining Recommendations (Manual Steps Required)
+
+**tasker_logo.png (69KB for 24x24px display):** The logo is rendered at 24x24px in the Header but the PNG is 69KB. Recommend replacing with an optimized version (~2-5KB) or an SVG.
+
+**Material Symbols icon font (~700KB-1MB woff2):** The full Material Symbols Outlined font loads on every page despite only ~35 icons being used. Recommend subsetting the font to only include used icons, or switching to inline SVG icons.

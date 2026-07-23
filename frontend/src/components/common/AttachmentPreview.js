@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { attachmentService } from '../../services/attachmentService';
+import { Icon } from './Icon';
 
 const getFileIcon = (type) => {
   if (type.includes('image')) return 'image';
@@ -104,13 +105,13 @@ const AttachmentPreview = ({ attachment, onClose }) => {
         <div className="w-full h-full relative overflow-hidden">
           <div className="absolute top-4 right-4 z-10 flex gap-2">
             <button onClick={handleZoomOut} className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600" aria-label="Zoom out">
-              <span className="material-symbols-outlined">zoom_out</span>
+              <Icon name="zoom_out" className="" />
             </button>
             <button onClick={handleResetZoom} className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600" aria-label="Reset zoom">
               <span className="text-sm">{Math.round(zoomLevel * 100)}%</span>
             </button>
             <button onClick={handleZoomIn} className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600" aria-label="Zoom in">
-              <span className="material-symbols-outlined">zoom_in</span>
+              <Icon name="zoom_in" className="" />
             </button>
           </div>
           <div className="w-full h-full flex items-center justify-center cursor-move" onMouseDown={handleDragStart} onMouseUp={handleDragEnd}>
@@ -183,7 +184,7 @@ const AttachmentPreview = ({ attachment, onClose }) => {
                 const fallbackDiv = document.createElement('div');
                 fallbackDiv.className = 'flex flex-col items-center justify-center h-full p-8 text-center';
                 fallbackDiv.innerHTML = `
-                  <span class="material-symbols-outlined text-6xl text-gray-400 mb-4">movie</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-6xl text-gray-400 mb-4"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
                   <p class="text-lg font-medium text-gray-800 dark:text-white mb-2">Unable to play video</p>
                   <p class="text-gray-600 dark:text-gray-300 mb-4">This video cannot be played in your browser.</p>
                 `;
@@ -198,7 +199,7 @@ const AttachmentPreview = ({ attachment, onClose }) => {
     } else {
       return (
         <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">{getFileIcon(fileType)}</span>
+          <Icon name={getFileIcon(fileType)} className="text-6xl text-gray-400 mb-4" />
           <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">Preview not available</p>
           <p className="text-gray-600 dark:text-gray-300 mb-4">This file type cannot be previewed directly in the browser.</p>
           <button
@@ -219,7 +220,7 @@ const AttachmentPreview = ({ attachment, onClose }) => {
               }
             }}
           >
-            <span className="material-symbols-outlined mr-1">download</span>
+            <Icon name="download" className="mr-1" />
             Download File
           </button>
         </div>
@@ -280,15 +281,15 @@ const AttachmentPreview = ({ attachment, onClose }) => {
         <p className="truncate max-w-xs">{attachment.filename}</p>
         <div className="flex items-center gap-2">
           <button onClick={handleDownload} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white" aria-label="Save">
-            <span className="material-symbols-outlined">download</span>
+            <Icon name="download" className="" />
           </button>
           {showPrintButton && (
             <button onClick={handlePrint} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white" aria-label="Print">
-              <span className="material-symbols-outlined">print</span>
+              <Icon name="print" className="" />
             </button>
           )}
           <button onClick={onClose} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white" aria-label="Close preview">
-            <span className="material-symbols-outlined">close</span>
+            <Icon name="close" className="" />
           </button>
         </div>
       </div>

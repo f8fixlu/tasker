@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
+import { Icon } from '../components/common/Icon';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -201,7 +202,7 @@ const Register = () => {
           <div className="py-4">
             <div className="flex items-center justify-center mb-4">
               <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-3xl">check_circle</span>
+                <Icon name="check_circle" className="text-green-600 dark:text-green-400 text-3xl" />
               </div>
             </div>
             <p className="text-center text-gray-700 dark:text-gray-300 mb-2">

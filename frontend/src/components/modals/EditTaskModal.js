@@ -13,6 +13,7 @@ import { taskService } from '../../services/taskService';
 import { attachmentService } from '../../services/attachmentService';
 import { formatToLocalDateTime } from '../../utils/date';
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
+import { Icon } from '../common/Icon';
 
 const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
   const { triggerTaskUpdate, triggerDropdownUpdate } = useTaskUpdate(); // Get task update trigger from new system
@@ -1246,7 +1247,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                 type="button"
                 onClick={handleAddCategory}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1269,7 +1270,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                 type="button"
                 onClick={handleAddTaskType}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1294,7 +1295,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                 type="button"
                 onClick={handleAddSubType}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1351,7 +1352,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                 type="button"
                 onClick={() => document.getElementById('file-upload').click()}
               >
-                <span className="material-symbols-outlined">attach_file</span>
+                <Icon name="attach_file" className="" />
               </Button>
               <input
                 id="file-upload"
@@ -1371,7 +1372,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                 {attachments.map(attachment => (
                   <div key={attachment.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                     <div className="flex items-center gap-2 min-w-0"> {/* Added min-w-0 to enable text truncation */}
-                      <span className="material-symbols-outlined text-gray-500 flex-shrink-0">description</span>
+                      <Icon name="description" className="text-gray-500 flex-shrink-0" />
                       <div className="min-w-0"> {/* Added min-w-0 to enable text truncation */}
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={attachment.name || attachment.filename}>{attachment.name || attachment.filename}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{(attachment.size || attachment.file_size ? (attachment.size || attachment.file_size) / 1024 : 0).toFixed(1)} KB</p>
@@ -1390,7 +1391,7 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
                       }}
                       className="text-gray-500 hover:text-red-500 flex-shrink-0 ml-2" // Added flex-shrink-0 and ml-2 for spacing
                     >
-                      <span className="material-symbols-outlined">close</span>
+                      <Icon name="close" className="" />
                     </button>
                   </div>
                 ))}

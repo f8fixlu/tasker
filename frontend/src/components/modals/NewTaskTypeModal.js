@@ -5,6 +5,7 @@ import Select from '../common/Select';
 import Button from '../common/Button';
 import { categoryService } from '../../services/categoryService';
 import { taskTypeService } from '../../services/taskTypeService';
+import { Icon } from '../common/Icon';
 
 const NewTaskTypeModal = ({ isOpen, onClose, onSave, categories: propCategories = [], selectedCategoryId = null }) => {
   const [formData, setFormData] = useState({
@@ -189,7 +190,7 @@ const NewTaskTypeModal = ({ isOpen, onClose, onSave, categories: propCategories 
               variant="outline"
               type="button"
             >
-              <span className="material-symbols-outlined text-lg">add</span>
+              <Icon name="add" className="text-lg" />
             </Button>
           </div>
         </div>

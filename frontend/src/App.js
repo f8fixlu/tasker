@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -33,6 +33,29 @@ const skeletonFallback = (
 );
 
 function App() {
+  const [showModalRenderer, setShowModalRenderer] = useState(false);
+
+  useEffect(() => {
+    // Defer ModalRenderer loading until after initial page paint
+    const timer = setTimeout(() => setShowModalRenderer(true), 2000);
+    // Also load on first user interaction (click/scroll/touch)
+    const onInteraction = () => {
+      setShowModalRenderer(true);
+      window.removeEventListener('click', onInteraction);
+      window.removeEventListener('scroll', onInteraction);
+      window.removeEventListener('touchstart', onInteraction);
+    };
+    window.addEventListener('click', onInteraction);
+    window.addEventListener('scroll', onInteraction);
+    window.addEventListener('touchstart', onInteraction);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('click', onInteraction);
+      window.removeEventListener('scroll', onInteraction);
+      window.removeEventListener('touchstart', onInteraction);
+    };
+  }, []);
+
   return (
     <Router>
       <ThemeProvider>
@@ -166,9 +189,11 @@ function App() {
                     }
                   />
                 </Routes>
-                <Suspense fallback={null}>
-                  <ModalRenderer />
-                </Suspense>
+                {showModalRenderer && (
+                  <Suspense fallback={null}>
+                    <ModalRenderer />
+                  </Suspense>
+                )}
               </ModalProvider>
             </NotificationUpdateProvider>
           </TaskUpdateProvider>

@@ -48,20 +48,6 @@ export const ThemeProvider = ({ children }) => {
     }
   }, [theme, tempThemeOverride]);
 
-  useEffect(() => {
-    // Apply theme class to document element
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
-    // Save theme preference to localStorage (but not if it's a temporary override)
-    if (!tempThemeOverride) {
-      localStorage.setItem('theme', theme);
-    }
-  }, [theme, tempThemeOverride]);
-
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };

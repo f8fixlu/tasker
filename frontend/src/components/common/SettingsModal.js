@@ -33,7 +33,7 @@ const SignatoryItem = memo(({ signatory, signatoryDataLength, removeSignatory, u
           className="absolute top-2 right-2 text-red-500 hover:text-red-700"
           title="Remove signatory"
         >
-          <span className="material-symbols-outlined">close</span>
+          <Icon name="close" className="" />
         </button>
       )}
       <div className="space-y-4">
@@ -1251,7 +1251,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                     className="flex items-center justify-center p-2"
                     title="Upload new picture"
                   >
-                    <span className="material-symbols-outlined text-sm">upload</span>
+                    <Icon name="upload" className="text-sm" />
                   </Button>
                   {profileData.profileImage && (
                     <Button
@@ -1260,7 +1260,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                       className="flex items-center justify-center p-2"
                       title="Delete picture"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <Icon name="delete" className="text-sm" />
                     </Button>
                   )}
                 </div>
@@ -1497,7 +1497,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                 onClick={addNewSignatory}
                 className="flex items-center"
               >
-                <span className="material-symbols-outlined mr-1">add</span>
+                <Icon name="add" className="mr-1" />
                 Add Signatory
               </Button>
             </div>
@@ -1610,7 +1610,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                             className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                             title="Remove header image"
                           >
-                            <span className="material-symbols-outlined text-sm">close</span>
+                            <Icon name="close" className="text-sm" />
                           </button>
                           <input
                             id="header-file-input"
@@ -1700,7 +1700,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                             className="absolute top-[-5px] right-[-5px] bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                             title="Remove footer image"
                           >
-                            <span className="material-symbols-outlined text-sm">close</span>
+                            <Icon name="close" className="text-sm" />
                           </button>
                           <input
                             id="footer-file-input"
@@ -1898,6 +1898,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                     disabled={true} /* Disabled because functionality is not fully working yet */
                   >
                     Import Data (ZIP) - Coming Soon
+import { Icon } from './Icon';
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -1919,7 +1920,7 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
           {bugReportSubmitted ? (
             <div className="text-center py-8">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                <span className="material-symbols-outlined text-green-600">check</span>
+                <Icon name="check" className="text-green-600" />
               </div>
               <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-4" id="modal-title-success">
                 Bug Report Submitted

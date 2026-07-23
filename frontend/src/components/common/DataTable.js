@@ -1,5 +1,6 @@
 import React, { useCallback, forwardRef } from 'react';
 import PropTypes from 'prop-types';
+import { Icon } from './Icon';
 
 const DataTable = forwardRef(({
   columns,
@@ -82,7 +83,7 @@ const DataTable = forwardRef(({
                           className="flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors pr-2"
                           title="Show/Hide Columns"
                         >
-                          <span className="material-symbols-outlined text-base">filter_list</span>
+                          <Icon name="filter_list" className="text-base" />
                         </button>
                         {columnVisibilityDropdown && (
                           <div

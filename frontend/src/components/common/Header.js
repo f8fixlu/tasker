@@ -8,6 +8,7 @@ import { formatToLocalDateTime } from '../../utils/date';
 import Button from './Button';
 import Modal from './Modal';
 import ThemeToggle from './ThemeToggle';
+import { Icon } from './Icon';
 
 const SettingsModal = lazy(() => import('./SettingsModal'));
 const NotificationsModal = lazy(() => import('../modals/NotificationsModal'));
@@ -121,7 +122,7 @@ const Header = () => {
             onClick={() => setIsMobileSidebarOpen(true)}
             aria-label="Open menu"
           >
-            <span className="material-symbols-outlined text-xl">menu</span>
+            <Icon name="menu" className="text-xl" />
           </button>
 
           <img src={`${process.env.PUBLIC_URL}/logo/tasker_logo.png`} alt="Tasker Logo" className="size-6" />
@@ -192,7 +193,7 @@ const Header = () => {
             className="p-2 rounded-full text-text-light dark:text-text-dark hover:bg-surface-light dark:hover:bg-surface-dark relative focus:outline-none"
             onClick={toggleNotifications}
           >
-            <span className="material-symbols-outlined text-sm">notifications</span>
+            <Icon name="notifications" className="text-sm" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
                 {unreadCount > 99 ? '99+' : unreadCount}

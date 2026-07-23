@@ -4,9 +4,7 @@ const CACHE_NAME = 'tasker-assets-v1';
 const ASSETS_TO_CACHE = [
   '/logo/tasker_logo.png',
   '/logo/logoleft.png',
-  '/logo/logoright.png',
-  // Material Symbols font files - these are dynamically loaded by the CSS
-  '/css/material-symbols.css'
+  '/logo/logoright.png'
 ];
 
 // Install event - cache the assets
@@ -31,9 +29,7 @@ self.addEventListener('install', (event) => {
 // Fetch event - serve cached assets when offline
 self.addEventListener('fetch', (event) => {
   // Handle requests for cached assets
-  if (event.request.url.includes('logo/') ||
-      event.request.url.includes('material-symbols') ||
-      event.request.url.includes('materialicons')) {
+  if (event.request.url.includes('logo/')) {
 
     event.respondWith(
       caches.match(event.request)

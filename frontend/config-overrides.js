@@ -30,7 +30,7 @@ module.exports = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
-          maxInitialRequests: 25,
+          maxInitialRequests: 8,
           minSize: 20000,
           cacheGroups: {
             defaultVendors: {

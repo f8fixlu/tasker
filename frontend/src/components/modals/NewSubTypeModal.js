@@ -5,6 +5,7 @@ import Select from '../common/Select';
 import Button from '../common/Button';
 import { taskTypeService } from '../../services/taskTypeService';
 import { subTypeService } from '../../services/subTypeService';
+import { Icon } from '../common/Icon';
 
 const NewSubTypeModal = ({ isOpen, onClose, onSave, taskTypes: propTaskTypes = [], currentTypeId = null, selectedCategoryId = null }) => {
   const [formData, setFormData] = useState({
@@ -154,7 +155,7 @@ const NewSubTypeModal = ({ isOpen, onClose, onSave, taskTypes: propTaskTypes = [
               variant="outline"
               type="button"
             >
-              <span className="material-symbols-outlined text-lg">add</span>
+              <Icon name="add" className="text-lg" />
             </Button>
           </div>
         </div>

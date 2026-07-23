@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import { Icon } from './Icon';
 
 const Calendar = ({ events = [], onDayClick, onEventClick }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -108,7 +109,7 @@ const Calendar = ({ events = [], onDayClick, onEventClick }) => {
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             onClick={prevMonth}
           >
-            <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_left</span>
+            <Icon name="chevron_left" className="text-gray-600 dark:text-gray-300" />
           </button>
           <button 
             className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
@@ -120,7 +121,7 @@ const Calendar = ({ events = [], onDayClick, onEventClick }) => {
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
             onClick={nextMonth}
           >
-            <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">chevron_right</span>
+            <Icon name="chevron_right" className="text-gray-600 dark:text-gray-300" />
           </button>
         </div>
       </div>

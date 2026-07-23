@@ -13,6 +13,7 @@ import { subTypeService } from '../../services/subTypeService';
 import { attachmentService } from '../../services/attachmentService';
 import { taskService } from '../../services/taskService';
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
+import { Icon } from '../common/Icon';
 
 const NewTaskModal = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -1140,7 +1141,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 type="button"
                 onClick={handleAddCategory}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1163,7 +1164,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 type="button"
                 onClick={handleAddTaskType}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1188,7 +1189,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 type="button"
                 onClick={handleAddSubType}
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" className="text-lg" />
               </Button>
             </div>
           </div>
@@ -1227,7 +1228,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
               type="button"
               onClick={() => document.getElementById('file-upload').click()}
             >
-              <span className="material-symbols-outlined">attach_file</span>
+              <Icon name="attach_file" className="" />
             </Button>
             <input
               id="file-upload"
@@ -1246,7 +1247,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 {attachments.map(attachment => (
                   <div key={attachment.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-md">
                     <div className="flex items-center gap-2 min-w-0"> {/* Added min-w-0 to enable text truncation */}
-                      <span className="material-symbols-outlined text-gray-500 flex-shrink-0">description</span>
+                      <Icon name="description" className="text-gray-500 flex-shrink-0" />
                       <div className="min-w-0"> {/* Added min-w-0 to enable text truncation */}
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={attachment.name}>{attachment.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{(attachment.size / 1024).toFixed(1)} KB</p>
@@ -1257,7 +1258,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                       onClick={() => removeAttachment(attachment.id)}
                       className="text-gray-500 hover:text-red-500 flex-shrink-0 ml-2" // Added flex-shrink-0 and ml-2 for spacing
                     >
-                      <span className="material-symbols-outlined">close</span>
+                      <Icon name="close" className="" />
                     </button>
                   </div>
                 ))}
@@ -1277,7 +1278,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-800'} ${savingDescription ? 'opacity-50' : ''}`}
                 title="Save description for this sub type"
               >
-                <span className="material-symbols-outlined">check</span>
+                <Icon name="check" className="" />
               </button>
               <button
                 type="button"
@@ -1286,7 +1287,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
                 className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
                 title="Clear description"
               >
-                <span className="material-symbols-outlined">delete</span>
+                <Icon name="delete" className="" />
               </button>
             </div>
           </div>

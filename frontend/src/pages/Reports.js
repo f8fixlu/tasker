@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { formatToLocalDateTime } from '../utils/date';
 import CategoryFiltersDropdown, { formatCategoryName } from '../components/common/CategoryFiltersDropdown';
+import { Icon } from '../components/common/Icon';
 
 // Lazy load pdfjs-dist to reduce initial bundle size (1.5MB+ library)
 let pdfjsLib = null;
@@ -2306,7 +2307,7 @@ const generatePDF = async () => {
               onClick={() => setShowCategoryFiltersDropdown(s => !s)}
               onMouseEnter={() => setIsCategoryFiltersHovered(true)}
             >
-              <span className="material-symbols-outlined text-sm">filter_list</span>
+              <Icon name="filter_list" className="text-sm" />
               <span className="text-sm">Category</span>
             </Button>
             {showCategoryFiltersDropdown && !loadingCategories && (
@@ -2331,9 +2332,9 @@ const generatePDF = async () => {
             disabled={isPreviewLoading}
           >
             {isPreviewLoading ? (
-              <span className="material-symbols-outlined animate-spin">progress_activity</span>
+              <Icon name="progress_activity" className="animate-spin" />
             ) : (
-              <span className="material-symbols-outlined">visibility</span>
+              <Icon name="visibility" className="" />
             )}
             <span>Preview Report</span>
           </Button>
@@ -2618,7 +2619,7 @@ const generatePDF = async () => {
                 onClick={exportTaskTypeSummaryToCSV}
                 disabled={taskTypeSummaryLoading}
               >
-                <span className="material-symbols-outlined text-sm">download</span>
+                <Icon name="download" className="text-sm" />
                 Export as CSV
               </Button>
             </div>
@@ -2760,7 +2761,7 @@ const generatePDF = async () => {
                 taskPopup.tasks.map((task) => (
                   <div key={task.id} className="text-xs text-gray-700 dark:text-gray-300">
                     <div className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[14px] mt-0.5 text-gray-400">task_alt</span>
+                      <Icon name="task_alt" className="text-[14px] mt-0.5 text-gray-400" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-gray-900 dark:text-white truncate">{task.title}</div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -2940,7 +2941,7 @@ const generatePDF = async () => {
                 consolidatedEventPopup.events.map((event) => (
                   <div key={event.id} className="text-xs text-gray-700 dark:text-gray-300">
                     <div className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[14px] mt-0.5 text-gray-400">event</span>
+                      <Icon name="event" className="text-[14px] mt-0.5 text-gray-400" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-gray-900 dark:text-white truncate">{event.title}</div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -2982,7 +2983,7 @@ const generatePDF = async () => {
                 onClick={exportEventSummaryToCSV}
                 disabled={eventSummaryLoading}
               >
-                <span className="material-symbols-outlined text-sm">download</span>
+                <Icon name="download" className="text-sm" />
                 Export as CSV
               </Button>
             </div>
@@ -3146,7 +3147,7 @@ const generatePDF = async () => {
               onClick={() => setShowMarginModal(true)}
               className="ml-2"
             >
-              <span className="material-symbols-outlined text-sm mr-1">margin</span>
+              <Icon name="margin" className="text-sm mr-1" />
               Set Margin
             </Button>
           </div>
@@ -3161,7 +3162,7 @@ const generatePDF = async () => {
               }}
               className="flex items-center gap-2"
             >
-              <span className="material-symbols-outlined mr-2">download</span>
+              <Icon name="download" className="mr-2" />
               Download
             </Button>
             <Button

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Button from './Button';
 import Modal from './Modal';
+import { Icon } from './Icon';
 
 const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
   const location = useLocation();
@@ -56,7 +57,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
               onClick={onClose}
               className="text-text-light dark:text-text-dark hover:text-text-secondary-light dark:hover:text-text-secondary-dark"
             >
-              <span className="material-symbols-outlined">close</span>
+              <Icon name="close" className="" />
             </button>
           </div>
 
@@ -115,7 +116,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                     }`}
                     onClick={onClose}
                   >
-                    <span className="material-symbols-outlined text-base">dashboard</span>
+                    <Icon name="dashboard" className="text-base" />
                     <span>Dashboard</span>
                   </Link>
                 </li>
@@ -131,7 +132,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                     }`}
                     onClick={onClose}
                   >
-                    <span className="material-symbols-outlined text-base">task</span>
+                    <Icon name="task" className="text-base" />
                     <span>Tasks</span>
                   </Link>
                 </li>
@@ -147,7 +148,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                     }`}
                     onClick={onClose}
                   >
-                    <span className="material-symbols-outlined text-base">calendar_month</span>
+                    <Icon name="calendar_month" className="text-base" />
                     <span>Calendar</span>
                   </Link>
                 </li>
@@ -163,7 +164,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                     }`}
                     onClick={onClose}
                   >
-                    <span className="material-symbols-outlined text-base">analytics</span>
+                    <Icon name="analytics" className="text-base" />
                     <span>Reports</span>
                   </Link>
                 </li>
@@ -180,7 +181,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                       }`}
                       onClick={onClose}
                     >
-                      <span className="material-symbols-outlined text-base">bar_chart</span>
+                      <Icon name="bar_chart" className="text-base" />
                       <span>System Stats</span>
                     </Link>
                   </li>
@@ -194,7 +195,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                       }`}
                       onClick={onClose}
                     >
-                      <span className="material-symbols-outlined text-base">people</span>
+                      <Icon name="people" className="text-base" />
                       <span>User Management</span>
                     </Link>
                   </li>
@@ -205,7 +206,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                   className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-text-light dark:text-text-dark hover:bg-background-light dark:hover:bg-background-dark`}
                   onClick={handleSettingsClick}
                 >
-                  <span className="material-symbols-outlined text-base">settings</span>
+                  <Icon name="settings" className="text-base" />
                   <span>Settings</span>
                 </button>
               </li>
@@ -218,7 +219,7 @@ const MobileSidebar = ({ isOpen, onClose, onOpenSettings }) => {
                 className="w-full justify-start"
                 onClick={handleLogout}
               >
-                <span className="material-symbols-outlined text-base mr-2">logout</span>
+                <Icon name="logout" className="text-base mr-2" />
                 Sign Out
               </Button>
             </div>

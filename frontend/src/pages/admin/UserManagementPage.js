@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Icon } from '../../components/common/Icon';
 
 const UserManagementPage = () => {
   console.log('UserManagementPage component rendered'); // Debugging line
@@ -379,7 +380,7 @@ const UserManagementPage = () => {
               onClick={() => setSearchTerm('')}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
-              <span className="material-symbols-outlined text-base">close</span>
+              <Icon name="close" className="text-base" />
             </button>
           )}
         </div>

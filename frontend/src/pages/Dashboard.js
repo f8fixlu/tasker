@@ -6,6 +6,7 @@ import { taskService } from '../services/taskService';
 import { eventService } from '../services/eventService';
 import { optimizedDateUtils, formatToLocalDateTime } from '../utils/dateOptimized';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
+import { Icon } from '../components/common/Icon';
 
 const WelcomeModal = lazy(() => import('../components/common/WelcomeModal'));
 
@@ -378,7 +379,7 @@ const Dashboard = () => {
             className="text-text-secondary-light hover:text-primary-600 dark:text-text-secondary-dark dark:hover:text-primary-400"
             onClick={() => handleViewTask(task)}
           >
-            <span className="material-symbols-outlined text-base">visibility</span>
+            <Icon name="visibility" className="text-base" />
           </button>
         </td>
       </tr>
@@ -573,7 +574,7 @@ const Dashboard = () => {
       <div className="lg:hidden bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>
+            <Icon name="today" className="text-blue-600 dark:text-blue-400 text-xl" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>
@@ -590,7 +591,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-blue-700 dark:text-blue-300 text-sm">Total Tasks</h3>
-                  <span className="material-symbols-outlined text-blue-700 dark:text-blue-300 text-base">list_alt</span>
+                  <Icon name="list_alt" className="text-blue-700 dark:text-blue-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-blue-900 dark:text-text-dark">{stats.totalTasks}</p>
               </div>
@@ -598,7 +599,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-purple-700 dark:text-purple-300 text-sm">Recent Tasks</h3>
-                  <span className="material-symbols-outlined text-purple-700 dark:text-purple-300 text-base">history</span>
+                  <Icon name="history" className="text-purple-700 dark:text-purple-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-purple-900 dark:text-text-dark">{stats.recentTasks}</p>
               </div>
@@ -606,7 +607,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-green-700 dark:text-green-300 text-sm">Tasks Today</h3>
-                  <span className="material-symbols-outlined text-green-700 dark:text-green-300 text-base">today</span>
+                  <Icon name="today" className="text-green-700 dark:text-green-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-green-900 dark:text-text-dark">{stats.tasksToday}</p>
               </div>
@@ -614,7 +615,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-orange-700 dark:text-orange-300 text-sm">Tasks this Month</h3>
-                  <span className="material-symbols-outlined text-orange-700 dark:text-orange-300 text-base">calendar_month</span>
+                  <Icon name="calendar_month" className="text-orange-700 dark:text-orange-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-orange-900 dark:text-text-dark">{stats.tasksThisMonth}</p>
               </div>
@@ -627,7 +628,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-indigo-700 dark:text-indigo-300 text-sm">Total Events</h3>
-                  <span className="material-symbols-outlined text-indigo-700 dark:text-indigo-300 text-base">event</span>
+                  <Icon name="event" className="text-indigo-700 dark:text-indigo-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-indigo-900 dark:text-text-dark">{eventStats.totalEvents}</p>
               </div>
@@ -635,7 +636,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-cyan-700 dark:text-cyan-300 text-sm">Events Today</h3>
-                  <span className="material-symbols-outlined text-cyan-700 dark:text-cyan-300 text-base">today</span>
+                  <Icon name="today" className="text-cyan-700 dark:text-cyan-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-cyan-900 dark:text-text-dark">{eventStats.eventsToday}</p>
               </div>
@@ -643,7 +644,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-teal-100 dark:bg-teal-900/30 hover:bg-teal-200 dark:hover:bg-teal-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-teal-700 dark:text-teal-300 text-sm">Events This Month</h3>
-                  <span className="material-symbols-outlined text-teal-700 dark:text-teal-300 text-base">calendar_month</span>
+                  <Icon name="calendar_month" className="text-teal-700 dark:text-teal-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-teal-900 dark:text-text-dark">{eventStats.eventsThisMonth}</p>
               </div>
@@ -651,7 +652,7 @@ const Dashboard = () => {
               <div className="flex flex-col gap-2 rounded-lg p-3 bg-rose-100 dark:bg-rose-900/30 hover:bg-rose-200 dark:hover:bg-rose-800/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-rose-700 dark:text-rose-300 text-sm">Completed Events</h3>
-                  <span className="material-symbols-outlined text-rose-700 dark:text-rose-300 text-base">check_circle</span>
+                  <Icon name="check_circle" className="text-rose-700 dark:text-rose-300 text-base" />
                 </div>
                 <p className="text-xl font-bold text-rose-900 dark:text-text-dark">{eventStats.completedEvents}</p>
               </div>
@@ -708,7 +709,7 @@ const Dashboard = () => {
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden lg:block">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-xl">today</span>
+                <Icon name="today" className="text-blue-600 dark:text-blue-400 text-xl" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>

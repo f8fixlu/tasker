@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Button from '../components/common/Button';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotificationUpdate } from '../context/NotificationUpdateContext';
 import { eventService } from '../services/eventService';
 import { holidayService } from '../services/holidayService';
+import { Icon } from '../components/common/Icon';
 
 const NewEventModal = React.lazy(() => import('../components/modals/NewEventModal'));
 const ViewEventModal = React.lazy(() => import('../components/modals/ViewEventModal'));
@@ -30,7 +31,7 @@ const scrollbarHideStyle = `
 
 const Calendar = () => {
   const { triggerTaskUpdate } = useTaskUpdate();
-  const { fetchNotifications } = useNotifications();
+  const { triggerNotificationUpdate } = useNotificationUpdate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'day', 'week', or 'month'
   const [isNewEventModalOpen, setIsNewEventModalOpen] = useState(false);
@@ -287,7 +288,7 @@ const Calendar = () => {
       // Trigger notification refresh to update badge count
       triggerTaskUpdate();
       // Also fetch notifications directly for immediate update
-      setTimeout(() => fetchNotifications(), 100);
+      setTimeout(() => triggerNotificationUpdate(), 100);
 
       return true;
     } catch (error) {
@@ -305,7 +306,7 @@ const Calendar = () => {
       // Trigger notification refresh to update badge count
       triggerTaskUpdate();
       // Also fetch notifications directly for immediate update
-      setTimeout(() => fetchNotifications(), 100);
+      setTimeout(() => triggerNotificationUpdate(), 100);
       
       return result; // Return the result so the modal can extract the event ID
     } catch (error) {
@@ -328,7 +329,7 @@ const Calendar = () => {
       setSavedHolidayKeys(prev => new Set([...prev, `${date}-${name}`]));
       await fetchEvents();
       triggerTaskUpdate();
-      setTimeout(() => fetchNotifications(), 100);
+      setTimeout(() => triggerNotificationUpdate(), 100);
     } catch (error) {
       console.error('Error saving holiday as event:', error);
     }
@@ -354,7 +355,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_left</span>
+                  <Icon name="chevron_left" className="" />
                 </Button>
                 <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
@@ -369,7 +370,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_right</span>
+                  <Icon name="chevron_right" className="" />
                 </Button>
               </>
             ) : view === 'week' ? (
@@ -384,7 +385,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_left</span>
+                  <Icon name="chevron_left" className="" />
                 </Button>
                 <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   Week of {currentDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
@@ -399,7 +400,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_right</span>
+                  <Icon name="chevron_right" className="" />
                 </Button>
               </>
             ) : view === 'day' ? (
@@ -414,7 +415,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_left</span>
+                  <Icon name="chevron_left" className="" />
                 </Button>
                 <span className="text-lg font-semibold text-[#111418] dark:text-white hidden">
                   {currentDate.toLocaleString('default', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
@@ -429,7 +430,7 @@ const Calendar = () => {
                     setCurrentDate(newDate);
                   }}
                 >
-                  <span className="material-symbols-outlined">chevron_right</span>
+                  <Icon name="chevron_right" className="" />
                 </Button>
               </>
             ) : null}
@@ -473,7 +474,7 @@ const Calendar = () => {
             className="flex items-center gap-2 h-[34px]"
             onClick={handleNewEventClick}
           >
-            <span className="material-symbols-outlined">event</span>
+            <Icon name="event" className="" />
             New Event
           </Button>
         </div>
@@ -613,7 +614,7 @@ const Calendar = () => {
                           }}
                           aria-label="Add event to this day"
                         >
-                          <span className="material-symbols-outlined text-xs">add</span>
+                          <Icon name="add" className="text-xs" />
                         </button>
                       )}
                       
@@ -860,7 +861,7 @@ const Calendar = () => {
                           }}
                           aria-label="Add event to this day"
                         >
-                          <span className="material-symbols-outlined text-xs">add</span>
+                          <Icon name="add" className="text-xs" />
                         </button>
                       )}
                       
@@ -1059,7 +1060,7 @@ const Calendar = () => {
                           await eventService.updateEvent(originalEvent.id, updateData);
                           await fetchEvents();
                           triggerTaskUpdate();
-                          setTimeout(() => fetchNotifications(), 100);
+                          setTimeout(() => triggerNotificationUpdate(), 100);
                         }}
                       ></div>
                     ))}
@@ -1213,7 +1214,7 @@ const Calendar = () => {
           onEventUpdate={() => {
             fetchEvents();
             triggerTaskUpdate();
-            setTimeout(() => fetchNotifications(), 100);
+            setTimeout(() => triggerNotificationUpdate(), 100);
           }}
         />
       </React.Suspense>
@@ -1233,7 +1234,7 @@ const Calendar = () => {
           {calendarEventPopup.event.isHoliday ? (
             <>
               <div className="flex items-center gap-2 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1.5">
-                <span className="material-symbols-outlined text-red-500 text-sm">celebration</span>
+                <Icon name="celebration" className="text-red-500 text-sm" />
                 <span className="font-semibold text-sm text-gray-900 dark:text-white">
                   {calendarEventPopup.event.title}
                 </span>
@@ -1266,7 +1267,7 @@ const Calendar = () => {
                     setCalendarEventPopup(null);
                   }}
                 >
-                  <span className="material-symbols-outlined text-xs">add</span>
+                  <Icon name="add" className="text-xs" />
                   Save as Event
                 </button>
               )}
