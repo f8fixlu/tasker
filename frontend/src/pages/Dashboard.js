@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '../hooks/useModal';
@@ -6,7 +6,8 @@ import { taskService } from '../services/taskService';
 import { eventService } from '../services/eventService';
 import { optimizedDateUtils, formatToLocalDateTime } from '../utils/dateOptimized';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
-import WelcomeModal from '../components/common/WelcomeModal';
+
+const WelcomeModal = lazy(() => import('../components/common/WelcomeModal'));
 
 // Function to truncate text if too long
 const truncateText = (text, maxLength = 50) => {
@@ -560,11 +561,13 @@ const Dashboard = () => {
         <h1 className="text-text-light dark:text-text-dark text-2xl sm:text-3xl font-bold">Dashboard</h1>
       </div>
 
-      <WelcomeModal
-        user={user}
-        isOpen={showWelcomeModal}
-        onClose={() => setShowWelcomeModal(false)}
-      />
+      <Suspense fallback={null}>
+        <WelcomeModal
+          user={user}
+          isOpen={showWelcomeModal}
+          onClose={() => setShowWelcomeModal(false)}
+        />
+      </Suspense>
 
       {/* Today box moved to appear first on screens <1024px */}
       <div className="lg:hidden bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">

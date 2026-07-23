@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -8,10 +8,10 @@ import { NotificationUpdateProvider } from './context/NotificationUpdateContext'
 import AdminRoute from './components/admin/AdminRoute';
 import AdminRedirectRoute from './components/common/AdminRedirectRoute';
 import Layout from './components/layout/Layout';
-import './styles/index.css';
+import { PageSkeleton } from './components/common/Skeleton';
+import Dashboard from './pages/Dashboard';
 
-// Lazy load pages for code splitting with preloading
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+// Lazy load pages for code splitting
 const Tasks = lazy(() => import('./pages/Tasks'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -26,22 +26,13 @@ const BackupStatusPage = lazy(() => import('./pages/admin/BackupStatusPage'));
 // Lazy load ModalRenderer to avoid bundling all modals in main chunk
 const ModalRenderer = lazy(() => import('./components/modals/ModalRenderer'));
 
+const skeletonFallback = (
+  <div className="flex justify-center items-center h-screen">
+    <div className="animate-pulse text-text-secondary-light dark:text-text-secondary-dark text-sm">Loading...</div>
+  </div>
+);
+
 function App() {
-  // Preload critical components for better performance
-  useEffect(() => {
-    // Preload commonly used components
-    const preloadCommonComponents = async () => {
-      // Preload common components that are likely to be used
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        // Preload dashboard and tasks if user is likely authenticated
-        import('./pages/Dashboard');
-        import('./pages/Tasks');
-      }
-    };
-
-    preloadCommonComponents();
-  }, []);
-
   return (
     <Router>
       <ThemeProvider>
@@ -53,11 +44,7 @@ function App() {
                   <Route
                     path="/login"
                     element={
-                      <Suspense fallback={
-                        <div className="flex justify-center items-center h-screen">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                        </div>
-                      }>
+                      <Suspense fallback={skeletonFallback}>
                         <Login />
                       </Suspense>
                     }
@@ -65,11 +52,7 @@ function App() {
                   <Route
                     path="/register"
                     element={
-                      <Suspense fallback={
-                        <div className="flex justify-center items-center h-screen">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                        </div>
-                      }>
+                      <Suspense fallback={skeletonFallback}>
                         <Register />
                       </Suspense>
                     }
@@ -79,13 +62,7 @@ function App() {
                     element={
                       <AdminRedirectRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
-                            <Dashboard />
-                          </Suspense>
+                          <Dashboard />
                         </Layout>
                       </AdminRedirectRoute>
                     }
@@ -95,13 +72,7 @@ function App() {
                     element={
                       <AdminRedirectRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
-                            <Dashboard />
-                          </Suspense>
+                          <Dashboard />
                         </Layout>
                       </AdminRedirectRoute>
                     }
@@ -111,11 +82,7 @@ function App() {
                     element={
                       <AdminRedirectRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <Tasks />
                           </Suspense>
                         </Layout>
@@ -127,11 +94,7 @@ function App() {
                     element={
                       <AdminRedirectRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <Calendar />
                           </Suspense>
                         </Layout>
@@ -143,11 +106,7 @@ function App() {
                     element={
                       <AdminRedirectRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <Reports />
                           </Suspense>
                         </Layout>
@@ -157,11 +116,7 @@ function App() {
                   <Route
                     path="/reset-password/:token"
                     element={
-                      <Suspense fallback={
-                        <div className="flex justify-center items-center h-screen">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                        </div>
-                      }>
+                      <Suspense fallback={skeletonFallback}>
                         <ResetPassword />
                       </Suspense>
                     }
@@ -171,11 +126,7 @@ function App() {
                     element={
                       <AdminRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <AdminStatsPage />
                           </Suspense>
                         </Layout>
@@ -187,11 +138,7 @@ function App() {
                     element={
                       <AdminRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <UserManagementPage />
                           </Suspense>
                         </Layout>
@@ -203,11 +150,7 @@ function App() {
                     element={
                       <AdminRoute>
                         <Layout>
-                          <Suspense fallback={
-                            <div className="flex justify-center items-center h-screen">
-                              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <BackupStatusPage />
                           </Suspense>
                         </Layout>
@@ -217,11 +160,7 @@ function App() {
                   <Route
                     path="*"
                     element={
-                      <Suspense fallback={
-                        <div className="flex justify-center items-center h-screen">
-                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                        </div>
-                      }>
+                      <Suspense fallback={skeletonFallback}>
                         <NotFound />
                       </Suspense>
                     }

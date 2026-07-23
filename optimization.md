@@ -1,7 +1,7 @@
 # Tasker Application Performance Optimizations
 
 ## Overview
-Comprehensive performance optimization targeting Dashboard page loading time and overall frontend bundle size. The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, and enable better code splitting.
+Comprehensive performance optimization targeting Dashboard page loading time and overall frontend bundle size. The optimizations reduce SQL queries from ~34 to ~4-8, eliminate dead code, improve caching, enable better code splitting, and reduce initial bundle size by ~104 KB through lazy-loading heavy components.
 
 ---
 
@@ -406,7 +406,7 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 | `backend/routes/reports.js` | Parallelized dashboard stats queries, combined date-count queries |
 | `backend/routes/tasks.js` | Batch SQL for bulk update/delete (Phase 4.5) |
 | `backend/server.js` | Mounted dashboard routes before other API routes |
-| `frontend/src/pages/Dashboard.js` | Fixed double fetch, removed ~300 lines dead code, removed 7 unused imports |
+| `frontend/src/pages/Dashboard.js` | Fixed double fetch, removed ~300 lines dead code, removed 7 unused imports, lazy WelcomeModal (Phase 8.4) |
 | `frontend/src/pages/Tasks.js` | Parallel dropdowns, useCallback handlers, AbortController, dead code removal (Phase 4) |
 | `frontend/src/pages/Calendar.js` | Date-range fetch, memoization, lazy modals (Phase 5) |
 | `frontend/src/pages/Reports.js` | Removed duplicate fetches, useCallback/useMemo, lazy charts, debug logs, dead code (Phase 6) |
@@ -414,9 +414,14 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 | `frontend/src/context/ModalContext.js` | Memoized value with useCallback/useMemo (Phase 7.2) |
 | `frontend/src/components/common/AttachmentPreview.js` | New component extracted from Tasks.js (Phase 4.6) |
 | `frontend/src/components/common/CategoryFiltersDropdown.js` | New component extracted from Reports.js (Phase 6.2) |
+| `frontend/src/components/common/Skeleton.js` | Added `PageSkeleton` for Suspense fallbacks (Phase 8.5) |
+| `frontend/src/components/common/Header.js` | Lazy-loaded SettingsModal, MobileSidebar, NotificationsModal (Phase 8.3) |
+| `frontend/src/components/common/AdminRedirectRoute.js` | Replaced spinner with text-based loading (Phase 8.5) |
+| `frontend/src/components/common/ProtectedRoute.js` | Deleted (dead code, Phase 8.2) |
+| `frontend/src/utils/dateOptimized.js` | Named re-export instead of barrel `export *` (Phase 8.7) |
 | `frontend/src/services/eventService.js` | Added `getCalendarEvents()` method (Phase 5.1) |
-| `frontend/src/App.js` | Lazy-loaded ModalRenderer |
-| `frontend/config-overrides.js` | Added splitChunks configuration |
+| `frontend/src/App.js` | Lazy-loaded ModalRenderer, eagerly imported Dashboard, removed preload hack, skeleton fallbacks, removed duplicate CSS import (Phases 3.1, 8.1, 8.2, 8.5, 8.6) |
+| `frontend/config-overrides.js` | Added splitChunks configuration, prop-types removal plugin (Phases 3.2, 8.8) |
 
 ---
 
@@ -448,3 +453,114 @@ Wrapped chart usages in `<React.Suspense>` with loading fallback.
 | Reports dashboard stats backend | 5 sequential queries | 4 parallel queries |
 | TaskUpdateContext unnecessary re-renders | All 8 consumers on every render | Only when updateTrigger changes |
 | ModalContext unnecessary re-renders | All 5 consumers on every render | Only when modals/selection changes |
+
+---
+
+## Phase 8: Bundle Size and Request Count Optimizations
+
+### 8.1 Eagerly Imported Dashboard (Default Route)
+**File:** `frontend/src/App.js`
+
+**Problem:** Dashboard was lazy-loaded via `React.lazy()`, but it's the default route (`/` and `/dashboard`) — every user lands here first. This triggered a Suspense spinner while the chunk downloaded, even though Dashboard was needed immediately.
+
+**Solution:**
+- Changed `const Dashboard = lazy(() => import('./pages/Dashboard'))` to a regular `import Dashboard from './pages/Dashboard'`
+- Removed `<Suspense>` wrappers around Dashboard in both `/` and `/dashboard` routes
+
+**Impact:** Eliminates the Suspense spinner for the most visited page. Dashboard chunk loads as part of the main bundle.
+
+### 8.2 Removed Preload Hacks That Defeated Code Splitting
+**Files:** `frontend/src/App.js`, `frontend/src/components/common/ProtectedRoute.js` (deleted)
+
+**Problem:**
+1. `App.js` had a `useEffect` that called `import('./pages/Dashboard')` and `import('./pages/Tasks')` on every non-login page load. This fired 2 extra chunk downloads that competed for bandwidth with the actual needed chunk.
+2. `ProtectedRoute.js` had the same preload hack and was never imported anywhere (dead code).
+
+**Solution:**
+- Removed the `useEffect` preload from `App.js`
+- Deleted `ProtectedRoute.js` entirely (never imported)
+
+**Impact:** Eliminates 2 competing chunk downloads per page load, reducing network contention and speeding up the initial page render.
+
+### 8.3 Lazy-Loaded SettingsModal, MobileSidebar, and NotificationsModal
+**File:** `frontend/src/components/common/Header.js`
+
+**Problem:** `Header.js` eagerly imported three heavy components:
+- `SettingsModal` (86.55 KB / 2077 lines) — only shown on user click
+- `MobileSidebar` (10.67 KB / 252 lines) — only shown on mobile hamburger click
+- `NotificationsModal` (7.07 KB / 180 lines) — only shown on "View all notifications" click
+
+These were all bundled into the Header, which is rendered on every page via Layout.
+
+**Solution:**
+- Converted all three to `React.lazy()` dynamic imports
+- Wrapped in `<Suspense fallback={null}>` (overlay components, no visible fallback needed)
+
+**Impact:** Removes ~104 KB from the eagerly loaded bundle. Header renders faster on every page.
+
+### 8.4 Lazy-Loaded WelcomeModal in Dashboard
+**File:** `frontend/src/pages/Dashboard.js`
+
+**Problem:** `WelcomeModal` was eagerly imported in Dashboard but only shown to first-time users.
+
+**Solution:** Converted to `React.lazy()` with `<Suspense fallback={null}>`.
+
+**Impact:** Removes WelcomeModal code from the Dashboard chunk for returning users.
+
+### 8.5 Replaced Spinner Fallbacks with Skeletons
+**Files:** `frontend/src/App.js`, `frontend/src/components/common/Skeleton.js`, `frontend/src/components/common/AdminRedirectRoute.js`
+
+**Problem:** Every `<Suspense>` fallback was a full-page blank screen with a centered spinner (`animate-spin`). This felt like the app was frozen during chunk loading.
+
+**Solution:**
+- Created `PageSkeleton` component in `Skeleton.js` that mimics the page layout (title + stat cards + table + card placeholders)
+- Routes inside Layout (Tasks, Calendar, Reports, Admin/*) use `<PageSkeleton />` as Suspense fallback
+- Routes without Layout (Login, Register, ResetPassword, NotFound) use a minimal text-based "Loading..." fallback
+- Updated `AdminRedirectRoute` to use `animate-pulse` text instead of spinner
+
+**Impact:** Lazy-loaded pages now show a layout-aware skeleton during chunk download, giving the perception of speed.
+
+### 8.6 Removed Duplicate CSS Import
+**Files:** `frontend/src/App.js`, `frontend/src/index.js`
+
+**Problem:** `import './styles/index.css'` appeared in both `index.js` (entry point) and `App.js`. CRA deduplicates this, but the duplication is confusing.
+
+**Solution:** Removed the import from `App.js`, keeping it only in `index.js`.
+
+**Impact:** Cleaner import structure, no functional change.
+
+### 8.7 Fixed dateOptimized.js Barrel Export
+**File:** `frontend/src/utils/dateOptimized.js`
+
+**Problem:** `export * from './date'` re-exported all 8 functions from `date.js` (220 lines). Dashboard only uses `optimizedDateUtils` and `formatToLocalDateTime`.
+
+**Solution:** Changed to named re-export: `export { formatToLocalDateTime } from './date'`.
+
+**Impact:** Reduces the number of symbols the bundler needs to track, improving tree-shaking efficiency.
+
+### 8.8 Stripped prop-types from Production Builds
+**Files:** `frontend/config-overrides.js`, `frontend/package.json`
+
+**Problem:** Multiple components imported `prop-types` for runtime type checking. In production, this is dead weight.
+
+**Solution:**
+- Installed `babel-plugin-transform-react-remove-prop-types`
+- Added it to the Babel config in `config-overrides.js` for production builds only
+
+**Impact:** Removes `prop-types` runtime code from production bundles.
+
+---
+
+## Updated Expected Performance Impact
+
+| Metric | Before (Phase 7) | After (Phase 8) |
+|--------|-------------------|-----------------|
+| Dashboard initial load spinner | Suspense spinner visible | No spinner (eager import) |
+| Competing chunk downloads per page | 2 (preload hack) | 0 |
+| Header eagerly loaded components | SettingsModal + MobileSidebar + NotificationsModal (~104 KB) | None (all lazy) |
+| WelcomeModal in Dashboard chunk | Yes | No (lazy) |
+| Suspense fallback UX | Blank screen + spinner | Layout-aware skeleton |
+| Duplicate CSS imports | 2 | 1 |
+| dateOptimized barrel exports | All 8 functions | Only `formatToLocalDateTime` |
+| prop-types in production | Included | Stripped |
+| Dead code files | ProtectedRoute.js | Deleted |

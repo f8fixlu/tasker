@@ -11,6 +11,20 @@ module.exports = {
       // Disable source maps in production to reduce bundle size
       config.devtool = false;
 
+      // Remove prop-types in production to reduce bundle size
+      config.module.rules.forEach(rule => {
+        if (rule.oneOf) {
+          rule.oneOf.forEach(oneOfRule => {
+            const loaderOptions = oneOfRule.options || (oneOfRule.use && oneOfRule.use.options);
+            const loaderPath = oneOfRule.loader || (oneOfRule.use && oneOfRule.use.loader) || '';
+            if (typeof loaderPath === 'string' && loaderPath.includes('babel-loader') && loaderOptions) {
+              loaderOptions.plugins = loaderOptions.plugins || [];
+              loaderOptions.plugins.push('transform-react-remove-prop-types');
+            }
+          });
+        }
+      });
+
       // Add splitChunks configuration for better caching
       config.optimization = {
         ...config.optimization,

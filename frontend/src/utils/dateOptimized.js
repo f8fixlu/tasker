@@ -139,4 +139,4 @@ export const optimizedDateUtils = {
 };
 
 // Export the original functions as well for compatibility
-export * from './date';
+export { formatToLocalDateTime } from './date';

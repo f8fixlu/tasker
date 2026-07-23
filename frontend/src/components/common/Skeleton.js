@@ -144,4 +144,23 @@ export const TaskOverviewSkeleton = () => (
   </div>
 );
 
+export const PageSkeleton = () => (
+  <div className="p-4 sm:p-6 space-y-4">
+    <div className="flex justify-between items-center">
+      <Skeleton type="text" className="w-48 h-8" />
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {[...Array(4)].map((_, i) => (
+        <Skeleton key={i} type="stat" />
+      ))}
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2">
+        <Skeleton type="table" className="h-64" />
+      </div>
+      <Skeleton type="card" className="h-64" />
+    </div>
+  </div>
+);
+
 export default Skeleton;
