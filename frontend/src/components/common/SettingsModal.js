@@ -4,6 +4,7 @@ import { authService } from '../../services/authService';
 import Button from './Button';
 import Input from './Input';
 import Modal from './Modal';
+import { Icon } from './Icon';
 
 // SignatoryItem component - defined outside SettingsModal to prevent re-creation on each render
 const SignatoryItem = memo(({ signatory, signatoryDataLength, removeSignatory, updateSignatoryField }) => {
@@ -1898,7 +1899,6 @@ const SettingsModal = ({ isOpen, onClose, user: propsUser }) => {
                     disabled={true} /* Disabled because functionality is not fully working yet */
                   >
                     Import Data (ZIP) - Coming Soon
-import { Icon } from './Icon';
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
