@@ -15,6 +15,35 @@ const truncateText = (text, maxLength = 50) => {
   return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 };
 
+// WMO weather code to description + icon mapping
+const WMO_WEATHER_CODES = {
+  0: { description: 'Clear sky', icon: '☀️' },
+  1: { description: 'Mainly clear', icon: '🌤️' },
+  2: { description: 'Partly cloudy', icon: '⛅' },
+  3: { description: 'Overcast', icon: '☁️' },
+  45: { description: 'Foggy', icon: '🌫️' },
+  48: { description: 'Rime fog', icon: '🌫️' },
+  51: { description: 'Light drizzle', icon: '🌦️' },
+  53: { description: 'Moderate drizzle', icon: '🌦️' },
+  55: { description: 'Dense drizzle', icon: '🌧️' },
+  61: { description: 'Slight rain', icon: '🌧️' },
+  63: { description: 'Moderate rain', icon: '🌧️' },
+  65: { description: 'Heavy rain', icon: '🌧️' },
+  71: { description: 'Slight snow', icon: '🌨️' },
+  73: { description: 'Moderate snow', icon: '🌨️' },
+  75: { description: 'Heavy snow', icon: '❄️' },
+  80: { description: 'Slight showers', icon: '🌦️' },
+  81: { description: 'Moderate showers', icon: '🌧️' },
+  82: { description: 'Violent showers', icon: '⛈️' },
+  85: { description: 'Slight snow showers', icon: '🌨️' },
+  86: { description: 'Heavy snow showers', icon: '❄️' },
+  95: { description: 'Thunderstorm', icon: '⛈️' },
+  96: { description: 'Thunderstorm with hail', icon: '⛈️' },
+  99: { description: 'Thunderstorm with heavy hail', icon: '⛈️' },
+};
+
+const getWeatherInfo = (code) => WMO_WEATHER_CODES[code] || { description: 'Unknown', icon: '🌡️' };
+
 const Dashboard = () => {
   const { user } = useAuth();
   const { openViewTaskModal } = useModal();
@@ -52,6 +81,8 @@ const Dashboard = () => {
   });
   const [initialLoadComplete, setInitialLoadComplete] = useState(true);
   const [error, setError] = useState(null);
+  const [weather, setWeather] = useState({ temp: null, high: null, low: null, condition: null, icon: null, loading: true, error: null });
+  const [wordOfDay, setWordOfDay] = useState({ word: null, definition: null, loading: true, error: null });
 
 
   // Define the dashboard data fetching function with true progressive loading
@@ -276,6 +307,102 @@ const Dashboard = () => {
       }
     }
   }, [user]);
+
+  // Fetch weather on mount using browser geolocation + Open-Meteo
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchWeather = async (lat, lon) => {
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&temperature_unit=celsius&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Weather fetch failed');
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        const info = getWeatherInfo(data.current.weather_code);
+        setWeather({
+          temp: Math.round(data.current.temperature_2m),
+          high: Math.round(data.daily.temperature_2m_max[0]),
+          low: Math.round(data.daily.temperature_2m_min[0]),
+          condition: info.description,
+          icon: info.icon,
+          loading: false,
+          error: null,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setWeather(prev => ({ ...prev, loading: false, error: 'Weather unavailable' }));
+        }
+      }
+    };
+
+    if (!navigator.geolocation) {
+      setWeather(prev => ({ ...prev, loading: false, error: 'Geolocation not supported' }));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+      () => {
+        if (!cancelled) {
+          setWeather(prev => ({ ...prev, loading: false, error: 'Location access denied' }));
+        }
+      },
+      { timeout: 5000 }
+    );
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch word of the day on mount, cache by date in localStorage
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchWordOfDay = async () => {
+      const dateKey = new Date().toISOString().slice(0, 10);
+      const cacheKey = `wod_${dateKey}`;
+
+      // Check cache first
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const data = JSON.parse(cached);
+          if (!cancelled) setWordOfDay({ word: data.word, definition: data.definition, loading: false, error: null });
+          return;
+        }
+      } catch (e) { /* ignore parse errors, fetch fresh */ }
+
+      // Fetch random word, retry up to 3 times if no definition found
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const wordRes = await fetch('https://random-word-api.herokuapp.com/word');
+          if (!wordRes.ok) continue;
+          const [word] = await wordRes.json();
+
+          const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+          if (!dictRes.ok) continue;
+
+          const entries = await dictRes.json();
+          const definition = entries?.[0]?.meanings?.[0]?.definitions?.[0]?.definition;
+
+          if (definition) {
+            const data = { word, definition };
+            try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) { /* quota exceeded */ }
+            if (!cancelled) setWordOfDay({ word, definition, loading: false, error: null });
+            return;
+          }
+        } catch (e) { /* network error, try next attempt */ }
+      }
+
+      // All attempts failed
+      if (!cancelled) setWordOfDay({ word: null, definition: null, loading: false, error: 'Unavailable' });
+    };
+
+    fetchWordOfDay();
+    return () => { cancelled = true; };
+  }, []);
 
   // Initial data fetch - only run on mount
   useEffect(() => {
@@ -557,17 +684,61 @@ const Dashboard = () => {
         />
       </Suspense>
 
-      {/* Today box moved to appear first on screens <1024px */}
+      {/* Today + Weather card — mobile */}
       <div className="lg:hidden bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-            <Icon name="today" className="text-blue-600 dark:text-blue-400 text-xl" />
+        {!weather.error ? (
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              {weather.loading ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" /><div className="w-14 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></div>
+                  <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="w-20 h-2.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-4xl" role="img" aria-label={weather.condition}>{weather.icon}</span>
+                    <p className="text-xl font-bold text-text-light dark:text-text-dark">{weather.temp}°C</p>
+                  </div>
+                  <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{weather.condition}</p>
+                  <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">H:{weather.high}°  L:{weather.low}°</p>
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon name="today" className="text-blue-600 dark:text-blue-400 text-lg" />
+                <p className="text-2xl font-bold text-text-light dark:text-text-dark">{new Date().getDate()}</p>
+              </div>
+              <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{new Date().toLocaleString('en-US', { month: 'long' })}</p>
+              <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">{new Date().toLocaleString('en-US', { weekday: 'long' })}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>
-            <p className="text-base font-medium text-text-light dark:text-text-dark">{optimizedDateUtils.memoizedFormatDate(new Date().toISOString(), 'fullDateWithDay')}</p>
+        ) : (
+          <div className="flex items-center justify-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon name="today" className="text-blue-600 dark:text-blue-400 text-lg" />
+                <p className="text-2xl font-bold text-text-light dark:text-text-dark">{new Date().getDate()}</p>
+              </div>
+              <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{new Date().toLocaleString('en-US', { month: 'long' })}</p>
+              <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark text-center">{new Date().toLocaleString('en-US', { weekday: 'long' })}</p>
+            </div>
           </div>
-        </div>
+        )}
+        {!wordOfDay.error && !wordOfDay.loading && wordOfDay.word && (
+          <>
+            <hr className="border-border-light dark:border-border-dark my-3" />
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon name="book_open" className="text-blue-600 dark:text-blue-400 text-lg flex-shrink-0" />
+                <p className="text-2xl font-bold text-text-light dark:text-text-dark">{wordOfDay.word}</p>
+              </div>
+              <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5 overflow-hidden">{wordOfDay.definition}</p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -694,15 +865,59 @@ const Dashboard = () => {
 
         <div className="flex flex-col gap-4 sm:gap-6">
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6 hidden lg:block">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <Icon name="today" className="text-blue-600 dark:text-blue-400 text-xl" />
+            {!weather.error ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  {weather.loading ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" /><div className="w-14 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></div>
+                      <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="w-20 h-2.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-4xl" role="img" aria-label={weather.condition}>{weather.icon}</span>
+                        <p className="text-xl font-bold text-text-light dark:text-text-dark">{weather.temp}°C</p>
+                      </div>
+                      <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{weather.condition}</p>
+                      <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">H:{weather.high}°  L:{weather.low}°</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Icon name="today" className="text-blue-600 dark:text-blue-400 text-lg" />
+                    <p className="text-2xl font-bold text-text-light dark:text-text-dark">{new Date().getDate()}</p>
+                  </div>
+                  <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{new Date().toLocaleString('en-US', { month: 'long' })}</p>
+                  <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">{new Date().toLocaleString('en-US', { weekday: 'long' })}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-text-secondary-light dark:text-text-secondary-dark">Today</h3>
-                <p className="text-base font-medium text-text-light dark:text-text-dark">{optimizedDateUtils.memoizedFormatDate(new Date().toISOString(), 'fullDateWithDay')}</p>
+            ) : (
+              <div className="flex items-center justify-center">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Icon name="today" className="text-blue-600 dark:text-blue-400 text-lg" />
+                    <p className="text-2xl font-bold text-text-light dark:text-text-dark">{new Date().getDate()}</p>
+                  </div>
+                  <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5">{new Date().toLocaleString('en-US', { month: 'long' })}</p>
+                  <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark text-center">{new Date().toLocaleString('en-US', { weekday: 'long' })}</p>
+                </div>
               </div>
-            </div>
+            )}
+            {!wordOfDay.error && !wordOfDay.loading && wordOfDay.word && (
+              <>
+                <hr className="border-border-light dark:border-border-dark my-3" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Icon name="book_open" className="text-blue-600 dark:text-blue-400 text-lg flex-shrink-0" />
+                    <p className="text-2xl font-bold text-text-light dark:text-text-dark">{wordOfDay.word}</p>
+                  </div>
+                  <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-0.5 overflow-hidden">{wordOfDay.definition}</p>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="bg-surface-light dark:bg-surface-dark rounded-xl shadow-card p-4 sm:p-6">

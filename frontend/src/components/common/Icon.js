@@ -42,6 +42,7 @@ import {
   Image,
   Grid3x3,
   Presentation,
+  BookOpen,
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -90,6 +91,7 @@ const ICON_MAP = {
   visibility: Eye,
   zoom_in: ZoomIn,
   zoom_out: ZoomOut,
+  book_open: BookOpen,
 };
 
 export const Icon = ({ name, className = '', spin = false, size, ...props }) => {
