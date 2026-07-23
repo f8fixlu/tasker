@@ -3,9 +3,7 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
-import Tooltip from '../components/common/Tooltip';
 import AttachmentPreview from '../components/common/AttachmentPreview';
-import ViewTaskModal from '../components/modals/ViewTaskModal';
 import { useModal } from '../hooks/useModal';
 import { useTaskUpdate } from '../context/TaskUpdateContext';
 import { useDebounce } from '../hooks/useDebounce';
@@ -521,32 +519,11 @@ const Option2Tasks = () => {
   useEffect(() => {
     const loadDropdowns = async () => {
       try {
-        // Reload all dropdown options
         setLoadingDropdowns({ categories: true, taskTypes: true, subTypes: true });
-
-        const [catRes, typeRes, subRes] = await Promise.allSettled([
-          categoryService.getAllCategories(),
-          taskTypeService.getAllTaskTypes(),
-          subTypeService.getAllSubTypes()
-        ]);
-
-        if (catRes.status === 'fulfilled') {
-          setCategories(catRes.value.categories || catRes.value.data || []);
-        } else {
-          console.error('Error fetching categories:', catRes.reason);
-        }
-
-        if (typeRes.status === 'fulfilled') {
-          setTaskTypes(typeRes.value.types || typeRes.value.data || []);
-        } else {
-          console.error('Error fetching task types:', typeRes.reason);
-        }
-
-        if (subRes.status === 'fulfilled') {
-          setSubTypes(subRes.value.subTypes || subRes.value.subtypes || subRes.value.data || []);
-        } else {
-          console.error('Error fetching sub types:', subRes.reason);
-        }
+        const data = await taskService.getDropdownData();
+        setCategories(data.categories || []);
+        setTaskTypes(data.types || []);
+        setSubTypes(data.subTypes || []);
       } catch (err) {
         console.error('Error refreshing dropdowns:', err);
       } finally {
@@ -925,19 +902,17 @@ const Option2Tasks = () => {
     ]);
   }, [openEditTaskModal, openViewTaskModal, showActionsDropdown, activeTaskId, loadingAttachmentTaskId, visibleColumns, allColumnsDefinition, handleAttachmentClick]);
 
-  // Load dropdowns on mount (parallel fetches)
+  // Load dropdowns on mount (single combined request)
   useEffect(() => {
     const load = async () => {
       try {
         setLoadingDropdowns({ categories: true, taskTypes: true, subTypes: true });
-        const [catRes, tRes, subRes] = await Promise.all([
-          categoryService.getAllCategories(),
-          taskTypeService.getAllTaskTypes(),
-          filters.type_id ? subTypeService.getSubTypesByTypeId(filters.type_id) : subTypeService.getAllSubTypes()
-        ]);
-        setCategories(catRes.categories || catRes.data || []);
-        setTaskTypes(tRes.types || tRes.data || []);
-        setSubTypes(subRes.subTypes || subRes.subtypes || subRes.data || []);
+        const data = await taskService.getDropdownData(filters.type_id || undefined);
+        setCategories(data.categories || []);
+        setTaskTypes(data.types || []);
+        if (filters.type_id) {
+          setSubTypes(data.subTypes || []);
+        }
       } catch (err) {
         console.error('Failed to load dropdowns', err);
       } finally {

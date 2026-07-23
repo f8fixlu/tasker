@@ -9,9 +9,11 @@ const {
   deleteTask,
   getTaskStats,
   updateOverdueTasks,
-  forceUpdateOverdueTasks,
-  getTasksCountByUserId
+  forceUpdateOverdueTasks
 } = require('../models/Task');
+const { getCategoriesByUserId } = require('../models/Category');
+const { getTaskTypesByUserId } = require('../models/TaskType');
+const { getSubTypesByUserId } = require('../models/SubType');
 
 // Import database utilities to run notification creation queries directly
 const { runQuery } = require('../utils/database');
@@ -27,7 +29,9 @@ function taskRoutes(req, res, parsedUrl) {
   
   // Parse the request body
   jsonParser(req, res, async () => {
-    if (method === 'GET' && path === '/api/tasks') {
+    if (method === 'GET' && path === '/api/tasks/dropdown-data') {
+      await handleGetDropdownData(req, res, req.user.id, parsedUrl.query);
+    } else if (method === 'GET' && path === '/api/tasks') {
       await handleGetTasks(req, res, req.user.id, parsedUrl.query);
     } else if (method === 'POST' && path === '/api/tasks') {
       await handleCreateTask(req, res, req.user.id);
@@ -53,6 +57,26 @@ function taskRoutes(req, res, parsedUrl) {
       res.end(JSON.stringify({ error: 'Route not found' }));
     }
   });
+}
+
+// Handle getting all dropdown data in a single request
+async function handleGetDropdownData(req, res, userId, query) {
+  try {
+    const type_id = query.type_id ? parseInt(query.type_id) : null;
+
+    const [categories, types, subTypes] = await Promise.all([
+      getCategoriesByUserId(userId),
+      getTaskTypesByUserId(userId),
+      type_id ? getSubTypesByUserId(userId, { type_id }) : getSubTypesByUserId(userId)
+    ]);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ categories, types, subTypes }));
+  } catch (error) {
+    console.error('Get dropdown data error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error during dropdown data retrieval' }));
+  }
 }
 
 // Handle getting tasks
@@ -138,33 +162,20 @@ async function handleGetTasks(req, res, userId, query) {
       options.task_date_to = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T23:59:59.999Z`;
     }
 
-    console.log('Get tasks request - userId:', userId, 'query:', query, 'options:', options);
-    
     if (getAll) {
       // If getting all tasks, return them with total count
       const tasks = await getTasksByUserId(userId, options);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tasks, total: tasks.length }));
     } else {
-      // For paginated results, we need to get both the paged results and total count
-      // Get the total count using the dedicated count function
-      const countOptions = { ...options };
-      countOptions.limit = null;
-      countOptions.offset = 0;
-      
-      console.log('Getting task count with options:', countOptions);
-      const totalCount = await getTasksCountByUserId(userId, countOptions);
-      console.log('Task count result:', totalCount);
-      
-      // Now get the actual paged results
-      const pagedOptions = { ...options };
-      console.log('Getting paged tasks with options:', pagedOptions);
-      const tasks = await getTasksByUserId(userId, pagedOptions);
-      console.log('Paged tasks result:', tasks.length);
-      
+      // Single query using COUNT(*) OVER() window function
+      const pagedOptions = { ...options, includeTotalCount: true };
+      const result = await getTasksByUserId(userId, pagedOptions);
+      const { tasks, totalCount } = result;
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        tasks, 
+      res.end(JSON.stringify({
+        tasks,
         total: totalCount,
         limit: options.limit,
         offset: options.offset,

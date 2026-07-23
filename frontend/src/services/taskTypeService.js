@@ -17,13 +17,7 @@ export const taskTypeService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/types', params), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -36,13 +30,7 @@ export const taskTypeService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get(`/tasks/types/${id}`), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -77,13 +65,7 @@ export const taskTypeService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/types', params), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache

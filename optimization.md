@@ -789,3 +789,85 @@ These were all bundled into the Header, which is rendered on every page via Layo
 | dateOptimized barrel exports | All 8 functions | Only `formatToLocalDateTime` |
 | prop-types in production | Included | Stripped |
 | Dead code files | ProtectedRoute.js | Deleted |
+
+---
+
+## Phase 9: Tasks Page & Backend Optimizations
+
+### 9.1 Removed Unused Font Loading
+**File:** `frontend/public/index.html`
+
+**Problem:** `index.html` loaded the full Material Icons font family (`Material+Icons`) even though the app only uses the outlined variant (`Material+Symbols+Outlined`). Additionally, incorrect `preload as="font"` entries with wrong MIME types and a duplicate CDN stylesheet loaded the same font twice.
+
+**Solution:**
+- Removed `<link>` for `Material+Icons` (unused)
+- Removed 3 broken preload lines (`<link rel="preload" as="font">` with wrong types)
+- Removed duplicate CDN `Material+Symbols+Outlined` stylesheet
+
+**Impact:** 3 fewer blocking font requests on every page load.
+
+### 9.2 Fixed Broken Local Font Reference
+**File:** `frontend/public/css/material-symbols.css`
+
+**Problem:** `material-symbols.css` referenced local font files via `./fonts/` paths that didn't exist (font files were never added). The browser would attempt and fail to load these.
+
+**Solution:** Removed the `src: local(...)` references that pointed to nonexistent paths. The app relies on the CDN-hosted Google Fonts version.
+
+**Impact:** Eliminates 4 failed font load attempts.
+
+### 9.3 Removed Dead Import: ViewTaskModal
+**File:** `frontend/src/pages/Tasks.js`
+
+**Problem:** `Tasks.js` imported `ViewTaskModal` (a ~25KB component) but never used it. The view task modal is rendered inline within the Tasks page itself.
+
+**Solution:** Removed the unused `ViewTaskModal` import.
+
+**Impact:** ~25KB removed from the Tasks page bundle.
+
+### 9.4 Removed Dead Import: Tooltip
+**File:** `frontend/src/pages/Tasks.js`
+
+**Problem:** `Tasks.js` imported `Tooltip` (~5KB) but never rendered it.
+
+**Solution:** Removed the unused `Tooltip` import.
+
+**Impact:** ~5KB removed from the Tasks page bundle.
+
+### 9.5 Removed Background Cache Refresh on Category/Type/SubType Services
+**Files:** `frontend/src/services/categoryService.js`, `frontend/src/services/taskTypeService.js`, `frontend/src/services/subTypeService.js`
+
+**Problem:** After every successful API write (create/update/delete), the service fired a background `getAll*()` request to refresh the cache. This caused a cascade of unnecessary requests after every mutation, even when the user wasn't viewing the affected dropdown.
+
+**Solution:** Removed the `setTimeout(() => this.getAll*(), 0)` background refresh calls from `_fetchAndCache` error handling and write operations. Cache TTLs (60s) handle staleness naturally.
+
+**Impact:** Eliminates 1-3 unnecessary API calls after every create/update/delete operation.
+
+### 9.6 Fixed Redundant Subtypes Loading on Mount
+**File:** `frontend/src/pages/Tasks.js`
+
+**Problem:** On mount, the dropdown loader fetched ALL subtypes (`subTypeService.getAllSubTypes()`), then a separate effect immediately cleared them since `filters.type_id` was empty. This was a wasted network request.
+
+**Solution:** Skip the subtypes fetch entirely on mount when no `type_id` is selected.
+
+**Impact:** 1 fewer API request on Tasks page mount.
+
+### 9.7 Combined Dropdown Endpoints into Single Request
+**Files:** `backend/routes/tasks.js`, `frontend/src/services/taskService.js`, `frontend/src/pages/Tasks.js`
+
+**Problem:** Tasks page mount and modal refreshes made 3 separate parallel API calls: `GET /api/tasks/categories`, `GET /api/tasks/types`, `GET /api/tasks/subtypes`. Each required its own HTTP roundtrip and SQLite query.
+
+**Solution:**
+- Added `GET /api/tasks/dropdown-data` backend endpoint that runs all 3 queries in parallel and returns a single `{ categories, types, subTypes }` response
+- Added `taskService.getDropdownData()` frontend method with 60s cache TTL
+- Updated both mount effect and modal refresh loader to use the combined endpoint
+
+**Impact:** 3 HTTP requests → 1. Reduces network overhead and server connection handling.
+
+### 9.8 Combined COUNT + SELECT with Window Function
+**Files:** `backend/models/Task.js`, `backend/routes/tasks.js`
+
+**Problem:** Paginated task listing ran 2 separate SQL queries: `SELECT COUNT(*) ...` (for total) and `SELECT ... LIMIT ? OFFSET ?` (for page). Both had identical WHERE clauses, duplicating filter logic and query planning.
+
+**Solution:** Added `includeTotalCount` option to `getTasksByUserId()`. When enabled, adds `COUNT(*) OVER() as total_count` window function to the SELECT clause, returning both the paged results and total count in a single query. Removed the now-unused `getTasksCountByUserId` import from routes.
+
+**Impact:** 2 SQL queries → 1 for paginated task listing. The window function computes the total count across all matching rows without a separate scan.

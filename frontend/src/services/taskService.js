@@ -258,5 +258,15 @@ export const taskService = {
       }
       throw error;
     }
+  },
+
+  // Get all dropdown data (categories, types, subtypes) in a single request
+  async getDropdownData(typeId = null) {
+    const params = {};
+    if (typeId) params.type_id = typeId;
+    const cacheKey = getCacheKey('/tasks/dropdown-data', params);
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return cachedData;
+    return this._fetchAndCache(() => api.get('/tasks/dropdown-data', params), cacheKey, 60000);
   }
 };

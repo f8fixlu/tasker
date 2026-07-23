@@ -17,13 +17,7 @@ export const categoryService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get(`/users/${userId}/categories`, params), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -36,13 +30,7 @@ export const categoryService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/categories', params), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -55,13 +43,7 @@ export const categoryService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get(`/tasks/categories/${id}`), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -104,13 +86,7 @@ export const categoryService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/categories'), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache

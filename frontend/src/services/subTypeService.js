@@ -17,13 +17,7 @@ export const subTypeService = {
     const cachedData = cache.get(cacheKey);
 
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/subtypes', params), cacheKey).catch(console.error);
-
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -36,13 +30,7 @@ export const subTypeService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get(`/tasks/subtypes/${id}`), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache
@@ -77,13 +65,7 @@ export const subTypeService = {
     const cachedData = cache.get(cacheKey);
     
     if (cachedData) {
-      // Return cached data immediately
-      const response = cachedData;
-      
-      // Update cache in background
-      this._fetchAndCache(() => api.get('/tasks/subtypes', params), cacheKey).catch(console.error);
-      
-      return response;
+      return cachedData;
     }
 
     // No cached data, fetch and cache

@@ -154,8 +154,6 @@ async function getTasksCountByUserId(user_id, options = {}) {
   
   const params = [user_id];
   
-  console.log('getTasksCountByUserId - SQL:', sql, 'params:', params);
-
   // Add search functionality
   if (options.search) {
     sql += ` AND (t.title LIKE ? OR COALESCE(tc.name, '') LIKE ? OR COALESCE(tt.name, '') LIKE ? OR COALESCE(tst.name, '') LIKE ?)`;
@@ -317,9 +315,7 @@ async function getTasksCountByUserId(user_id, options = {}) {
   }
   
   try {
-    console.log('Executing count query:', sql, 'with params:', params);
     const result = await getRow(sql, params);
-    console.log('Count query result:', result);
     return result ? result.count : 0;
   } catch (error) {
     console.error('Error in getTasksCountByUserId:', error);
@@ -330,14 +326,17 @@ async function getTasksCountByUserId(user_id, options = {}) {
 // Get tasks by user ID
 async function getTasksByUserId(user_id, options = {}) {
   // Skip attachment_count subquery when not needed (dashboard doesn't use it)
+  const includeTotalCount = options.includeTotalCount || false;
+  const totalCountField = includeTotalCount ? ', COUNT(*) OVER() as total_count' : '';
+
   const selectFields = options.skipAttachmentCount
     ? `t.id, t.title, t.description, t.category_id, t.type_id, t.sub_type_id, t.quantity, t.priority, t.due_date, t.task_date,
        t.created_date, t.status, t.user_id, t.edited_date,
-       tc.name as category_name, tt.name as type_name, tst.name as sub_type_name`
+       tc.name as category_name, tt.name as type_name, tst.name as sub_type_name${totalCountField}`
     : `t.id, t.title, t.description, t.category_id, t.type_id, t.sub_type_id, t.quantity, t.priority, t.due_date, t.task_date,
        t.created_date, t.status, t.user_id, t.edited_date,
        tc.name as category_name, tt.name as type_name, tst.name as sub_type_name,
-       (SELECT COUNT(*) FROM attachments a WHERE a.task_id = t.id) as attachment_count`;
+       (SELECT COUNT(*) FROM attachments a WHERE a.task_id = t.id) as attachment_count${totalCountField}`;
 
   let sql = `
     SELECT
@@ -350,8 +349,6 @@ async function getTasksByUserId(user_id, options = {}) {
   `;
 
   const params = [user_id];
-  
-  console.log('getTasksByUserId - SQL:', sql, 'params:', params);
   
   // Add search functionality
   if (options.search) {
@@ -567,21 +564,28 @@ async function getTasksByUserId(user_id, options = {}) {
     }
   }
   
-  console.log('Executing tasks query:', sql, 'with params:', params);
-  
   try {
     let tasks = await getAll(sql, params);
-    console.log('Tasks query result:', tasks.length);
-    
-    // Convert UTC dates to local time for all tasks
-    tasks = tasks.map(task => ({
-      ...task,
-      due_date: convertUTCToLocal(task.due_date),
-      task_date: convertUTCToLocal(task.task_date),
-      created_date: convertUTCToLocal(task.created_date),
-      edited_date: convertUTCToLocal(task.edited_date)
-    }));
 
+    // Convert UTC dates to local time for all tasks
+    let totalCount = null;
+    tasks = tasks.map(task => {
+      if (includeTotalCount && task.total_count !== undefined) {
+        totalCount = task.total_count;
+      }
+      const { total_count, ...rest } = task;
+      return {
+        ...rest,
+        due_date: convertUTCToLocal(rest.due_date),
+        task_date: convertUTCToLocal(rest.task_date),
+        created_date: convertUTCToLocal(rest.created_date),
+        edited_date: convertUTCToLocal(rest.edited_date)
+      };
+    });
+
+    if (includeTotalCount) {
+      return { tasks, totalCount: totalCount || 0 };
+    }
     return tasks;
   } catch (error) {
     console.error('Error in getTasksByUserId:', error);

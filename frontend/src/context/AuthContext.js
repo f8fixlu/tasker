@@ -39,15 +39,12 @@ export const AuthProvider = ({ children }) => {
       // Ensure role is extracted from token if not present in cached user data
       if (!userData.role && token) {
         try {
-          console.log('Decoding token for role extraction on initial load:', token);
           const tokenParts = token.split('.');
           if (tokenParts.length !== 3) {
             console.error('Invalid JWT token format');
           } else {
             const payload = JSON.parse(atob(tokenParts[1]));
-            console.log('Decoded token payload:', payload);
             userData.role = payload.role;
-            console.log('Extracted role from token:', payload.role);
           }
         } catch (error) {
           console.error('Error decoding token:', error);
@@ -135,15 +132,12 @@ export const AuthProvider = ({ children }) => {
           let userRole = null;
           if (token) {
             try {
-              console.log('Decoding token for role extraction:', token);
               const tokenParts = token.split('.');
               if (tokenParts.length !== 3) {
                 console.error('Invalid JWT token format');
               } else {
                 const payload = JSON.parse(atob(tokenParts[1]));
-                console.log('Decoded token payload:', payload);
                 userRole = payload.role;
-                console.log('Extracted role from token:', userRole);
               }
             } catch (error) {
               console.error('Error decoding token:', error);
@@ -207,15 +201,12 @@ export const AuthProvider = ({ children }) => {
       let userRole = null;
       if (data.accessToken) {
         try {
-          console.log('Decoding token for role extraction:', data.accessToken);
           const tokenParts = data.accessToken.split('.');
           if (tokenParts.length !== 3) {
             console.error('Invalid JWT token format');
           } else {
             const payload = JSON.parse(atob(tokenParts[1]));
-            console.log('Decoded token payload:', payload);
             userRole = payload.role;
-            console.log('Extracted role from token:', userRole);
           }
         } catch (error) {
           console.error('Error decoding token:', error);
@@ -378,15 +369,12 @@ export const AuthProvider = ({ children }) => {
           let userRole = null;
           if (token) {
             try {
-              console.log('Decoding token for role extraction:', token);
               const tokenParts = token.split('.');
               if (tokenParts.length !== 3) {
                 console.error('Invalid JWT token format');
               } else {
                 const payload = JSON.parse(atob(tokenParts[1]));
-                console.log('Decoded token payload:', payload);
                 userRole = payload.role;
-                console.log('Extracted role from token:', userRole);
               }
             } catch (error) {
               console.error('Error decoding token:', error);
