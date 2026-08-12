@@ -23,7 +23,7 @@
   "scripts": {
     "start": "react-app-rewired start",
     "build": "react-app-rewired build && node optimize-css.js",
-    "build:prod": "cross-env NODE_ENV=production REACT_APP_API_URL=https://backend.f8fixlu.biz/api react-app-rewired build && node optimize-css.js",
+    "build:prod": "cross-env NODE_ENV=production react-app-rewired build && node optimize-css.js",
     "analyze": "ANALYZE_BUNDLE=true react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",

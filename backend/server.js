@@ -74,8 +74,12 @@ const server = http.createServer((req, res) => {
   let pathname;
 
   // Set CORS headers for all requests
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tasker.f8fixlu.biz';
+  const backendUrl = process.env.BACKEND_URL || 'https://backend.f8fixlu.biz';
+  const frontendDomain = frontendUrl.replace(/^https?:\/\//, '').split(':')[0];
+  const backendDomain = backendUrl.replace(/^https?:\/\//, '').split(':')[0];
   const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? ['https://tasker.f8fixlu.biz', 'https://backend.f8fixlu.biz'] // Production domains
+    ? [frontendUrl, backendUrl] // Production domains from environment
     : ['http://localhost:3000']; // Development domain
 
   const origin = req.headers.origin;
@@ -99,9 +103,9 @@ const server = http.createServer((req, res) => {
     const originDomain = origin.replace(/^https?:\/\//, '').split(':')[0];
     const hostDomain = host.split(':')[0];
 
-    // Allow if origin is tasker.f8fixlu.biz and host is backend.f8fixlu.biz (or vice versa)
-    if ((originDomain === 'tasker.f8fixlu.biz' && hostDomain === 'backend.f8fixlu.biz') ||
-        (originDomain === 'backend.f8fixlu.biz' && hostDomain === 'tasker.f8fixlu.biz')) {
+    // Allow if origin is the frontend domain and host is the backend domain (or vice versa)
+    if ((originDomain === frontendDomain && hostDomain === backendDomain) ||
+        (originDomain === backendDomain && hostDomain === frontendDomain)) {
       corsOrigin = origin;
       allowCredentials = true;
     } else if (originDomain.includes(hostDomain) || hostDomain.includes(originDomain)) {
