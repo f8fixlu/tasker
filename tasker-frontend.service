@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
+User=tasker
 ExecStart=/usr/bin/node server.js
-WorkingDirectory=/home/pi/apps/tasker/frontend
+WorkingDirectory=/opt/tasker/frontend
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production

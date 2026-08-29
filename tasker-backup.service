@@ -4,13 +4,13 @@ After=network.target
 
 [Service]
 Type=oneshot
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/apps/tasker/scripts
-Environment="RCLONE_CONFIG=/home/pi/.config/rclone/rclone.conf"
-ExecStart=/bin/bash /home/pi/apps/tasker/scripts/tasker_backup.sh
-StandardOutput=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
-StandardError=append:/home/pi/apps/tasker/scripts/logs/tasker_backup.log
+User=tasker
+Group=tasker
+WorkingDirectory=/opt/tasker/scripts
+Environment="RCLONE_CONFIG=/opt/tasker/rclone.conf"
+ExecStart=/bin/bash /opt/tasker/scripts/tasker_backup.sh
+StandardOutput=append:/opt/tasker/scripts/logs/tasker_backup.log
+StandardError=append:/opt/tasker/scripts/logs/tasker_backup.log
 
 # Run daily at 2 AM
 OnCalendar=*-*-* 02:00:00
@@ -25,7 +25,7 @@ IOSchedulingPriority=7
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status /home/pi/.config/rclone
+ReadWritePaths=/opt/tasker/scripts/logs /opt/tasker/status
 
 [Install]
 WantedBy=multi-user.target

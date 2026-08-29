@@ -5,13 +5,13 @@
 #########################################
 
 # === CONFIGURATION ===
-SOURCE="/home/pi/apps/tasker"
+SOURCE="/opt/tasker"
 REMOTE_CURRENT="gdrive_f8fixlu_crypt:current"
 REMOTE_VERSIONS="gdrive_f8fixlu_crypt:versions"
-EXCLUDE="/home/pi/tasker_exclude.txt"
+EXCLUDE="/opt/tasker_exclude.txt"
 
-LOG="/home/pi/tasker_backup.log"
-STATUS_FILE="/home/pi/tasker_backup_status.json"
+LOG="/opt/tasker/tasker_backup.log"
+STATUS_FILE="/opt/tasker/tasker_backup_status.json"
 
 RETENTION_DAYS=30
 

@@ -148,7 +148,7 @@ This guide will walk you through setting up Tasker (frontend and backend) on a R
    [Service]
    Type=simple
    User=pi
-   WorkingDirectory=/home/pi/tasker/backend
+   WorkingDirectory=/opt/tasker/backend
    ExecStart=/usr/bin/node server.js
    Restart=always
    RestartSec=10

@@ -1,5 +1,5 @@
 # Tasker Backup Exclusion File
-# Location: /home/pi/tasker_exclude.txt
+# Location: /opt/tasker_exclude.txt
 # Used by: tasker_backup.sh
 
 # === Runtime Directories (don't backup, can cause file lock issues) ===

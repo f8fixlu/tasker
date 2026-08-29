@@ -4,17 +4,17 @@
 # TASKER ADVANCED REAL-TIME DB BACKUP
 #########################################
 
-DB_DIR="/home/pi/apps/tasker/backend/database"
+DB_DIR="/opt/tasker/backend/database"
 DB_FILE="tasker.db"
 DB_PATH="$DB_DIR/$DB_FILE"
 
-TMP_BACKUP="/home/pi/tasker_tmp_db_backup.db"
+TMP_BACKUP="/opt/tasker/tasker_tmp_db_backup.db"
 
 REMOTE_CURRENT="gdrive_f8fixlu_crypt:db/current"
 REMOTE_VERSIONS="gdrive_f8fixlu_crypt:db/versions"
 
-LOG="/home/pi/tasker_db_watch.log"
-STATUS_FILE="/home/pi/tasker_backup_status.json"
+LOG="/opt/tasker/tasker_db_watch.log"
+STATUS_FILE="/opt/tasker/tasker_backup_status.json"
 
 RETENTION_DAYS=14
 DEBOUNCE_SECONDS=20

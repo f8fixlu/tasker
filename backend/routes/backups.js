@@ -193,7 +193,7 @@ async function handleTriggerDatabaseBackup(req, res) {
       // Create a one-time backup script
       const onceScript = `#!/bin/bash
 # One-time database backup
-DB_DIR="/home/pi/apps/tasker/backend/database"
+DB_DIR="/opt/tasker/backend/database"
 DB_FILE="tasker.db"
 DB_PATH="$DB_DIR/$DB_FILE"
 TMP_BACKUP="/tmp/tasker_db_backup_$$.db"

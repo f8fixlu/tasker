@@ -88,7 +88,7 @@ sudo ufw enable
 ## Step 3: Clone and Build Your Application
 
 ```bash
-cd /home/pi/apps
+cd /opt
 mkdir -p tasker
 cd tasker
 
@@ -127,7 +127,7 @@ After=network.target
 Type=simple
 User=pi
 ExecStart=/usr/bin/npm start
-WorkingDirectory=/home/pi/apps/tasker/backend
+WorkingDirectory=/opt/tasker/backend
 Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
@@ -170,8 +170,8 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-ExecStart=/usr/bin/serve -s /home/pi/apps/tasker/frontend/build -l 3000
-WorkingDirectory=/home/pi/apps/tasker/frontend
+ExecStart=/usr/bin/serve -s /opt/tasker/frontend/build -l 3000
+WorkingDirectory=/opt/tasker/frontend
 Restart=always
 RestartSec=10
 
@@ -214,7 +214,7 @@ app.use(cors({
 Create a `.env` file in your backend directory with production settings:
 
 ```bash
-nano /home/pi/apps/tasker/backend/.env
+nano /opt/tasker/backend/.env
 ```
 
 Example content:
@@ -306,7 +306,7 @@ htop
 
 1. Pull the latest code:
 ```bash
-cd /home/pi/apps/tasker
+cd /opt/tasker
 git pull origin main
 
 # Update backend dependencies

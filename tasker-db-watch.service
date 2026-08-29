@@ -5,12 +5,12 @@ Wants=tasker-backend.service
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/apps/tasker/scripts
-ExecStart=/bin/bash /home/pi/apps/tasker/scripts/tasker_db_watch.sh
-StandardOutput=append:/home/pi/apps/tasker/scripts/logs/tasker_db_watch.log
-StandardError=append:/home/pi/apps/tasker/scripts/logs/tasker_db_watch.log
+User=tasker
+Group=tasker
+WorkingDirectory=/opt/tasker/scripts
+ExecStart=/bin/bash /opt/tasker/scripts/tasker_db_watch.sh
+StandardOutput=append:/opt/tasker/scripts/logs/tasker_db_watch.log
+StandardError=append:/opt/tasker/scripts/logs/tasker_db_watch.log
 
 # Restart on failure
 Restart=always
@@ -23,7 +23,7 @@ WatchdogSec=300
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/apps/tasker/backend/database /home/pi/apps/tasker/scripts/logs /home/pi/apps/tasker/status /tmp
+ReadWritePaths=/opt/tasker/backend/database /opt/tasker/scripts/logs /opt/tasker/status /tmp
 
 # Resource limits
 MemoryMax=256M

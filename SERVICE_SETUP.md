@@ -6,7 +6,7 @@ The application is configured with separate services for the backend and fronten
 ## Prerequisites
 
 - Raspberry Pi with systemd (most modern Linux distributions)
-- Tasker application deployed at `/home/pi/apps/tasker/`
+- Tasker application deployed at `/opt/tasker/`
 - Frontend built and ready to serve
 - Node.js and npm installed
 
@@ -18,7 +18,7 @@ First, build the frontend:
 
 ```bash
 # Build the frontend
-cd /home/pi/apps/tasker/frontend
+cd /opt/tasker/frontend
 npm run build:prod
 ```
 
@@ -34,11 +34,11 @@ sudo cp tasker-frontend.service /etc/systemd/system/
 
 ```bash
 # Install backend dependencies
-cd /home/pi/apps/tasker/backend
+cd /opt/tasker/backend
 npm install
 
 # Install frontend dependencies
-cd /home/pi/apps/tasker/frontend
+cd /opt/tasker/frontend
 npm install
 ```
 
@@ -110,17 +110,17 @@ curl http://localhost:3000      # Frontend
 1. **Service fails to start**: Check logs with `journalctl -u tasker-backend -f` or `journalctl -u tasker-frontend -f`
 2. **Permission errors**: Ensure the pi user owns the application directory
    ```bash
-   sudo chown -R pi:pi /home/pi/apps/tasker/
+   sudo chown -R pi:pi /opt/tasker/
    ```
 3. **Port conflicts**: Verify no other processes are using ports 5000 (backend) or 3000 (frontend)
 4. **Dependency issues**: Make sure all Node.js dependencies are installed
-5. **Frontend not loading**: Verify build exists in `/home/pi/apps/tasker/frontend/build/`
+5. **Frontend not loading**: Verify build exists in `/opt/tasker/frontend/build/`
 
 ## Directory Structure
 
 Ensure your application is structured as follows:
 ```
-/home/pi/apps/tasker/
+/opt/tasker/
 ├── backend/
 │   ├── package.json
 │   ├── server.js
@@ -152,14 +152,14 @@ Tasker includes automated backup services for both the webapp and database using
 
 ### Backup Scripts Location
 
-The backup scripts are located in `/home/pi/apps/tasker/scripts/`:
+The backup scripts are located in `/opt/tasker/scripts/`:
 - `tasker_backup.sh` - Webapp backup script
 - `tasker_db_watch.sh` - Database real-time backup script
 
 ### Logs and Status
 
-- Logs: `/home/pi/apps/tasker/scripts/logs/`
-- Status file: `/home/pi/apps/tasker/status/tasker_backup_status.json`
+- Logs: `/opt/tasker/scripts/logs/`
+- Status file: `/opt/tasker/status/tasker_backup_status.json`
 
 ### Copy Backup Service Files
 
@@ -210,13 +210,13 @@ sudo systemctl stop tasker-db-watch
 ### Backup Configuration
 
 **Webapp Backup:**
-- Backs up `/home/pi/apps/tasker/` to remote storage
+- Backs up `/opt/tasker/` to remote storage
 - Uses incremental sync with versioning
 - Retention: 30 days
 - Logs: `scripts/logs/tasker_backup.log`
 
 **Database Backup:**
-- Watches `/home/pi/apps/tasker/backend/database/tasker.db` for changes
+- Watches `/opt/tasker/backend/database/tasker.db` for changes
 - Performs real-time backups on database modifications
 - Uses WAL checkpoint for safe snapshots
 - Integrity check before each backup
@@ -235,7 +235,7 @@ REMOTE_VERSIONS="gdrive_f8fixlu_crypt:versions"
 
 ### Exclude File
 
-Create an exclude file at `/home/pi/tasker_exclude.txt` to specify files/folders to exclude from backup:
+Create an exclude file at `/opt/tasker_exclude.txt` to specify files/folders to exclude from backup:
 
 ```
 node_modules/
@@ -249,6 +249,6 @@ status/
 
 You can monitor backup status through:
 1. **Admin Dashboard**: Navigate to `/admin/backups` in your browser
-2. **Status file**: Check `/home/pi/apps/tasker/status/tasker_backup_status.json`
+2. **Status file**: Check `/opt/tasker/status/tasker_backup_status.json`
 3. **Logs**: View logs in `scripts/logs/` directory
 4. **Systemd**: Use `journalctl` commands shown above

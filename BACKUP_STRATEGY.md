@@ -88,7 +88,7 @@ Tasker uses a **dual backup strategy** to protect your data while minimizing imp
 
 ### On Raspberry Pi
 ```
-/home/pi/apps/tasker/
+/opt/tasker/
 ├── scripts/
 │   ├── tasker_backup.sh          # Webapp backup script
 │   ├── tasker_db_watch.sh        # Database backup script
@@ -138,10 +138,10 @@ sudo systemctl status tasker-db-watch
 
 # View logs
 sudo journalctl -u tasker-backup -n 50
-tail -f /home/pi/apps/tasker/scripts/logs/tasker_backup.log
+tail -f /opt/tasker/scripts/logs/tasker_backup.log
 
 # Check status file
-cat /home/pi/apps/tasker/status/tasker_backup_status.json
+cat /opt/tasker/status/tasker_backup_status.json
 ```
 
 ### API Endpoints
@@ -171,7 +171,7 @@ cd /tmp/restore-test && ls -la
 ### 2. Monitor Disk Space
 ```bash
 # Check available space
-df -h /home/pi/apps/tasker
+df -h /opt/tasker
 
 # Check rclone remote space
 rclone about gdrive_f8fixlu_crypt:
@@ -180,14 +180,14 @@ rclone about gdrive_f8fixlu_crypt:
 ### 3. Review Logs Weekly
 ```bash
 # Check for errors
-grep -i "error\|fail" /home/pi/apps/tasker/scripts/logs/*.log
+grep -i "error\|fail" /opt/tasker/scripts/logs/*.log
 ```
 
 ### 4. Backup .env Separately
 ```bash
 # Encrypt and backup .env separately
-gpg -c /home/pi/apps/tasker/backend/.env
-cp /home/pi/apps/tasker/backend/.env.gpg /secure/backup/location/
+gpg -c /opt/tasker/backend/.env
+cp /opt/tasker/backend/.env.gpg /secure/backup/location/
 ```
 
 ### 5. Verify Backup Integrity
@@ -214,7 +214,7 @@ sqlite3 /tmp/tasker.db "PRAGMA integrity_check;"
 - Consider moving backup to different time
 
 ### Database Backup Not Triggering
-- Check if inotify is working: `inotifywait -m /home/pi/apps/tasker/backend/database`
+- Check if inotify is working: `inotifywait -m /opt/tasker/backend/database`
 - Verify database path in script
 - Check for permission issues
 
@@ -224,20 +224,20 @@ sqlite3 /tmp/tasker.db "PRAGMA integrity_check;"
 
 1. **Restore Webapp:**
    ```bash
-   rclone copy gdrive_f8fixlu_crypt:current /home/pi/apps/tasker
-   cd /home/pi/apps/tasker/backend && npm install
-   cd /home/pi/apps/tasker/frontend && npm install && npm run build
+   rclone copy gdrive_f8fixlu_crypt:current /opt/tasker
+   cd /opt/tasker/backend && npm install
+   cd /opt/tasker/frontend && npm install && npm run build
    ```
 
 2. **Restore Database:**
    ```bash
-   rclone copy gdrive_f8fixlu_crypt:db/current/tasker.db /home/pi/apps/tasker/backend/database/
+   rclone copy gdrive_f8fixlu_crypt:db/current/tasker.db /opt/tasker/backend/database/
    ```
 
 3. **Restore .env:**
    ```bash
    # From your secure backup
-   cp /secure/backup/location/.env /home/pi/apps/tasker/backend/
+   cp /secure/backup/location/.env /opt/tasker/backend/
    ```
 
 4. **Restart Services:**
@@ -276,7 +276,7 @@ DEBOUNCE_SECONDS=60  # Wait 60 seconds after changes
 ## Support
 
 For issues or questions:
-1. Check logs first: `/home/pi/apps/tasker/scripts/logs/`
+1. Check logs first: `/opt/tasker/scripts/logs/`
 2. Review dashboard: `/admin/backups`
 3. Check systemd status: `systemctl status tasker-*`
 4. Verify rclone: `rclone config show`

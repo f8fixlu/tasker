@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'cd /home/pi/apps/tasker/backend && npm start & cd /home/pi/apps/tasker/frontend && node server.js'
+ExecStart=/bin/sh -c 'cd /opt/tasker/backend && npm start & cd /opt/tasker/frontend && node server.js'
 
 [Install]
 WantedBy=multi-user.target

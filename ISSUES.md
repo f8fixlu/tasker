@@ -108,13 +108,13 @@
 
 3. **Setup Directories:**
    ```bash
-   mkdir -p /home/pi/apps/tasker/scripts/logs
-   mkdir -p /home/pi/apps/tasker/status
+   mkdir -p /opt/tasker/scripts/logs
+   mkdir -p /opt/tasker/status
    ```
 
 4. **Copy Exclude File:**
    ```bash
-   cp tasker_exclude.txt /home/pi/tasker_exclude.txt
+   cp tasker_exclude.txt /opt/tasker_exclude.txt
    ```
 
 5. **Deploy Service Files:**
@@ -137,9 +137,10 @@
 
 #### Rclone Config Read-Only
 - **Problem**: "Failed to save config... read-only file system"
-- **Solution**: Fixed rclone config directory permissions
+- **Solution**: Set the rclone config read/write and owned by the service user
    ```bash
-   sudo chown -R pi:pi /home/pi/.config/rclone
+   sudo chmod 600 /opt/tasker/rclone.conf
+   sudo chown tasker:tasker /opt/tasker/rclone.conf
    ```
 
 ### Backup Configuration
@@ -159,8 +160,8 @@
 ### Monitoring
 
 - **Dashboard**: `https://tasker.f8fixlu.biz/admin/backups`
-- **Logs**: `/home/pi/apps/tasker/scripts/logs/`
-- **Status**: `/home/pi/apps/tasker/status/tasker_backup_status.json`
+- **Logs**: `/opt/tasker/scripts/logs/`
+- **Status**: `/opt/tasker/status/tasker_backup_status.json`
 - **Systemd**: `journalctl -u tasker-backup -f`
 
 ### Database Backup Optimization

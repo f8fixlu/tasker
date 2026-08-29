@@ -4,7 +4,7 @@
 # TASKER ADVANCED REAL-TIME DB BACKUP
 #########################################
 
-DB_DIR="/home/pi/apps/tasker/backend/database"
+DB_DIR="/opt/tasker/backend/database"
 DB_FILE="tasker.db"
 DB_PATH="$DB_DIR/$DB_FILE"
 
@@ -27,7 +27,7 @@ LAST_BACKUP_HASH_FILE="/tmp/tasker_db_last_hash"
 LAST_BACKUP_TIME=0
 
 # Prevent rclone from trying to update config (causes errors on read-only filesystems)
-export RCLONE_CONFIG="/home/pi/.config/rclone/rclone.conf"
+export RCLONE_CONFIG="/opt/tasker/rclone.conf"
 
 echo "Starting advanced DB watcher at $(date)" >> "$LOG"
 

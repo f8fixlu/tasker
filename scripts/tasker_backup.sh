@@ -5,10 +5,10 @@
 #########################################
 
 # === CONFIGURATION ===
-SOURCE="/home/pi/apps/tasker"
+SOURCE="/opt/tasker"
 REMOTE_CURRENT="gdrive_f8fixlu_crypt:current"
 REMOTE_VERSIONS="gdrive_f8fixlu_crypt:versions"
-EXCLUDE="/home/pi/tasker_exclude.txt"
+EXCLUDE="/opt/tasker_exclude.txt"
 
 # Updated paths to project directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

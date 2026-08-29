@@ -19,7 +19,7 @@ This guide explains how to deploy the backup system to your Raspberry Pi.
    sudo apt install inotify-tools
    ```
 
-3. **Exclude file created at `/home/pi/tasker_exclude.txt`:**
+3. **Exclude file created at `/opt/tasker_exclude.txt`:**
    ```
    node_modules/
    .git/
@@ -35,23 +35,23 @@ This guide explains how to deploy the backup system to your Raspberry Pi.
 
 ```bash
 # Create directory structure
-mkdir -p /home/pi/apps/tasker/scripts/logs
-mkdir -p /home/pi/apps/tasker/status
+mkdir -p /opt/tasker/scripts/logs
+mkdir -p /opt/tasker/status
 
 # Copy scripts
-cp tasker_backup.sh /home/pi/apps/tasker/scripts/
-cp tasker_db_watch.sh /home/pi/apps/tasker/scripts/
+cp tasker_backup.sh /opt/tasker/scripts/
+cp tasker_db_watch.sh /opt/tasker/scripts/
 
 # Copy service files
-cp tasker-backup.service /home/pi/apps/tasker/
-cp tasker-db-watch.service /home/pi/apps/tasker/
+cp tasker-backup.service /opt/tasker/
+cp tasker-db-watch.service /opt/tasker/
 ```
 
 ### 2. Make Scripts Executable
 
 ```bash
-chmod +x /home/pi/apps/tasker/scripts/tasker_backup.sh
-chmod +x /home/pi/apps/tasker/scripts/tasker_db_watch.sh
+chmod +x /opt/tasker/scripts/tasker_backup.sh
+chmod +x /opt/tasker/scripts/tasker_db_watch.sh
 ```
 
 ### 3. Update Backup Scripts Configuration
@@ -62,16 +62,16 @@ Edit the backup scripts if needed to update:
 - `EXCLUDE` - Path to your exclude file
 
 ```bash
-nano /home/pi/apps/tasker/scripts/tasker_backup.sh
-nano /home/pi/apps/tasker/scripts/tasker_db_watch.sh
+nano /opt/tasker/scripts/tasker_backup.sh
+nano /opt/tasker/scripts/tasker_db_watch.sh
 ```
 
 ### 4. Install Systemd Services
 
 ```bash
 # Copy service files to systemd directory
-sudo cp /home/pi/apps/tasker/tasker-backup.service /etc/systemd/system/
-sudo cp /home/pi/apps/tasker/tasker-db-watch.service /etc/systemd/system/
+sudo cp /opt/tasker/tasker-backup.service /etc/systemd/system/
+sudo cp /opt/tasker/tasker-db-watch.service /etc/systemd/system/
 
 # Reload systemd
 sudo systemctl daemon-reload
@@ -101,7 +101,7 @@ sudo journalctl -u tasker-backup -f
 sudo journalctl -u tasker-db-watch -f
 
 # Check backup status file
-cat /home/pi/apps/tasker/status/tasker_backup_status.json
+cat /opt/tasker/status/tasker_backup_status.json
 ```
 
 ## Service Descriptions
@@ -110,33 +110,33 @@ cat /home/pi/apps/tasker/status/tasker_backup_status.json
 - **Type:** Scheduled (runs daily at 2 AM)
 - **Purpose:** Backs up entire webapp to cloud storage
 - **Retention:** 30 days of versions
-- **Log:** `/home/pi/apps/tasker/scripts/logs/tasker_backup.log`
+- **Log:** `/opt/tasker/scripts/logs/tasker_backup.log`
 
 ### tasker-db-watch.service (Database Backup)
 - **Type:** Continuous (runs forever, watches for changes)
 - **Purpose:** Real-time database backup on any change
 - **Retention:** 14 days of versions
-- **Log:** `/home/pi/apps/tasker/scripts/logs/tasker_db_watch.log`
+- **Log:** `/opt/tasker/scripts/logs/tasker_db_watch.log`
 
 ## Manual Backup Commands
 
 ### Trigger Manual Webapp Backup
 ```bash
-sudo /home/pi/apps/tasker/scripts/tasker_backup.sh
+sudo /opt/tasker/scripts/tasker_backup.sh
 ```
 
 ### Check Backup Status
 ```bash
-cat /home/pi/apps/tasker/status/tasker_backup_status.json
+cat /opt/tasker/status/tasker_backup_status.json
 ```
 
 ### View Recent Logs
 ```bash
 # Last 50 lines of webapp backup log
-tail -50 /home/pi/apps/tasker/scripts/logs/tasker_backup.log
+tail -50 /opt/tasker/scripts/logs/tasker_backup.log
 
 # Last 50 lines of database backup log
-tail -50 /home/pi/apps/tasker/scripts/logs/tasker_db_watch.log
+tail -50 /opt/tasker/scripts/logs/tasker_db_watch.log
 ```
 
 ## Web Dashboard
@@ -158,7 +158,7 @@ sudo journalctl -u tasker-backup -n 50 --no-pager
 sudo journalctl -u tasker-db-watch -n 50 --no-pager
 
 # Test script manually
-sudo -u pi bash /home/pi/apps/tasker/scripts/tasker_backup.sh
+sudo -u pi bash /opt/tasker/scripts/tasker_backup.sh
 ```
 
 ### rclone Not Working
@@ -173,13 +173,13 @@ rclone config show
 ### Permission Issues
 ```bash
 # Fix ownership
-sudo chown -R pi:pi /home/pi/apps/tasker/scripts
-sudo chown -R pi:pi /home/pi/apps/tasker/status
+sudo chown -R pi:pi /opt/tasker/scripts
+sudo chown -R pi:pi /opt/tasker/status
 
 # Fix permissions
-chmod 755 /home/pi/apps/tasker/scripts
-chmod 755 /home/pi/apps/tasker/scripts/logs
-chmod 755 /home/pi/apps/tasker/status
+chmod 755 /opt/tasker/scripts
+chmod 755 /opt/tasker/scripts/logs
+chmod 755 /opt/tasker/status
 ```
 
 ### Database Watch Service Keeps Restarting
