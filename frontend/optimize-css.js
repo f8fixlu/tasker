@@ -6,7 +6,7 @@ const { execSync } = require('child_process');
 function inlineCriticalCSS() {
   try {
     // Read the built HTML file
-    const indexPath = path.join(__dirname, '..', 'build', 'index.html');
+    const indexPath = path.join(__dirname, 'build', 'index.html');
     if (!fs.existsSync(indexPath)) {
       console.log('Build directory does not exist. Run build first.');
       return;
