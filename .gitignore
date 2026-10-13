@@ -13,6 +13,8 @@ yarn-error.log*
 
 # Environment variables
 .env
+*.envbak
+/backend/.envbak
 /backend/.env
 .env.local
 /backend/.env.local
