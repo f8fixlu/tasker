@@ -11,7 +11,7 @@ Restart=always
 RestartSec=10
 Environment=NODE_ENV=production
 Environment=PORT=3000
-Environment=BACKEND_URL=https://backend.f8fixlu.biz
+Environment=BACKEND_URL=https://backend.f8fixlu.cc
 Environment=NODE_OPTIONS="--max-http-header-size=65536"
 
 [Install]

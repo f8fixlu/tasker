@@ -21,7 +21,7 @@ app.use(helmet({
       fontSrc: ["'self'", "fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://backend.f8fixlu.biz", "https://api.open-meteo.com", "https://random-word-api.herokuapp.com", "https://api.dictionaryapi.dev"],
+      connectSrc: ["'self'", "https://backend.f8fixlu.cc", "https://api.open-meteo.com", "https://random-word-api.herokuapp.com", "https://api.dictionaryapi.dev"],
       frameSrc: ["'self'", "blob:", "data:"], // Allow framing of blobs and data URLs
       childSrc: ["'self'", "blob:", "data:"], // Allow child frames with blobs and data URLs
       objectSrc: ["'self'", "blob:", "data:"] // Allow objects with blob and data URLs
@@ -51,7 +51,7 @@ app.use(compression());
 
 // Enable CORS for your backend API
 app.use(cors({
-  origin: process.env.BACKEND_URL || 'https://backend.f8fixlu.biz', // Backend URL
+  origin: process.env.BACKEND_URL || 'https://backend.f8fixlu.cc', // Backend URL
   credentials: true
 }));
 
@@ -101,7 +101,7 @@ app.listen(PORT, () => {
   console.log(`Tasker Frontend Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Compression: Enabled`);
-  console.log(`CORS: Enabled for ${process.env.BACKEND_URL || 'https://backend.f8fixlu.biz'}`);
+  console.log(`CORS: Enabled for ${process.env.BACKEND_URL || 'https://backend.f8fixlu.cc'}`);
 });
 
 module.exports = app;

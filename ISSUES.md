@@ -159,7 +159,7 @@
 
 ### Monitoring
 
-- **Dashboard**: `https://tasker.f8fixlu.biz/admin/backups`
+- **Dashboard**: `https://tasker.f8fixlu.cc/admin/backups`
 - **Logs**: `/opt/tasker/scripts/logs/`
 - **Status**: `/opt/tasker/status/tasker_backup_status.json`
 - **Systemd**: `journalctl -u tasker-backup -f`

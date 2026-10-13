@@ -30,10 +30,10 @@ const AboutModal = ({ isOpen, onClose }) => {
           <p className="text-gray-600 dark:text-gray-300">
             Tasker is designed to help you manage your tasks efficiently. For support or feedback, please contact us at{' '}
             <a
-              href="mailto:support@f8fixlu.biz"
+              href="mailto:support@f8fixlu.cc"
               className="text-blue-500 hover:text-blue-700 underline"
             >
-              support@f8fixlu.biz
+              support@f8fixlu.cc
             </a>.
           </p>
         </div>

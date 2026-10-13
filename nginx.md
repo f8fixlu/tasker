@@ -1,13 +1,13 @@
 # Tasker Application Deployment with Nginx and Let's Encrypt on Raspberry Pi
 
 This guide will walk you through setting up your Tasker application on a Raspberry Pi with Nginx as a reverse proxy and Let's Encrypt for SSL certificates. The setup will include:
-- Frontend: tasker.f8fixlu.biz
-- Backend API: backend.f8fixlu.biz
+- Frontend: tasker.f8fixlu.cc
+- Backend API: backend.f8fixlu.cc
 
 ## Prerequisites
 
 - Raspberry Pi (Pi 3 or 4 recommended) with Raspberry Pi OS
-- Domain names added to your Cloudflare account (tasker.f8fixlu.biz and backend.f8fixlu.biz)
+- Domain names added to your Cloudflare account (tasker.f8fixlu.cc and backend.f8fixlu.cc)
 - Cloudflare Tunnel configured and running (cloudflared service)
 - Local IP addresses: frontend on 192.168.5.202:3000, backend on 192.168.5.202:5000
 
@@ -56,12 +56,12 @@ tunnel: <your-tunnel-id>
 credentials-file: /root/.cloudflared/<your-tunnel-id>.json
 
 ingress:
-  - hostname: tasker.f8fixlu.biz
+  - hostname: tasker.f8fixlu.cc
     service: http://192.168.5.202:3000
-  - hostname: backend.f8fixlu.biz
+  - hostname: backend.f8fixlu.cc
     service: http://192.168.5.202:5000
   # Alternative: If you want to route API calls through the same domain
-  # - hostname: tasker.f8fixlu.biz
+  # - hostname: tasker.f8fixlu.cc
   #   path: /api/*
   #   service: http://192.168.5.202:5000
   - service: http_status:404
@@ -193,7 +193,7 @@ sudo systemctl status tasker-frontend
 Update your frontend to use the correct API endpoint. In your frontend's `.env.production` file:
 
 ```
-REACT_APP_API_URL=http://backend.f8fixlu.biz
+REACT_APP_API_URL=http://backend.f8fixlu.cc
 ```
 
 Or update your axios interceptors/config to point to the backend domain.
@@ -204,7 +204,7 @@ In your backend server.js file, ensure CORS is configured to allow your frontend
 
 ```javascript
 app.use(cors({
-  origin: ['https://tasker.f8fixlu.biz', 'https://backend.f8fixlu.biz', 'http://tasker.f8fixlu.biz', 'http://backend.f8fixlu.biz'],
+  origin: ['https://tasker.f8fixlu.cc', 'https://backend.f8fixlu.cc', 'http://tasker.f8fixlu.cc', 'http://backend.f8fixlu.cc'],
   credentials: true
 }));
 ```
@@ -224,8 +224,8 @@ NODE_ENV=production
 PORT=5000
 DB_PATH=./database.sqlite
 JWT_SECRET=your_production_jwt_secret
-BASE_URL=https://backend.f8fixlu.biz
-FRONTEND_URL=https://tasker.f8fixlu.biz
+BASE_URL=https://backend.f8fixlu.cc
+FRONTEND_URL=https://tasker.f8fixlu.cc
 ```
 
 ## Step 9: Restart Services
@@ -251,8 +251,8 @@ sudo systemctl status tasker-frontend
 sudo systemctl status cloudflared
 
 # Test the domains
-curl -I https://tasker.f8fixlu.biz
-curl -I https://backend.f8fixlu.biz
+curl -I https://tasker.f8fixlu.cc
+curl -I https://backend.f8fixlu.cc
 ```
 
 ## Step 11: Set Up Monitoring (Optional)
@@ -365,7 +365,7 @@ sudo dphys-swapfile swapon
 ```
 
 Your Tasker application should now be accessible at:
-- Frontend: https://tasker.f8fixlu.biz (proxied through Cloudflare)
-- Backend API: https://backend.f8fixlu.biz (proxied through Cloudflare)
+- Frontend: https://tasker.f8fixlu.cc (proxied through Cloudflare)
+- Backend API: https://backend.f8fixlu.cc (proxied through Cloudflare)
 
 The setup includes SSL certificates managed by Cloudflare, secure tunneling, and proper routing.

@@ -41,7 +41,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.biz>',
+    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.cc>',
     to: email,
     subject: 'Password Reset Request',
     html: `
@@ -76,7 +76,7 @@ const sendPasswordResetConfirmationEmail = async (email) => {
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.biz>',
+    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.cc>',
     to: email,
     subject: 'Password Reset Confirmation',
     html: `
@@ -115,7 +115,7 @@ const sendWelcomeEmail = async (email, fullName) => {
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.biz>',
+    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.cc>',
     to: email,
     subject: 'Welcome to Tasker!',
     html: `
@@ -150,7 +150,7 @@ const sendPasswordChangeNotificationEmail = async (email) => {
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.biz>',
+    from: process.env.SMTP_FROM || '"Tasker" <noreply@f8fixlu.cc>',
     to: email,
     subject: 'Password Change Notification',
     html: `

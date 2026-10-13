@@ -12,7 +12,7 @@ Tasker is a task/event manager: two independent Node apps (`backend/`, `frontend
 - `npm run install:all` — install root + backend + frontend
 - `npm run dev` — backend (`:5000`, `node --watch`) and frontend (`:3000`) via concurrently
 - `cd backend && npm test` — Jest; single file: `npx jest tests/unit/models/User.test.js`
-- `cd frontend && npm run build` uses `.env`; `npm run build:prod` **hardcodes** `REACT_APP_API_URL=https://backend.f8fixlu.biz/api`
+- `cd frontend && npm run build` uses `.env`; `npm run build:prod` **hardcodes** `REACT_APP_API_URL=https://backend.f8fixlu.cc/api`
 
 ## Config / runtime gotchas
 - The backend loads env from the **repo-root `.env` first** (`backend/server.js:6`), falling back to a cwd `.env`. The README's `backend/.env` advice is misleading — put secrets in the root `.env` (gitignored). `backend/.envbak` is a template but contains real-looking credentials; never commit secrets.

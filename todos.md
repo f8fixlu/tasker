@@ -1,7 +1,7 @@
 # Tasker Single-Port Consolidation Plan
 
 ## Goal
-Merge frontend (port 3000) and backend (port 5000) into a single Express server running on a single port, eliminating the need for `backend.f8fixlu.biz` subdomain and complex CORS setup.
+Merge frontend (port 3000) and backend (port 5000) into a single Express server running on a single port, eliminating the need for `backend.f8fixlu.cc` subdomain and complex CORS setup.
 
 ## Steps
 
@@ -27,7 +27,7 @@ Merge frontend (port 3000) and backend (port 5000) into a single Express server 
 ### Phase 4: CORS & Security Cleanup
 - [ ] Remove CORS from merged server (same-origin requests no longer need it) or keep only for dev
 - [ ] Update `helmet` CSP `connectSrc` to allow same-origin API calls
-- [ ] Remove references to `backend.f8fixlu.biz` in `frontend/server.js` (will be retired)
+- [ ] Remove references to `backend.f8fixlu.cc` in `frontend/server.js` (will be retired)
 
 ### Phase 5: Port & Script Updates
 - [ ] Change merged server port to 443 (or keep a preferred port)
@@ -39,11 +39,11 @@ Merge frontend (port 3000) and backend (port 5000) into a single Express server 
   ```yaml
   tunnel: f8fixlu
   ingress:
-    - hostname: tasker.f8fixlu.biz
+    - hostname: tasker.f8fixlu.cc
       service: http://localhost:{NEW_PORT}
     - service: http_status:404
   ```
-- [ ] Remove `backend.f8fixlu.biz` DNS record from Cloudflare if no longer needed
+- [ ] Remove `backend.f8fixlu.cc` DNS record from Cloudflare if no longer needed
 
 ### Phase 7: Verification
 - [ ] Test API endpoints via `/api/*` paths

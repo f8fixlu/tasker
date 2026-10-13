@@ -47,7 +47,7 @@ Create a `.env.production` file with the following variables:
 
 ```env
 NODE_ENV=production
-BACKEND_URL=https://backend.f8fixlu.biz  # Your backend API URL
+BACKEND_URL=https://backend.f8fixlu.cc  # Your backend API URL
 ```
 
 ## Performance Optimizations
