@@ -15,6 +15,14 @@ import { taskService } from '../../services/taskService';
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
 import { Icon } from '../common/Icon';
 
+const BATCH_SUFFIX_PATTERN = / - Batch \d+$/;
+
+const stripBatchNumber = (description = '') =>
+  description.replace(BATCH_SUFFIX_PATTERN, '').trim();
+
+const hasBatchNumber = (description = '') =>
+  BATCH_SUFFIX_PATTERN.test(description.trim());
+
 const NewTaskModal = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -40,6 +48,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
   const [savingTask, setSavingTask] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [originalDescription, setOriginalDescription] = useState('');
+  const [includeBatch, setIncludeBatch] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
 
@@ -69,6 +78,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
       loadOptions();
       // Reset the user modification flag when modal opens
       setHasUserModifiedTitle(false);
+      setIncludeBatch(false);
     }
   }, [isOpen]);
 
@@ -149,6 +159,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
       });
       setSavingDescription(false);
       setOriginalDescription('');
+      setIncludeBatch(false);
       setShowWarningModal(false); // Reset warning modal when main modal closes
       setWarningMessage(''); // Clear warning message
     }
@@ -160,49 +171,31 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
       const fetchSubTypeDescription = async () => {
         try {
           const subTypeData = allSubTypes.find(subType => subType.id.toString() === formData.subType);
-          if (subTypeData && subTypeData.description) {
-            // Check if the current description in the form matches the sub type's description
-            // If they match, it means the user hasn't modified it, so we can update it
-            // If they don't match, it means the user has modified it, so we preserve the modification
-            const currentDescriptionMatchesSubType = formData.description === subTypeData.description ||
-                                                     formData.description === (subTypeData.description + ' - Batch 1') ||
-                                                     formData.description === originalDescription;
+          const rawDescription = subTypeData?.description || '';
+          const baseDescription = stripBatchNumber(rawDescription);
 
-            if (currentDescriptionMatchesSubType || !hasUserModifiedDescription) {
-              let updatedDescription = subTypeData.description;
-              // Only apply batch number if the description doesn't already have one
-              if (!/ - Batch \d+$/.test(subTypeData.description.trim())) {
-                updatedDescription = await checkAndAppendBatchNumber(subTypeData.description);
-              }
+          // Update the description only when it still matches the sub type template
+          // or the user hasn't edited it, so manual edits are preserved.
+          const currentDescriptionMatchesSubType =
+            formData.description === rawDescription ||
+            formData.description === baseDescription ||
+            formData.description === originalDescription;
 
-              setFormData(prev => ({
-                ...prev,
-                description: updatedDescription
-              }));
-              setOriginalDescription(updatedDescription);
-              // Reset the user modification flag since we're setting the description based on sub type
-              setHasUserModifiedDescription(false);
-              descriptionModifiedRef.current = false;
+          if (currentDescriptionMatchesSubType || !hasUserModifiedDescription) {
+            let updatedDescription = baseDescription;
+
+            if (includeBatch) {
+              updatedDescription = await checkAndAppendBatchNumber(baseDescription);
             }
-            // If the user HAS modified the description and it doesn't match the sub type's description,
-            // we don't update it when subType changes to preserve manual edits including batch numbers
-          } else {
-            // Set default description to "- Batch 1" when sub type description is empty
-            // But only if the user hasn't modified the description
-            const currentDescriptionMatchesDefault = !hasUserModifiedDescription ||
-                                                   formData.description === '- Batch 1' ||
-                                                   formData.description === originalDescription;
 
-            if (currentDescriptionMatchesDefault) {
-              setFormData(prev => ({
-                ...prev,
-                description: '- Batch 1'
-              }));
-              setOriginalDescription('- Batch 1');
-              // Reset the user modification flag since we're setting the description automatically
-              setHasUserModifiedDescription(false);
-              descriptionModifiedRef.current = false;
-            }
+            setFormData(prev => ({
+              ...prev,
+              description: updatedDescription
+            }));
+            setOriginalDescription(updatedDescription);
+            // Reset the user modification flag since we're setting the description based on sub type
+            setHasUserModifiedDescription(false);
+            descriptionModifiedRef.current = false;
           }
         } catch (error) {
           console.error('Error fetching sub type description:', error);
@@ -224,7 +217,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
         descriptionModifiedRef.current = false;
       }
     }
-  }, [formData.subType, isOpen, allSubTypes, hasUserModifiedDescription, formData.description, originalDescription]);
+  }, [formData.subType, isOpen, allSubTypes, hasUserModifiedDescription, formData.description, originalDescription, includeBatch]);
 
   // Effect to automatically format the task title when type, subType, or quantity changes
   useEffect(() => {
@@ -403,8 +396,10 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
     { value: 'high', label: 'High' }
   ];
 
-  // Function to check if the sub type is the first entry based on date and task type, and append "Batch 1" if needed
+  // Function to check the next batch number for this type, sub type, and date
   const checkAndAppendBatchNumber = async (description) => {
+    const baseDescription = stripBatchNumber(description);
+
     try {
       // Get all tasks to check for duplicate sub types based on task type and date
       const allTasks = await taskService.getAllTasks();
@@ -431,31 +426,36 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
         );
       }).length;
 
-      // Determine if this is the first occurrence of this sub type for this date and task type
-      if (sameSubTypeCount === 0) {
-        // This is the first entry for this sub type on this date and task type
-        // Add "- Batch 1" to the description if it's not already there
-        if (!description.trim().endsWith('- Batch 1')) {
-          return `${description.trim()} - Batch 1`;
-        }
-        return description.trim();
-      } else {
-        // This is not the first occurrence, so determine the appropriate batch number
-        const batchNumber = sameSubTypeCount + 1; // +1 because the current task will be the next occurrence
-
-        // Check if the description already ends with a batch number
-        if (/ - Batch \d+$/.test(description.trim())) {
-          // If it already has a batch number, return as is (user may have modified it)
-          return description.trim();
-        }
-
-        // Otherwise, append the appropriate batch number
-        return `${description.trim()} - Batch ${batchNumber}`;
-      }
+      // The new task is the next occurrence for this type, sub type, and date
+      const batchNumber = sameSubTypeCount + 1;
+      return baseDescription
+        ? `${baseDescription} - Batch ${batchNumber}`
+        : `- Batch ${batchNumber}`;
     } catch (error) {
       console.error('Error checking for duplicate sub types:', error);
       // If there's an error, return the original description
       return description;
+    }
+  };
+
+  // Add or remove the batch suffix when the Batch checkbox is toggled
+  const handleBatchChange = async (e) => {
+    const checked = e.target.checked;
+    setIncludeBatch(checked);
+
+    if (checked) {
+      const updatedDescription = await checkAndAppendBatchNumber(
+        stripBatchNumber(formData.description)
+      );
+      setFormData(prev => ({
+        ...prev,
+        description: updatedDescription
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        description: stripBatchNumber(prev.description)
+      }));
     }
   };
 
@@ -622,18 +622,16 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
     }
 
     try {
-      // If the user has modified the description, don't apply batch number logic
-      // Otherwise, check for duplicates and append batch number if needed
+      // Apply or remove the batch suffix based on the Batch checkbox
       let finalDescription = formData.description;
-      if (!hasUserModifiedDescription) {
-        // Check for duplicate description and append batch number if needed before submission
-        // This handles cases where the user has not manually edited the description
-        finalDescription = await checkAndAppendBatchNumber(formData.description);
+      if (includeBatch) {
+        // Keep a batch number the user entered manually; otherwise use the next
+        // batch number for this type, sub type, and task date.
+        if (!hasUserModifiedDescription || !hasBatchNumber(finalDescription)) {
+          finalDescription = await checkAndAppendBatchNumber(finalDescription);
+        }
       } else {
-        // If the user has modified the description, preserve any existing batch number
-        // Only remove batch number if it was automatically added and user wants to remove it
-        // But if the user has edited the description and kept the batch number, preserve it
-        finalDescription = formData.description;
+        finalDescription = stripBatchNumber(finalDescription);
       }
 
       // Transform form data to match backend expectations
@@ -705,6 +703,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
       });
       setAttachments([]);
       setHasUserModifiedTitle(false); // Reset the flag for new task
+      setIncludeBatch(false); // Reset the Batch checkbox after submission
       setUserChangedTaskDate(false); // Reset date change tracking after submission
       setUserChangedDueDate(false); // Reset date change tracking after submission
       setFilteredTypes(allTypes); // Reset filtered types
@@ -1268,27 +1267,44 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
         </div>
         
         <div>
-          <div className="flex justify-between items-center mb-1">
+          <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={handleSaveDescription}
-                disabled={savingDescription || !formData.subType}
-                className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-800'} ${savingDescription ? 'opacity-50' : ''}`}
-                title="Save description for this sub type"
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor="include-batch"
+                className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+                title="Include Batch 1, Batch 2, and so on in the description"
               >
-                <Icon name="check" className="" />
-              </button>
-              <button
-                type="button"
-                onClick={handleClearDescription}
-                disabled={!formData.subType}
-                className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
-                title="Clear description"
-              >
-                <Icon name="delete" className="" />
-              </button>
+                <input
+                  id="include-batch"
+                  name="includeBatch"
+                  type="checkbox"
+                  checked={includeBatch}
+                  onChange={handleBatchChange}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:bg-gray-700 dark:border-gray-600"
+                />
+                Batch
+              </label>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={handleSaveDescription}
+                  disabled={savingDescription || !formData.subType}
+                  className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-800'} ${savingDescription ? 'opacity-50' : ''}`}
+                  title="Save description for this sub type"
+                >
+                  <Icon name="check" className="" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearDescription}
+                  disabled={!formData.subType}
+                  className={`${!formData.subType ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
+                  title="Clear description"
+                >
+                  <Icon name="delete" className="" />
+                </button>
+              </div>
             </div>
           </div>
           <textarea
