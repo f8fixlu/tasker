@@ -14,14 +14,12 @@ import { attachmentService } from '../../services/attachmentService';
 import { taskService } from '../../services/taskService';
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
 import { Icon } from '../common/Icon';
-
-const BATCH_SUFFIX_PATTERN = / - Batch \d+$/;
-
-const stripBatchNumber = (description = '') =>
-  description.replace(BATCH_SUFFIX_PATTERN, '').trim();
-
-const hasBatchNumber = (description = '') =>
-  BATCH_SUFFIX_PATTERN.test(description.trim());
+import {
+  applyQuantityToDescription,
+  hasBatchSuffix,
+  stripBatchSuffix,
+  toQuantityTemplate
+} from '../../utils/description';
 
 const NewTaskModal = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -172,20 +170,25 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
         try {
           const subTypeData = allSubTypes.find(subType => subType.id.toString() === formData.subType);
           const rawDescription = subTypeData?.description || '';
-          const baseDescription = stripBatchNumber(rawDescription);
+          const baseDescription = stripBatchSuffix(rawDescription);
+          const quantityDescription = applyQuantityToDescription(
+            baseDescription,
+            formData.quantity
+          );
 
           // Update the description only when it still matches the sub type template
           // or the user hasn't edited it, so manual edits are preserved.
           const currentDescriptionMatchesSubType =
             formData.description === rawDescription ||
             formData.description === baseDescription ||
+            formData.description === quantityDescription ||
             formData.description === originalDescription;
 
           if (currentDescriptionMatchesSubType || !hasUserModifiedDescription) {
-            let updatedDescription = baseDescription;
+            let updatedDescription = quantityDescription;
 
             if (includeBatch) {
-              updatedDescription = await checkAndAppendBatchNumber(baseDescription);
+              updatedDescription = await checkAndAppendBatchNumber(quantityDescription);
             }
 
             setFormData(prev => ({
@@ -217,7 +220,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
         descriptionModifiedRef.current = false;
       }
     }
-  }, [formData.subType, isOpen, allSubTypes, hasUserModifiedDescription, formData.description, originalDescription, includeBatch]);
+  }, [formData.subType, formData.quantity, isOpen, allSubTypes, hasUserModifiedDescription, formData.description, originalDescription, includeBatch]);
 
   // Effect to automatically format the task title when type, subType, or quantity changes
   useEffect(() => {
@@ -398,7 +401,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
 
   // Function to check the next batch number for this type, sub type, and date
   const checkAndAppendBatchNumber = async (description) => {
-    const baseDescription = stripBatchNumber(description);
+    const baseDescription = stripBatchSuffix(description);
 
     try {
       // Get all tasks to check for duplicate sub types based on task type and date
@@ -445,7 +448,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
 
     if (checked) {
       const updatedDescription = await checkAndAppendBatchNumber(
-        stripBatchNumber(formData.description)
+        stripBatchSuffix(formData.description)
       );
       setFormData(prev => ({
         ...prev,
@@ -454,7 +457,7 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
     } else {
       setFormData(prev => ({
         ...prev,
-        description: stripBatchNumber(prev.description)
+        description: stripBatchSuffix(prev.description)
       }));
     }
   };
@@ -622,16 +625,24 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
     }
 
     try {
-      // Apply or remove the batch suffix based on the Batch checkbox
+      // Apply the quantity to automatically generated descriptions, then
+      // apply or remove the batch suffix based on the Batch checkbox.
       let finalDescription = formData.description;
+      if (!hasUserModifiedDescription) {
+        finalDescription = applyQuantityToDescription(
+          finalDescription,
+          formData.quantity
+        );
+      }
+
       if (includeBatch) {
         // Keep a batch number the user entered manually; otherwise use the next
         // batch number for this type, sub type, and task date.
-        if (!hasUserModifiedDescription || !hasBatchNumber(finalDescription)) {
+        if (!hasUserModifiedDescription || !hasBatchSuffix(finalDescription)) {
           finalDescription = await checkAndAppendBatchNumber(finalDescription);
         }
       } else {
-        finalDescription = stripBatchNumber(finalDescription);
+        finalDescription = stripBatchSuffix(finalDescription);
       }
 
       // Transform form data to match backend expectations
@@ -1028,23 +1039,30 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
 
     try {
       setSavingDescription(true);
-      await subTypeService.updateSubTypeDescription(formData.subType, formData.description);
+      const descriptionTemplate = toQuantityTemplate(
+        formData.description,
+        formData.quantity
+      );
+      await subTypeService.updateSubTypeDescription(
+        formData.subType,
+        descriptionTemplate
+      );
 
-      // Update the allSubTypes array with the new description
+      // Update the allSubTypes array with the new description template
       setAllSubTypes(prev => prev.map(subType =>
         subType.id.toString() === formData.subType
-          ? { ...subType, description: formData.description }
+          ? { ...subType, description: descriptionTemplate }
           : subType
       ));
 
-      // Update the filteredSubTypes array with the new description
+      // Update the filteredSubTypes array with the new description template
       setFilteredSubTypes(prev => prev.map(subType =>
         subType.id.toString() === formData.subType
-          ? { ...subType, description: formData.description }
+          ? { ...subType, description: descriptionTemplate }
           : subType
       ));
 
-      setOriginalDescription(formData.description);
+      setOriginalDescription(descriptionTemplate);
       setWarningMessage('Description saved successfully');
       setShowWarningModal(true);
     } catch (error) {
@@ -1062,6 +1080,9 @@ const NewTaskModal = ({ isOpen, onClose, onSave }) => {
       ...prev,
       description: ''
     }));
+    // Keep the cleared description instead of re-populating it from the sub type
+    setHasUserModifiedDescription(true);
+    descriptionModifiedRef.current = true;
   };
 
   if (loading && isOpen) {

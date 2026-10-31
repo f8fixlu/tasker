@@ -14,6 +14,12 @@ import { attachmentService } from '../../services/attachmentService';
 import { formatToLocalDateTime } from '../../utils/date';
 import { useTaskUpdate } from '../../context/TaskUpdateContext';
 import { Icon } from '../common/Icon';
+import {
+  applyQuantityToDescription,
+  descriptionMatchesQuantityTemplate,
+  getBatchSuffix,
+  stripBatchSuffix
+} from '../../utils/description';
 
 const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
   const { triggerTaskUpdate, triggerDropdownUpdate } = useTaskUpdate(); // Get task update trigger from new system
@@ -686,6 +692,19 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
       return;
     }
 
+    // Keep the quantity inside the description in sync with the Quantity field
+    if (name === 'quantity') {
+      setFormData(prev => ({
+        ...prev,
+        quantity: processedValue,
+        description: applyQuantityToDescription(
+          prev.description,
+          processedValue
+        )
+      }));
+      return;
+    }
+
     // Handle cascading dropdowns before updating form data
     if (name === 'category') {
       // When category changes, reset type and subType selections
@@ -828,13 +847,32 @@ const EditTaskModal = ({ isOpen, onClose, task, onSave }) => {
     }
 
     try {
+      // If the description came from the selected sub type, render it with the
+      // current quantity while keeping any batch suffix.
+      const selectedSubType = allSubTypes.find(
+        subType => subType.id?.toString() === formData.subType
+      );
+      const descriptionTemplate = selectedSubType?.description;
+      let finalDescription = formData.description;
+
+      if (
+        descriptionTemplate &&
+        descriptionMatchesQuantityTemplate(finalDescription, descriptionTemplate)
+      ) {
+        const batchSuffix = getBatchSuffix(finalDescription);
+        finalDescription = `${applyQuantityToDescription(
+          stripBatchSuffix(descriptionTemplate),
+          formData.quantity
+        )}${batchSuffix}`;
+      }
+
       // Transform form data to match backend expectations
       // Map frontend field names to backend field names
       const now = new Date();
       const taskData = {
         id: formData.id,
         title: formData.title,
-        description: formData.description,
+        description: finalDescription,
         category_id: formData.category ? parseInt(formData.category) : null,  // Use actual category ID from database
         type_id: formData.type ? parseInt(formData.type) : null,              // Use actual type ID from database
         sub_type_id: formData.subType ? parseInt(formData.subType) : null,    // Use actual sub type ID from database
