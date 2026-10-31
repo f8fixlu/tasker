@@ -237,16 +237,12 @@ async function handleGetTaskCompletionTrend(req, res, userId, query) {
 async function handleGetTasksForReport(req, res, userId, query) {
   try {
     // Parse query parameters for filtering
-    let startDate = query.start_date || null;
-    let endDate = query.end_date || null;
-
-    // Extend end date to include the full day to ensure tasks on that date are included
-    if (endDate) {
-      // Create a new date object for the end date and set it to the end of the day
-      const endDateObj = new Date(endDate);
-      endDateObj.setHours(23, 59, 59, 999); // Set to end of the day
-      endDate = endDateObj.toISOString();
-    }
+    // Pass the date strings (YYYY-MM-DD) as-is. The model compares the DATE
+    // part of task_date in the app's display timezone (Asia/Manila, UTC+8), so
+    // no time-of-day or timezone conversion is needed here (the previous ISO
+    // conversion depended on the server timezone and could leak the next day).
+    const startDate = query.start_date || null;
+    const endDate = query.end_date || null;
 
     const options = {
       start_date: query.start_date || null,
@@ -301,23 +297,13 @@ async function handleGetTasksForReport(req, res, userId, query) {
 async function handleGetEventsForReport(req, res, userId, query) {
   try {
     // Parse query parameters for filtering
-    let startDate = query.start_date || null;
-    let endDate = query.end_date || null;
-
-    // Extend dates to include the full day to ensure events on those dates are included
-    // For start date: set to beginning of the day
-    if (startDate) {
-      const startDateObj = new Date(startDate);
-      startDateObj.setHours(0, 0, 0, 0); // Set to beginning of the day
-      startDate = startDateObj.toISOString();
-    }
-
-    // For end date: set to end of the day
-    if (endDate) {
-      const endDateObj = new Date(endDate);
-      endDateObj.setHours(23, 59, 59, 999); // Set to end of the day
-      endDate = endDateObj.toISOString();
-    }
+    // Pass the date strings (YYYY-MM-DD) as-is. The model compares the DATE
+    // part of each event's start_date in the app's display timezone (Asia/Manila,
+    // UTC+8), so no time-of-day or timezone conversion is needed here. The
+    // previous ISO conversion combined with the model's '+1 day' offset made the
+    // range spill into the next day (Oct 31 also showing Nov 1-2 events).
+    const startDate = query.start_date || null;
+    const endDate = query.end_date || null;
 
     const options = {
       start_date: startDate || null,

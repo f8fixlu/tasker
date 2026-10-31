@@ -214,9 +214,14 @@ const Reports = () => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    // Format using local date parts. toISOString() converts to UTC and shifts
+    // the date back a day for users ahead of UTC (e.g. Asia/Manila, UTC+8).
+    const toInputDate = (date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
     return {
-      startDate: startOfMonth.toISOString().split('T')[0], // Start of current month
-      endDate: today.toISOString().split('T')[0]          // Current day
+      startDate: toInputDate(startOfMonth), // Start of current month
+      endDate: toInputDate(today)          // Current day
     };
   });
 

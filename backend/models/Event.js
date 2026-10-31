@@ -246,11 +246,14 @@ async function getEventsByUserId(user_id, options = {}) {
 
   // Add date range filter if provided
   if (options.start_date && options.end_date) {
-    // Convert the start and end dates to ensure proper comparison
-    // The dates are stored in the database in 'YYYY-MM-DD HH:MM:SS' format
-    // Using SQLite datetime functions to handle timezone conversion consistently
-    // Compare based on the date part after timezone conversion (as it appears to the user)
-    sql += ` AND (e.start_date >= datetime(?, 'localtime') AND e.start_date <= datetime(?, 'localtime', '+1 day'))`;
+    // Compare the DATE part of start_date shifted to the app's display timezone
+    // (Asia/Manila, UTC+8 - matches convertUTCToLocal) against the raw date
+    // strings. Using '+8 hours' (instead of 'localtime') keeps this consistent
+    // regardless of the server timezone. The range is inclusive on both ends and
+    // never spills into the next day (the previous '+1 day' offset made the range
+    // leak into the day after the requested end date, e.g. Oct 31 range also
+    // showing Nov 1-2 events).
+    sql += ` AND (DATE(e.start_date, '+8 hours') >= DATE(?) AND DATE(e.start_date, '+8 hours') <= DATE(?))`;
     params.push(options.start_date, options.end_date);
   }
 

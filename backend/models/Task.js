@@ -254,15 +254,20 @@ async function getTasksCountByUserId(user_id, options = {}) {
     let dateConditions = [];
 
     if (options.task_date_from && options.task_date_to) {
-      // Compare the datetime ranges directly since they are now in proper UTC format
-      // The boundaries are created in routes.js to cover the full UTC range for each local date
-      dateConditions.push(`(t.task_date >= ? AND t.task_date <= ?)`);
+      // Compare the DATE part of task_date in the app's display timezone
+      // (Asia/Manila, UTC+8 - matches convertUTCToLocal) against the date
+      // strings, so the range is inclusive on both ends and never spills into
+      // the next day regardless of the server timezone. DATE() truncates ISO
+      // timestamps, so callers may pass either YYYY-MM-DD or full ISO strings.
+      dateConditions.push(
+        `(DATE(t.task_date, '+8 hours') >= DATE(?) AND DATE(t.task_date, '+8 hours') <= DATE(?))`
+      );
       params.push(options.task_date_from, options.task_date_to);
     } else if (options.task_date_from) {
-      dateConditions.push(`(t.task_date >= ?)`);
+      dateConditions.push(`DATE(t.task_date, '+8 hours') >= DATE(?)`);
       params.push(options.task_date_from);
     } else if (options.task_date_to) {
-      dateConditions.push(`(t.task_date <= ?)`);
+      dateConditions.push(`DATE(t.task_date, '+8 hours') <= DATE(?)`);
       params.push(options.task_date_to);
     }
 
@@ -450,15 +455,20 @@ async function getTasksByUserId(user_id, options = {}) {
     let dateConditions = [];
 
     if (options.task_date_from && options.task_date_to) {
-      // Compare the datetime ranges directly since they are now in proper UTC format
-      // The boundaries are created in routes.js to cover the full UTC range for each local date
-      dateConditions.push(`(t.task_date >= ? AND t.task_date <= ?)`);
+      // Compare the DATE part of task_date in the app's display timezone
+      // (Asia/Manila, UTC+8 - matches convertUTCToLocal) against the date
+      // strings, so the range is inclusive on both ends and never spills into
+      // the next day regardless of the server timezone. DATE() truncates ISO
+      // timestamps, so callers may pass either YYYY-MM-DD or full ISO strings.
+      dateConditions.push(
+        `(DATE(t.task_date, '+8 hours') >= DATE(?) AND DATE(t.task_date, '+8 hours') <= DATE(?))`
+      );
       params.push(options.task_date_from, options.task_date_to);
     } else if (options.task_date_from) {
-      dateConditions.push(`(t.task_date >= ?)`);
+      dateConditions.push(`DATE(t.task_date, '+8 hours') >= DATE(?)`);
       params.push(options.task_date_from);
     } else if (options.task_date_to) {
-      dateConditions.push(`(t.task_date <= ?)`);
+      dateConditions.push(`DATE(t.task_date, '+8 hours') <= DATE(?)`);
       params.push(options.task_date_to);
     }
 
