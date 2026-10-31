@@ -1,7 +1,17 @@
 const path = require('path');
+const webpack = require('webpack');
+const pkg = require('./package.json');
 
 module.exports = {
   webpack: function(config, env) {
+    // Expose the app version from package.json so the UI always matches the
+    // released version without needing a manual edit on every bump.
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        __APP_VERSION__: JSON.stringify(pkg.version),
+      })
+    );
+
     // Disable eslint during production builds
     if (env === 'production') {
       config.plugins = config.plugins.filter(

@@ -1,6 +1,11 @@
 import React from 'react';
 import Modal from '../common/Modal';
 
+/* global __APP_VERSION__ */
+// Injected at build time from frontend/package.json via config-overrides.js
+const APP_VERSION =
+  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.1';
+
 const AboutModal = ({ isOpen, onClose }) => {
   return (
     <Modal
@@ -20,7 +25,7 @@ const AboutModal = ({ isOpen, onClose }) => {
             />
             <div>
               <p><span className="font-medium">Application:</span> Tasker</p>
-              <p><span className="font-medium">Version:</span> 2.0.0</p>
+              <p><span className="font-medium">Version:</span> {APP_VERSION}</p>
               <p><span className="font-medium">Description:</span> A comprehensive task management application</p>
             </div>
           </div>
